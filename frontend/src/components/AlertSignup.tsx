@@ -8,7 +8,7 @@ export default function AlertSignup() {
   const [keyword, setKeyword] = useState("");
 
   return (
-    <div className="card p-6 sm:p-10 bg-[var(--color-blush)] border-none">
+    <div className="card p-6 sm:p-10 bg-[linear-gradient(135deg,_var(--color-blush-deep)_0%,_var(--color-blush)_55%,_var(--color-blush-soft)_100%)] border-none">
       <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-10">
         <div className="flex items-start gap-4 md:flex-1">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[var(--color-rose-dark)]">
