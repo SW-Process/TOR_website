@@ -1,0 +1,87 @@
+import Link from "next/link";
+import { ArrowUpRight, Building2, Eye } from "lucide-react";
+import { Category, TOR, daysUntil, formatBudget, formatThaiDate } from "@/lib/mockData";
+import StatusBadge from "./StatusBadge";
+import BookmarkButton from "./BookmarkButton";
+
+const categoryIcon: Record<Category, string> = {
+  งานก่อสร้าง: "🏗️",
+  เทคโนโลยีสารสนเทศ: "💻",
+  งานที่ปรึกษา: "📋",
+  จัดซื้อครุภัณฑ์: "🩺",
+  งานบริการ: "🧹",
+  บำรุงรักษา: "🛠️",
+  สาธารณสุข: "🏥",
+  สิ่งแวดล้อม: "🌳",
+};
+
+export default function TORCard({ tor }: { tor: TOR }) {
+  const remaining = daysUntil(tor.deadline);
+  const deadlineLabel =
+    tor.status === "ปิดรับแล้ว"
+      ? `ปิดรับเมื่อ ${formatThaiDate(tor.deadline)}`
+      : remaining <= 0
+      ? "ปิดรับวันนี้"
+      : `เหลือ ${remaining} วัน`;
+
+  return (
+    <div className="card overflow-hidden flex flex-col hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all">
+      <Link href={`/tor/${tor.id}`} className="relative block h-32 shrink-0 bg-gradient-to-br from-[var(--color-blush)] to-[var(--color-blush-deep)]">
+        <span className="absolute inset-0 flex items-center justify-center text-4xl">
+          {categoryIcon[tor.category]}
+        </span>
+        <span className="absolute top-3 left-3">
+          <StatusBadge status={tor.status} />
+        </span>
+        <span className="absolute top-3 right-3">
+          <BookmarkButton id={tor.id} />
+        </span>
+      </Link>
+
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-rose-dark)]">
+          {tor.category}
+        </span>
+
+        <Link href={`/tor/${tor.id}`}>
+          <h3 className="font-[family-name:var(--font-heading)] text-[15px] font-bold leading-snug text-[var(--color-text)] line-clamp-2 hover:text-[var(--color-rose-dark)] transition-colors">
+            {tor.title}
+          </h3>
+        </Link>
+
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-text-muted)]">
+          <span className="flex items-center gap-1.5">
+            <Building2 size={12} />
+            {tor.agency}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Eye size={12} />
+            {tor.views.toLocaleString("th-TH")}
+          </span>
+        </div>
+
+        <div className="mt-auto flex items-end justify-between gap-3 pt-3 border-t border-[var(--color-border)]">
+          <div>
+            <p className="font-[family-name:var(--font-heading)] text-lg font-extrabold text-[var(--color-rose-dark)]">
+              {formatBudget(tor.budget)}
+            </p>
+            <p
+              className={`text-xs font-medium ${
+                tor.status === "ใกล้ปิดรับ" ? "text-[var(--color-warning)]" : "text-[var(--color-text-faint)]"
+              }`}
+            >
+              {deadlineLabel}
+            </p>
+          </div>
+          <Link
+            href={`/tor/${tor.id}`}
+            aria-label="ดูรายละเอียด"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-ink)] text-white hover:bg-black transition-colors"
+          >
+            <ArrowUpRight size={17} />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,26 +1,136 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-alt: #fdf6f5;
+  --color-border: #f0e2e0;
+  --color-border-strong: #e6cfcc;
+
+  --color-text: #241d1b;
+  --color-text-muted: #8b7d79;
+  --color-text-faint: #b3a7a3;
+
+  /* ink = primary action color (buttons, logo, headings) */
+  --color-ink: #221a18;
+  --color-ink-soft: #4a3d3a;
+
+  /* rose = accent color (headline highlight, prices, stats, links) */
+  --color-rose: #e05777;
+  --color-rose-dark: #c23e60;
+  --color-rose-light: #fbe7ec;
+
+  /* blush = brand background wash */
+  --color-blush: #fbe2df;
+  --color-blush-deep: #f6cfcb;
+  --color-blush-soft: #fdf0ee;
+
+  --color-primary: var(--color-ink);
+  --color-primary-dark: #000000;
+  --color-primary-light: var(--color-rose-light);
+
+  --color-success: #2f7a5c;
+  --color-success-bg: #e7f5ee;
+  --color-warning: #b06a1a;
+  --color-warning-bg: #fbeedb;
+  --color-danger: #b3540a;
+  --color-danger-bg: #fdf1e7;
+
+  --shadow-glow: 0 14px 28px -10px rgba(224, 87, 119, 0.4);
+
+  --font-heading: var(--font-body);
+
+  --shadow-sm: 0 1px 3px rgba(90, 42, 42, 0.06);
+  --shadow-md: 0 8px 24px rgba(90, 42, 42, 0.09);
+  --shadow-lg: 0 20px 44px rgba(90, 42, 42, 0.14);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text);
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-heading);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), "Noto Sans Thai", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading), var(--font-body), sans-serif;
+  letter-spacing: -0.015em;
+}
+
+.container-page {
+  max-width: 1180px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.65rem;
+  line-height: 1.5rem;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-rose-dark);
+}
+
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-pill-primary {
+  background: var(--color-ink);
+  color: #fff;
+}
+
+.btn-pill-primary:hover {
+  background: #000;
+}
+
+.btn-icon-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem;
+  width: 1.75rem;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--color-ink);
+  flex-shrink: 0;
 }
