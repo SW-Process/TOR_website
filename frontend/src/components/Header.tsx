@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X, Search, Bookmark, Bell, FileSearch } from "lucide-react";
+import { Menu, X, Search, Bookmark, LogIn, FileSearch } from "lucide-react";
 
 const navLinks = [
   { href: "/", label: "หน้าแรก" },
@@ -53,10 +53,10 @@ export default function Header() {
           >
             <Bookmark size={16} />
           </Link>
-          <button className="btn-pill btn-pill-primary ml-1 px-4 py-2.5 text-[13px]">
-            <Bell size={14} />
-            ตั้งค่าแจ้งเตือน
-          </button>
+          <Link href="/login" className="btn-pill btn-pill-primary ml-1 px-4 py-2.5 text-[13px]">
+            <LogIn size={14} />
+            เข้าสู่ระบบ
+          </Link>
         </div>
 
         <button
@@ -80,10 +80,14 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
-          <button className="btn-pill btn-pill-primary mt-1 py-2.5 text-sm">
-            <Bell size={15} />
-            ตั้งค่าแจ้งเตือน
-          </button>
+          <Link
+            href="/login"
+            onClick={() => setOpen(false)}
+            className="btn-pill btn-pill-primary mt-1 py-2.5 text-sm"
+          >
+            <LogIn size={15} />
+            เข้าสู่ระบบ
+          </Link>
         </nav>
       )}
     </header>

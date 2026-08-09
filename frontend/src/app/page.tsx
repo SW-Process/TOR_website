@@ -78,7 +78,7 @@ export default function Home() {
               </Link>
               <Link
                 href="/tor?sort=deadline"
-                className="btn-pill border border-[var(--color-ink)]/15 bg-white/60 px-5 py-3 text-sm text-[var(--color-text)] hover:bg-white transition-colors"
+                className="btn-pill border border-[var(--color-border-strong)] bg-white px-5 py-3 text-sm text-[var(--color-text)] shadow-[var(--shadow-sm)] hover:border-[var(--color-ink)]/30 transition-colors"
               >
                 ดู TOR ใกล้ปิดรับ
               </Link>
@@ -86,8 +86,10 @@ export default function Home() {
 
             <div className="mt-10 grid grid-cols-3 gap-4 max-w-md">
               {trust.map((t) => (
-                <div key={t.title} className="flex flex-col gap-1.5">
-                  <t.icon size={18} className="text-[var(--color-rose-dark)]" />
+                <div key={t.title} className="flex flex-col gap-2">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-[var(--shadow-sm)] text-[var(--color-rose-dark)]">
+                    <t.icon size={16} />
+                  </span>
                   <p className="text-xs font-semibold text-[var(--color-text)] leading-tight">{t.title}</p>
                   <p className="text-[11px] text-[var(--color-text-muted)] leading-tight">{t.sub}</p>
                 </div>
@@ -112,14 +114,11 @@ export default function Home() {
 
             <span className="animate-dot-pulse absolute top-2 right-28 h-2.5 w-2.5 rounded-full bg-[var(--color-rose-dark)]" />
             <span
-              className="animate-dot-pulse absolute bottom-24 left-2 h-3 w-3 rounded-full bg-[var(--color-ink)]/70"
-              style={{ animationDelay: "-1s" }}
-            />
-            <span
               className="animate-dot-pulse absolute top-1/2 left-0 h-2 w-2 rounded-full bg-[var(--color-rose-dark)]/60"
               style={{ animationDelay: "-2s" }}
             />
 
+            <div className="absolute top-[210px] left-16 h-8 w-[240px] rotate-[-4deg] rounded-full bg-black/15 blur-xl" />
             <div className="animate-card-bob absolute top-10 left-6 w-[300px]">
               <div
                 className="rotate-[-4deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
@@ -141,6 +140,7 @@ export default function Home() {
               </div>
             </div>
 
+            <div className="absolute bottom-2 right-8 h-7 w-44 rotate-[3deg] rounded-full bg-black/15 blur-xl" />
             <div className="animate-card-bob absolute bottom-10 right-4 w-56" style={{ animationDelay: "-2.5s" }}>
               <div
                 className="rotate-[3deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
@@ -154,6 +154,7 @@ export default function Home() {
               </div>
             </div>
 
+            <div className="absolute top-[calc(50%+58px)] right-14 h-6 w-20 -translate-x-1/2 rounded-full bg-black/20 blur-lg" />
             <div
               className="animate-card-bob absolute top-1/2 right-16 -translate-y-1/2"
               style={{ animationDelay: "-4s" }}
@@ -169,6 +170,17 @@ export default function Home() {
               </div>
             </div>
 
+            <div className="animate-card-bob absolute bottom-16 left-0" style={{ animationDelay: "-3.5s" }}>
+              <div
+                className="flex items-center gap-2 rounded-full bg-white pl-1.5 pr-4 py-1.5 ring-1 ring-black/[0.03]"
+                style={{ boxShadow: "0 16px 32px -14px rgba(224,87,119,0.3), 0 6px 16px rgba(34,26,24,0.06)" }}
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-success-bg)] text-[var(--color-success)]">
+                  <ShieldCheck size={14} />
+                </span>
+                <span className="text-xs font-semibold text-[var(--color-text)]">ข้อมูลยืนยันจาก e-GP</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
