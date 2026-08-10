@@ -40,7 +40,7 @@ export default function AlertSignup() {
             <input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="เช่น งานก่อสร้างถนน, ระบบ IT"
+              placeholder="เช่น พัฒนาเว็บแอป, ระบบคลาวด์"
               className="flex-1 rounded-full border border-transparent bg-white px-4 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] focus:outline-none focus:border-[var(--color-ink)]"
             />
             <button type="submit" className="btn-pill btn-pill-primary px-4 py-2.5 text-sm whitespace-nowrap">
