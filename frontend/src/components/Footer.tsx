@@ -3,7 +3,7 @@ import { FileSearch, Mail, ShieldCheck } from "lucide-react";
 
 export default function Footer() {
   return (
-    <footer className="mt-16 rounded-t-[2rem] bg-[var(--color-ink)] text-white">
+    <footer className="rounded-t-[2rem] bg-[var(--color-ink)] text-white">
       <div className="container-page py-14 grid gap-10 md:grid-cols-4">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2.5">
@@ -11,7 +11,7 @@ export default function Footer() {
               <FileSearch size={16} />
             </span>
             <span className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight">
-              TOR Insight
+              TOR Checker
             </span>
           </div>
           <p className="mt-4 text-sm leading-relaxed text-white/60 max-w-md">
@@ -51,7 +51,7 @@ export default function Footer() {
 
       <div className="border-t border-white/10">
         <div className="container-page py-4 text-xs text-white/40 flex flex-col sm:flex-row gap-2 sm:justify-between">
-          <span>© 2569 TOR Insight — โครงการต้นแบบ (Mock Frontend) ไม่ใช่บริการทางราชการอย่างเป็นทางการ</span>
+          <span>© 2569 TOR Checker — โครงการต้นแบบ (Mock Frontend) ไม่ใช่บริการทางราชการอย่างเป็นทางการ</span>
           <span>ข้อมูลทั้งหมดในหน้านี้เป็นข้อมูลจำลองเพื่อการนำเสนอต้นแบบ</span>
         </div>
       </div>

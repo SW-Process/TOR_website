@@ -11,7 +11,7 @@ const plexSansThai = IBM_Plex_Sans_Thai({
 });
 
 export const metadata: Metadata = {
-  title: "TOR Insight | ค้นหาและวิเคราะห์ประกาศจัดซื้อจัดจ้าง กทม.",
+  title: "TOR Checker | ค้นหาและวิเคราะห์ประกาศจัดซื้อจัดจ้าง กทม.",
   description:
     "แพลตฟอร์มค้นหา TOR และประกาศจัดซื้อจัดจ้างของกรุงเทพมหานคร พร้อมสรุปสาระสำคัญด้วย AI ค้นหา กรอง บันทึก และรับการแจ้งเตือน TOR ที่ตรงกับคุณ",
 };

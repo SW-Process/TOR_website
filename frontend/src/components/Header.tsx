@@ -22,7 +22,7 @@ export default function Header() {
             <FileSearch size={16} />
           </span>
           <span className="font-[family-name:var(--font-heading)] text-[17px] font-bold tracking-tight text-[var(--color-ink)]">
-            TOR Insight
+            TOR Checker
           </span>
         </Link>
 
