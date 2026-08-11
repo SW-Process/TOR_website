@@ -43,7 +43,7 @@ export default function Footer() {
               <Mail size={13} />
               <span>support@tor-insight.go.th (ตัวอย่าง)</span>
             </li>
-            <li><Link href="#" className="hover:text-white transition-colors">นโยบายความเป็นส่วนตัว (PDPA)</Link></li>
+            <li><Link href="/privacy-policy" className="hover:text-white transition-colors">นโยบายความเป็นส่วนตัว (PDPA)</Link></li>
             <li><Link href="#" className="hover:text-white transition-colors">ข้อกำหนดการใช้งาน</Link></li>
           </ul>
         </div>
