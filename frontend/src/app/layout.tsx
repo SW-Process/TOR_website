@@ -11,7 +11,7 @@ const plexSansThai = IBM_Plex_Sans_Thai({
 });
 
 export const metadata: Metadata = {
-  title: "TOR Insight | ค้นหาและวิเคราะห์ประกาศจัดซื้อจัดจ้าง กทม.",
+  title: "TOR Checker | ค้นหาและวิเคราะห์ประกาศจัดซื้อจัดจ้าง กทม.",
   description:
     "แพลตฟอร์มค้นหา TOR และประกาศจัดซื้อจัดจ้างของกรุงเทพมหานคร พร้อมสรุปสาระสำคัญด้วย AI ค้นหา กรอง บันทึก และรับการแจ้งเตือน TOR ที่ตรงกับคุณ",
 };
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col bg-[var(--color-bg)] text-[var(--color-text)]">
         <Header />
-        <main className="flex-1">{children}</main>
+        <main className="flex flex-1 flex-col">{children}</main>
         <Footer />
       </body>
     </html>

@@ -6,24 +6,24 @@ import Link from "next/link";
 import { ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { Category, categories, torList } from "@/lib/mockData";
 
-import imgConstruction from "./picture/งานก่อสร้าง.jpg";
-import imgIT from "./picture/เทคโนโลยีสารสนเทศ.jpg";
-import imgConsulting from "./picture/งานที่ปรึกษา.jpg";
-import imgProcurement from "./picture/จัดซื้อครุภัณฑ์.jpg";
-import imgService from "./picture/งานบริการ.jpg";
-import imgMaintenance from "./picture/บำรุงรักษา.jpg";
-import imgHealth from "./picture/สาธารณสุข.jpg";
-import imgEnvironment from "./picture/สิ่งแวดล้อม.jpg";
+import imgSoftwareDev from "./picture/พัฒนาระบบซอฟต์แวร์.jpg";
+import imgWebApp from "./picture/พัฒนาเว็บไซต์และแอปพลิเคชัน.jpg";
+import imgCloud from "./picture/โครงสร้างพื้นฐานและคลาวด์.jpg";
+import imgCyberSecurity from "./picture/ความมั่นคงปลอดภัยไซเบอร์.jpg";
+import imgDataAnalytics from "./picture/ข้อมูลและระบบวิเคราะห์.jpg";
+import imgMaintenance from "./picture/บำรุงรักษาระบบ.jpg";
+import imgITHardware from "./picture/จัดซื้อครุภัณฑ์ไอที.jpg";
+import imgDigitalConsulting from "./picture/ที่ปรึกษาด้านดิจิทัล.jpg";
 
-const categoryImage: Record<Category, typeof imgConstruction> = {
-  งานก่อสร้าง: imgConstruction,
-  เทคโนโลยีสารสนเทศ: imgIT,
-  งานที่ปรึกษา: imgConsulting,
-  จัดซื้อครุภัณฑ์: imgProcurement,
-  งานบริการ: imgService,
-  บำรุงรักษา: imgMaintenance,
-  สาธารณสุข: imgHealth,
-  สิ่งแวดล้อม: imgEnvironment,
+const categoryImage: Record<Category, typeof imgSoftwareDev> = {
+  พัฒนาระบบซอฟต์แวร์: imgSoftwareDev,
+  พัฒนาเว็บไซต์และแอปพลิเคชัน: imgWebApp,
+  โครงสร้างพื้นฐานและคลาวด์: imgCloud,
+  ความมั่นคงปลอดภัยไซเบอร์: imgCyberSecurity,
+  ข้อมูลและระบบวิเคราะห์: imgDataAnalytics,
+  บำรุงรักษาระบบ: imgMaintenance,
+  จัดซื้อครุภัณฑ์ไอที: imgITHardware,
+  ที่ปรึกษาด้านดิจิทัล: imgDigitalConsulting,
 };
 
 // Instead of "cloning" just the two edge cards and silently snapping the

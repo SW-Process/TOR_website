@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowUpRight, Lock, Mail } from "lucide-react";
+import GoogleIcon from "@/components/GoogleIcon";
 
 export default function LoginPage() {
   const router = useRouter();
   const [signingIn, setSigningIn] = useState(false);
 
   return (
-    <div className="relative flex min-h-[calc(100svh-73px)] items-center overflow-hidden bg-[linear-gradient(135deg,_var(--color-blush-deep)_0%,_var(--color-blush)_40%,_var(--color-blush-soft)_75%,_#ffffff_100%)]">
+    <div className="relative flex min-h-screen flex-1 items-center overflow-hidden bg-[linear-gradient(135deg,_var(--color-blush-deep)_0%,_var(--color-blush)_45%,_var(--color-blush-soft)_100%)]">
       <div
         className="absolute inset-0 opacity-[0.35] [background-image:radial-gradient(rgba(34,26,24,0.18)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_80%_60%_at_70%_30%,black_10%,transparent_75%)]"
         aria-hidden
@@ -30,15 +31,15 @@ export default function LoginPage() {
       <div className="container-page relative py-14 sm:py-20">
         <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center">
           <div className="hidden lg:block">
-            <span className="eyebrow">สำหรับหน่วยงานภาครัฐ</span>
+            <span className="eyebrow">สำหรับผู้ใช้ทั่วไป</span>
             <h1 className="mt-4 font-[family-name:var(--font-heading)] text-6xl font-extrabold leading-[1.05] tracking-tight text-[var(--color-text)]">
-              เข้าสู่ระบบสำหรับ
+              เข้าสู่ระบบเพื่อ
               <br />
-              <span className="text-[var(--color-rose-dark)]">หน่วยงานผู้ประกาศ TOR</span>
+              <span className="text-[var(--color-rose-dark)]">ไม่พลาดทุก TOR ที่ใช่</span>
             </h1>
             <p className="mt-6 max-w-md text-base text-[var(--color-ink-soft)] leading-relaxed">
-              สำหรับเจ้าหน้าที่หน่วยงานในสังกัดกรุงเทพมหานครที่ต้องการเผยแพร่ แก้ไข
-              หรือติดตามสถานะประกาศจัดซื้อจัดจ้างของหน่วยงาน
+              เข้าสู่ระบบเพื่อดู TOR ที่คุณบันทึกไว้
+              และรับการแจ้งเตือนทางอีเมลเมื่อมีประกาศใหม่ที่ตรงกับความสนใจ
             </p>
           </div>
 
@@ -48,34 +49,34 @@ export default function LoginPage() {
               style={{ animationDelay: "-2s" }}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" />
-              <span className="text-xs font-semibold text-[var(--color-text)]">8 หน่วยงานใช้งานอยู่</span>
+              <span className="text-xs font-semibold text-[var(--color-text)]">สมาชิกใช้งานอยู่กว่า 1,200 คน</span>
             </div>
 
             <div className="rounded-[2rem] border border-white/60 bg-white/70 p-7 shadow-[var(--shadow-lg)] backdrop-blur-2xl sm:p-9">
-              <span className="eyebrow lg:hidden">สำหรับหน่วยงานภาครัฐ</span>
+              <span className="eyebrow lg:hidden">สำหรับผู้ใช้ทั่วไป</span>
               <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-extrabold text-[var(--color-text)] lg:mt-0">
-                เข้าสู่ระบบหน่วยงาน
+                เข้าสู่ระบบสมาชิก
               </h2>
               <p className="mt-1.5 text-sm text-[var(--color-text-muted)]">
-                สำหรับบัญชีที่ใช้ประกาศและจัดการ TOR
+                สำหรับสมาชิกที่ต้องการบันทึกและรับการแจ้งเตือน TOR
               </p>
 
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   setSigningIn(true);
-                  setTimeout(() => router.push("/post-tor"), 700);
+                  setTimeout(() => router.push("/"), 700);
                 }}
                 className="mt-7 flex flex-col gap-4"
               >
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold text-[var(--color-text)]">อีเมลหน่วยงาน</span>
+                  <span className="text-xs font-semibold text-[var(--color-text)]">อีเมล</span>
                   <div className="flex items-center gap-2.5 rounded-2xl border border-white bg-white/90 px-3.5 py-2.5 shadow-[var(--shadow-sm)] transition-colors focus-within:border-[var(--color-rose-dark)]">
                     <Mail size={16} className="shrink-0 text-[var(--color-text-faint)]" />
                     <input
                       required
                       type="email"
-                      placeholder="name@bangkok.go.th"
+                      placeholder="you@email.com"
                       className="w-full bg-transparent text-sm focus:outline-none"
                     />
                   </div>
@@ -102,10 +103,24 @@ export default function LoginPage() {
                 </button>
               </form>
 
+              <div className="mt-6 flex items-center gap-3">
+                <span className="h-px flex-1 bg-[var(--color-border)]" />
+                <span className="text-xs text-[var(--color-text-faint)]">หรือ</span>
+                <span className="h-px flex-1 bg-[var(--color-border)]" />
+              </div>
+
+              <button
+                type="button"
+                className="mt-4 flex w-full items-center justify-center gap-2.5 rounded-full border border-[var(--color-border)] bg-white py-3 text-sm font-semibold text-[var(--color-text)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-blush-soft)]/40"
+              >
+                <GoogleIcon size={18} />
+                เข้าสู่ระบบด้วย Google
+              </button>
+
               <p className="mt-6 text-center text-xs leading-relaxed text-[var(--color-text-muted)]">
-                ไม่ใช่เจ้าหน้าที่หน่วยงาน?{" "}
-                <Link href="/tor" className="font-semibold text-[var(--color-rose-dark)] hover:underline">
-                  ค้นหา TOR ต่อได้เลยโดยไม่ต้องเข้าสู่ระบบ
+                ยังไม่มีบัญชี?{" "}
+                <Link href="/signup" className="font-semibold text-[var(--color-rose-dark)] hover:underline">
+                  สมัครสมาชิก
                 </Link>
               </p>
             </div>
