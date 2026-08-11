@@ -14,6 +14,7 @@ import imgDataAnalytics from "./picture/ข้อมูลและระบบ�
 import imgMaintenance from "./picture/บำรุงรักษาระบบ.jpg";
 import imgITHardware from "./picture/จัดซื้อครุภัณฑ์ไอที.jpg";
 import imgDigitalConsulting from "./picture/ที่ปรึกษาด้านดิจิทัล.jpg";
+import imgOther from "./picture/อื่นๆ.jpg";
 
 const categoryImage: Record<Category, typeof imgSoftwareDev> = {
   พัฒนาระบบซอฟต์แวร์: imgSoftwareDev,
@@ -24,6 +25,7 @@ const categoryImage: Record<Category, typeof imgSoftwareDev> = {
   บำรุงรักษาระบบ: imgMaintenance,
   จัดซื้อครุภัณฑ์ไอที: imgITHardware,
   ที่ปรึกษาด้านดิจิทัล: imgDigitalConsulting,
+  อื่นๆ: imgOther,
 };
 
 // Instead of "cloning" just the two edge cards and silently snapping the

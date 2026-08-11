@@ -1,7 +1,15 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { FileSearch, Mail, ShieldCheck } from "lucide-react";
 
+const HIDDEN_ON = ["/login", "/signup"];
+
 export default function Footer() {
+  const pathname = usePathname();
+  if (HIDDEN_ON.includes(pathname)) return null;
+
   return (
     <footer className="rounded-t-[2rem] bg-[var(--color-ink)] text-white">
       <div className="container-page py-14 grid gap-10 md:grid-cols-4">
