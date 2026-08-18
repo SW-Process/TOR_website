@@ -49,25 +49,28 @@ export default function TORStatsChart() {
       </div>
 
       <div className="mt-8 flex flex-1 min-h-0 gap-3">
-        <div className="flex h-full flex-col justify-between text-[10px] text-[var(--color-text-faint)] shrink-0 text-right pb-6">
-          {[...TICKS].reverse().map((t) => (
-            <span key={t}>{t}</span>
-          ))}
-        </div>
-
-        <div className="relative flex-1 min-w-0 pb-6">
-          <div className="absolute inset-0 bottom-6 flex flex-col justify-between" aria-hidden>
+        <div className="flex flex-col shrink-0 text-right text-[10px] text-[var(--color-text-faint)]">
+          <div className="flex flex-1 flex-col justify-between">
             {[...TICKS].reverse().map((t) => (
-              <span key={t} className="h-px w-full bg-[var(--color-border)]" />
+              <span key={t}>{t}</span>
             ))}
           </div>
+          <div className="h-6" aria-hidden />
+        </div>
 
-          <div className="relative flex h-full items-end justify-between gap-4">
-            {data.map((m, i) => {
-              const pct = Math.max((m.scraped / Y_MAX) * 100, 2);
-              return (
-                <div key={m.month} className="relative flex flex-1 flex-col items-center h-full">
-                  <div className="relative flex w-full flex-1 items-end justify-center">
+        <div className="flex flex-1 min-w-0 flex-col">
+          <div className="relative flex-1">
+            <div className="absolute inset-0 flex flex-col justify-between" aria-hidden>
+              {[...TICKS].reverse().map((t) => (
+                <span key={t} className="h-px w-full bg-[var(--color-border)]" />
+              ))}
+            </div>
+
+            <div className="relative flex h-full items-end justify-between gap-4">
+              {data.map((m, i) => {
+                const pct = Math.max((m.scraped / Y_MAX) * 100, 2);
+                return (
+                  <div key={m.month} className="relative flex h-full flex-1 items-end justify-center">
                     {hovered === i && (
                       <div
                         className="absolute z-10 whitespace-nowrap rounded-lg bg-[var(--color-ink)] px-2.5 py-1 text-[11px] font-semibold text-white"
@@ -85,10 +88,17 @@ export default function TORStatsChart() {
                       style={{ height: `${pct}%` }}
                     />
                   </div>
-                  <span className="mt-2.5 h-4 text-[10px] text-[var(--color-text-faint)]">{m.month}</span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex h-6 items-start justify-between gap-4 pt-2">
+            {data.map((m) => (
+              <span key={m.month} className="flex-1 text-center text-[10px] text-[var(--color-text-faint)]">
+                {m.month}
+              </span>
+            ))}
           </div>
         </div>
       </div>
