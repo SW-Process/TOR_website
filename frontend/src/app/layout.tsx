@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Thai } from "next/font/google";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 import "./globals.css";
 
 const plexSansThai = IBM_Plex_Sans_Thai({
@@ -23,9 +21,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${plexSansThai.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[var(--color-bg)] text-[var(--color-text)]">
-        <Header />
-        <main className="flex flex-1 flex-col">{children}</main>
-        <Footer />
+        {children}
       </body>
     </html>
   );
