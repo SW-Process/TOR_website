@@ -48,9 +48,14 @@ export default function ScraperHealth() {
         description="ตรวจสอบสถานะการดึงข้อมูลจากแต่ละแหล่งข้อมูล และดู error ที่เกิดขึ้นระหว่างการรัน"
       />
 
-      <div className="mt-7 px-5 sm:px-8 grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {sources.map((source) => (
-          <div key={source.id} className="card p-5">
+      <div className="mt-7 px-5 sm:px-8 grid sm:grid-cols-2 xl:grid-cols-6 gap-4">
+        {sources.map((source, i) => (
+          <div
+            key={source.id}
+            className={`card p-5 xl:col-span-2 ${
+              i === 3 ? "xl:col-start-2" : i === 4 ? "xl:col-start-4" : ""
+            }`}
+          >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-text)] truncate">
