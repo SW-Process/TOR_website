@@ -14,7 +14,7 @@ export default function SignUpPage() {
   const [passwordError, setPasswordError] = useState("");
 
   return (
-    <div className="relative flex min-h-screen flex-1 items-start justify-center overflow-hidden bg-[linear-gradient(135deg,_var(--color-blush-deep)_0%,_var(--color-blush)_45%,_var(--color-blush-soft)_100%)] px-4 pt-2 pb-6 sm:pt-4">
+    <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-[linear-gradient(135deg,_var(--color-blush-deep)_0%,_var(--color-blush)_45%,_var(--color-blush-soft)_100%)] px-4 py-8">
       <div
         className="absolute inset-0 opacity-[0.35] [background-image:radial-gradient(rgba(34,26,24,0.18)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_40%,black_10%,transparent_75%)]"
         aria-hidden

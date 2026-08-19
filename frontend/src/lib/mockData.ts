@@ -8,7 +8,8 @@ export type Category =
   | "ข้อมูลและระบบวิเคราะห์"
   | "บำรุงรักษาระบบ"
   | "จัดซื้อครุภัณฑ์ไอที"
-  | "ที่ปรึกษาด้านดิจิทัล";
+  | "ที่ปรึกษาด้านดิจิทัล"
+  | "อื่นๆ";
 
 export interface AISummary {
   keyPoints: string[];
@@ -45,6 +46,7 @@ export const categories: Category[] = [
   "บำรุงรักษาระบบ",
   "จัดซื้อครุภัณฑ์ไอที",
   "ที่ปรึกษาด้านดิจิทัล",
+  "อื่นๆ",
 ];
 
 export const agencies: string[] = [

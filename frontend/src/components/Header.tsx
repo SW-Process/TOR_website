@@ -26,7 +26,7 @@ export default function Header() {
           </span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden lg:flex items-center gap-8">
           {navLinks.map((link) => (
             <Link
               key={link.label}
@@ -38,7 +38,7 @@ export default function Header() {
           ))}
         </nav>
 
-        <div className="hidden md:flex items-center gap-1.5">
+        <div className="hidden lg:flex items-center gap-1.5">
           <Link
             href="/tor"
             aria-label="ค้นหา"
@@ -61,7 +61,7 @@ export default function Header() {
 
         <button
           aria-label="เปิดเมนู"
-          className="md:hidden rounded-full p-2 text-[var(--color-ink)] hover:bg-[var(--color-blush-soft)]"
+          className="lg:hidden rounded-full p-2 text-[var(--color-ink)] hover:bg-[var(--color-blush-soft)]"
           onClick={() => setOpen((v) => !v)}
         >
           {open ? <X size={22} /> : <Menu size={22} />}
@@ -69,7 +69,7 @@ export default function Header() {
       </div>
 
       {open && (
-        <nav className="md:hidden border-t border-[var(--color-border)] bg-white px-5 py-3 flex flex-col gap-1">
+        <nav className="lg:hidden border-t border-[var(--color-border)] bg-white px-5 py-3 flex flex-col gap-1">
           {navLinks.map((link) => (
             <Link
               key={link.label}

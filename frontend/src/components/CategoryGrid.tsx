@@ -14,6 +14,7 @@ import imgDataAnalytics from "./picture/ข้อมูลและระบบ�
 import imgMaintenance from "./picture/บำรุงรักษาระบบ.jpg";
 import imgITHardware from "./picture/จัดซื้อครุภัณฑ์ไอที.jpg";
 import imgDigitalConsulting from "./picture/ที่ปรึกษาด้านดิจิทัล.jpg";
+import imgOther from "./picture/อื่นๆ.jpg";
 
 const categoryImage: Record<Category, typeof imgSoftwareDev> = {
   พัฒนาระบบซอฟต์แวร์: imgSoftwareDev,
@@ -24,6 +25,7 @@ const categoryImage: Record<Category, typeof imgSoftwareDev> = {
   บำรุงรักษาระบบ: imgMaintenance,
   จัดซื้อครุภัณฑ์ไอที: imgITHardware,
   ที่ปรึกษาด้านดิจิทัล: imgDigitalConsulting,
+  อื่นๆ: imgOther,
 };
 
 // Instead of "cloning" just the two edge cards and silently snapping the
@@ -42,6 +44,17 @@ const START_INDEX = Math.floor(REPEAT / 2) * total;
 
 function realIndexOf(renderIndex: number) {
   return ((renderIndex % total) + total) % total;
+}
+
+// Scrolls only the carousel's own scroll container. Element.scrollIntoView()
+// (even with block: "nearest") will also scroll the page itself if the
+// carousel isn't already fully in the viewport, which jumps the whole page
+// down to this section on load — this keeps the scroll change local.
+function centerInContainer(container: HTMLElement, target: HTMLElement, behavior: ScrollBehavior) {
+  const containerRect = container.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const delta = targetRect.left + targetRect.width / 2 - (containerRect.left + containerRect.width / 2);
+  container.scrollTo({ left: container.scrollLeft + delta, behavior });
 }
 
 export default function CategoryGrid() {
@@ -73,9 +86,10 @@ export default function CategoryGrid() {
   }
 
   useLayoutEffect(() => {
-    cardRefs.current[START_INDEX]?.scrollIntoView({ behavior: "instant", inline: "center", block: "nearest" });
-
     const container = scrollRef.current;
+    const startCard = cardRefs.current[START_INDEX];
+    if (container && startCard) centerInContainer(container, startCard, "instant");
+
     if (!container) return;
 
     let frame: number;
@@ -90,16 +104,16 @@ export default function CategoryGrid() {
       container.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function goTo(index: number) {
+    const container = scrollRef.current;
     const target = cardRefs.current[index];
-    if (!target) return;
+    if (!container || !target) return;
 
     suppressAutoDetect.current = true;
     setRenderIndex(index);
-    target.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    centerInContainer(container, target, "smooth");
 
     clearTimeout(suppressTimeout.current);
     suppressTimeout.current = setTimeout(() => {
@@ -157,6 +171,7 @@ export default function CategoryGrid() {
                   alt={c}
                   fill
                   sizes="(min-width: 640px) 280px, 68vw"
+                  priority={i === START_INDEX}
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/15" />
