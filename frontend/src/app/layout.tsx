@@ -20,7 +20,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="th"
       className={`${plexSansThai.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[var(--color-bg)] text-[var(--color-text)]">
+      <body className="min-h-screen flex flex-col bg-[var(--color-bg)] text-[var(--color-text)]">
         {children}
       </body>
     </html>
