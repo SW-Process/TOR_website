@@ -125,11 +125,10 @@ function CalendarTable({
     ...Array.from({ length: startOffset }, () => null),
     ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
   ];
-  // Every month always renders exactly 6 weeks (42 cells) — a table with
-  // table-layout: fixed and an explicit per-cell height then makes every
-  // month's grid pixel-identical, regardless of how many real days or
-  // saved TOR items it contains.
-  while (flatCells.length < 42) flatCells.push(null);
+  // Pad only to complete the final week — a month needs 4-6 rows depending
+  // on its start day and length; forcing a 6th blank row on a short month
+  // wastes a whole row of empty space.
+  while (flatCells.length % 7 !== 0) flatCells.push(null);
   const weeks = chunk(flatCells, 7);
 
   return (
