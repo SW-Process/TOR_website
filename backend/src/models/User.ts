@@ -1,13 +1,36 @@
-const { Schema, model } = require("mongoose");
-const bcrypt = require("bcrypt");
+import { Schema, model, type HydratedDocument, type Model } from "mongoose";
+import bcrypt from "bcrypt";
 
 const SALT_ROUNDS = 12;
+
+export type UserRole = "vendor" | "admin";
+
+export interface IUser {
+  email: string;
+  passwordHash: string | null;
+  googleOAuthId: string | null;
+  role: UserRole;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IUserMethods {
+  comparePassword(candidate: string): Promise<boolean>;
+}
+
+type UserModel = Model<IUser, {}, IUserMethods>;
+
+export type UserDocument = HydratedDocument<IUser, IUserMethods>;
+
+interface UserDocumentInternals {
+  _plainPassword?: string;
+}
 
 /**
  * users — shared identity for Vendor and Admin accounts.
  * Public users need no account and are never stored here.
  */
-const userSchema = new Schema(
+const userSchema = new Schema<IUser, UserModel, IUserMethods>(
   {
     email: {
       type: String,
@@ -33,21 +56,22 @@ const userSchema = new Schema(
  * Assign a plaintext password; it is hashed in the pre-save hook below.
  * e.g. `user.password = "secret123"` then `await user.save()`.
  */
-userSchema.virtual("password").set(function (plain) {
+userSchema.virtual("password").set(function (this: UserDocumentInternals, plain: string) {
   this._plainPassword = plain;
 });
 
 userSchema.pre("save", async function () {
-  if (!this._plainPassword) return;
-  this.passwordHash = await bcrypt.hash(this._plainPassword, SALT_ROUNDS);
-  this._plainPassword = undefined;
+  const self = this as UserDocument & UserDocumentInternals;
+  if (!self._plainPassword) return;
+  self.passwordHash = await bcrypt.hash(self._plainPassword, SALT_ROUNDS);
+  self._plainPassword = undefined;
 });
 
 /**
  * Compare a plaintext candidate against the stored hash.
  * Requires the document to be loaded with `.select("+passwordHash")`.
  */
-userSchema.methods.comparePassword = function (candidate) {
+userSchema.methods.comparePassword = function (this: UserDocument, candidate: string) {
   if (!this.passwordHash) return Promise.resolve(false);
   return bcrypt.compare(candidate, this.passwordHash);
 };
@@ -55,10 +79,12 @@ userSchema.methods.comparePassword = function (candidate) {
 // Strip sensitive / noisy fields from any JSON serialization
 userSchema.set("toJSON", {
   transform: (_doc, ret) => {
-    delete ret.passwordHash;
-    delete ret.__v;
-    return ret;
+    const out = ret as unknown as Record<string, unknown>;
+    delete out.passwordHash;
+    delete out.__v;
+    return out;
   },
 });
 
-module.exports = model("User", userSchema);
+export const User = model<IUser, UserModel>("User", userSchema);
+export default User;

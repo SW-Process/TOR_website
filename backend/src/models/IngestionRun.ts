@@ -1,9 +1,31 @@
-const { Schema, model } = require("mongoose");
+import { Schema, model, type Types } from "mongoose";
+
+export type IngestionTrigger = "scheduled" | "manual";
+export type IngestionStatus = "running" | "success" | "partial" | "failed";
+
+export interface IIngestionRunStats {
+  torsFound: number;
+  torsCreated: number;
+  torsUpdated: number;
+  torsFailed: number;
+}
+
+export interface IIngestionRun {
+  trigger: IngestionTrigger;
+  triggeredBy: Types.ObjectId | null;
+  startedAt: Date;
+  completedAt: Date | null;
+  status: IngestionStatus;
+  stats: IIngestionRunStats;
+  outcomeSummary?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /**
  * ingestionRuns — history of TOR sync runs (FR-34–FR-36).
  */
-const ingestionRunSchema = new Schema(
+const ingestionRunSchema = new Schema<IIngestionRun>(
   {
     trigger: {
       type: String,
@@ -37,4 +59,5 @@ const ingestionRunSchema = new Schema(
 
 ingestionRunSchema.index({ startedAt: -1 });
 
-module.exports = model("IngestionRun", ingestionRunSchema);
+export const IngestionRun = model<IIngestionRun>("IngestionRun", ingestionRunSchema);
+export default IngestionRun;
