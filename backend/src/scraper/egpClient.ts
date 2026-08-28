@@ -13,6 +13,7 @@ export interface EgpClientConfig {
   delayMs: number;
   maxRetries: number;
   timeoutMs: number;
+  maxFileBytes: number;
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -43,6 +44,7 @@ export function egpConfigFromEnv(env: NodeJS.ProcessEnv = process.env): EgpClien
     delayMs: numFromEnv(env.EGP_REQUEST_DELAY_MS, 400),
     maxRetries: numFromEnv(env.EGP_MAX_RETRIES, 4),
     timeoutMs: numFromEnv(env.EGP_TIMEOUT_MS, 120_000),
+    maxFileBytes: numFromEnv(env.EGP_MAX_FILE_BYTES, 52_428_800),
   };
 }
 
@@ -126,6 +128,10 @@ export class EgpClient implements EgpClientLike {
   async downloadFile(announcementId: string, filename: string): Promise<Buffer> {
     const url = `${this.cfg.fileBase}/${announcementId}/${encodeURIComponent(filename)}`;
     const res = await this.request(url, "bytes");
+    const len = res.headers.get("content-length");
+    if (len && Number(len) > this.cfg.maxFileBytes) {
+      throw new Error(`e-GP file too large: ${len} bytes > ${this.cfg.maxFileBytes}`);
+    }
     return Buffer.from(await res.arrayBuffer());
   }
 }

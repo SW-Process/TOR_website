@@ -8,6 +8,7 @@ const CONFIG = {
   delayMs: 0,
   maxRetries: 3,
   timeoutMs: 1000,
+  maxFileBytes: 52_428_800,
   sleep: () => Promise.resolve(),
 };
 
@@ -82,6 +83,14 @@ describe("EgpClient.downloadFile", () => {
     expect(Buffer.isBuffer(buf)).toBe(true);
     expect(buf.toString()).toContain("%PDF");
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://egp.test/api/file/ann-1/%E0%B8%A3%E0%B9%88%E0%B8%B2%E0%B8%87%20TOR.pdf");
+  });
+
+  it("rejects a download whose Content-Length exceeds the cap", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(
+      new Response(Buffer.from("x"), { status: 200, headers: { "content-length": "99999999999" } })
+    );
+    const client = new EgpClient({ ...CONFIG, maxFileBytes: 1024 });
+    await expect(client.downloadFile("ann-1", "big.pdf")).rejects.toThrow(/too large/);
   });
 });
 
