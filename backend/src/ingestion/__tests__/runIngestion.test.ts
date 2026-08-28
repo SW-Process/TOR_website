@@ -190,6 +190,40 @@ describe("runIngestion", () => {
     expect(run?.stats.torsFound).toBe(1);
   });
 
+  it("finalises the run as failed when project collection throws", async () => {
+    const client: EgpClientLike = {
+      ...fakeClient(),
+      searchProjects: async () => {
+        throw new Error("e-GP down");
+      },
+    };
+    const { runId, done } = await runIngestion(baseOpts, { client, storage: fakeStorage(), parse });
+    await done;
+    const run = await IngestionRun.findById(runId).lean();
+    expect(run?.status).toBe("failed");
+    expect(run?.outcomeSummary).toMatch(/^run aborted:/);
+    expect(await Tor.countDocuments({})).toBe(0);
+  });
+
+  it("retries the PDF on the next run when the first download failed", async () => {
+    const storage = fakeStorage();
+    const failing: EgpClientLike = {
+      ...fakeClient(),
+      downloadFile: async () => {
+        throw new Error("e-GP 503");
+      },
+    };
+    await (await runIngestion(baseOpts, { client: failing, storage, parse })).done;
+    let tor = await Tor.findOne({ projectCode: "69000000001" }).lean();
+    expect(tor?.sourceDocument?.storageKey ?? null).toBeNull();
+
+    const working = fakeClient();
+    const spy = jest.spyOn(working, "downloadFile");
+    await (await runIngestion(baseOpts, { client: working, storage, parse })).done;
+    expect(spy).toHaveBeenCalled();
+    tor = await Tor.findOne({ projectCode: "69000000001" }).lean();
+    expect(tor?.sourceDocument?.storageKey).toBeTruthy();
+  });
 });
 
 describe("markInterruptedRunsFailed", () => {
