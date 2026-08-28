@@ -1,10 +1,69 @@
-const { Schema, model } = require("mongoose");
+import { Schema, model, type Types } from "mongoose";
+
+export type Confidence = "high" | "medium" | "low";
+export type TorStatus = "open" | "closing_soon" | "closed";
+
+export interface IEvaluationCriterion {
+  label: string;
+  weight?: number;
+}
+
+export interface IAiSummary {
+  keyPoints: string[];
+  qualifications: string[];
+  evaluationCriteria: IEvaluationCriterion[];
+  confidence?: Confidence;
+  model?: string;
+  generatedAt?: Date;
+}
+
+export type FairnessField =
+  | "budget"
+  | "deadline"
+  | "category"
+  | "agency"
+  | "title"
+  | "qualificationRequirements"
+  | "other";
+
+export interface IFairnessFlag {
+  field: FairnessField;
+  severity: "low" | "medium" | "high";
+  message: string;
+  detectedAt: Date;
+  status: "open" | "acknowledged" | "dismissed";
+}
+
+export interface ITor {
+  title: string;
+  description?: string;
+  sourceDocumentUrl?: string;
+  agency?: string;
+  department?: string;
+  projectCode?: string;
+  budget?: number;
+  announcementDate?: Date;
+  submissionDeadline?: Date;
+  technologyStack: string[];
+  projectType?: string;
+  qualificationRequirements: string[];
+  evaluationCriteria?: string;
+  location?: string;
+  status: TorStatus;
+  viewCount: number;
+  aiSummary: IAiSummary | null;
+  fairnessFlags: Types.DocumentArray<IFairnessFlag>;
+  similarTORs: Types.ObjectId[];
+  ingestionRunId?: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /**
  * aiSummary — embedded (FR-12 / FR-20). Always fetched with the TOR,
  * never queried on its own.
  */
-const aiSummarySchema = new Schema(
+const aiSummarySchema = new Schema<IAiSummary>(
   {
     keyPoints: { type: [String], default: [] },
     qualifications: { type: [String], default: [] },
@@ -32,7 +91,7 @@ const aiSummarySchema = new Schema(
  * fairnessFlags — embedded array (Section 5.2). Reviewed by Admins on the
  * TOR detail page (UC-5); not a queryable entity of its own.
  */
-const fairnessFlagSchema = new Schema(
+const fairnessFlagSchema = new Schema<IFairnessFlag>(
   {
     field: {
       type: String,
@@ -50,7 +109,7 @@ const fairnessFlagSchema = new Schema(
 /**
  * tors — the central entity.
  */
-const torSchema = new Schema(
+const torSchema = new Schema<ITor>(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String },
@@ -89,4 +148,5 @@ const torSchema = new Schema(
 // Full-text search over the fields the public search UI queries
 torSchema.index({ title: "text", description: "text", agency: "text" });
 
-module.exports = model("Tor", torSchema);
+export const Tor = model<ITor>("Tor", torSchema);
+export default Tor;

@@ -1,17 +1,17 @@
 /**
  * Create an admin account. Admins are never created via the public API.
  *
- *   node src/scripts/createAdmin.js <email> <password>
+ *   npm run create-admin -- <email> <password>
  */
-require("dotenv").config();
-const mongoose = require("mongoose");
-const connectDB = require("../config/db");
-const { User } = require("../models");
+import "dotenv/config";
+import mongoose from "mongoose";
+import { connectDB } from "../config/db";
+import { User } from "../models";
 
-async function main() {
+async function main(): Promise<void> {
   const [email, password] = process.argv.slice(2);
   if (!email || !password) {
-    console.error("Usage: node src/scripts/createAdmin.js <email> <password>");
+    console.error("Usage: npm run create-admin -- <email> <password>");
     process.exit(1);
   }
   if (password.length < 8) {
@@ -29,10 +29,10 @@ async function main() {
   }
 
   const user = new User({ email, role: "admin" });
-  user.password = password;
+  user.set("password", password);
   await user.save();
 
-  console.log(`Created admin ${user.email} (${user._id})`);
+  console.log(`Created admin ${user.email} (${user.id})`);
   await mongoose.disconnect();
 }
 
