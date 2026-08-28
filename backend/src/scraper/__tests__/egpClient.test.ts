@@ -61,6 +61,13 @@ describe("EgpClient.searchProjects", () => {
     const client = new EgpClient(CONFIG);
     await expect(client.searchProjects({ page: 1 })).rejects.toThrow(/503/);
   });
+
+  it("does not retry a 404", async () => {
+    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(jsonResponse({ message: "nope" }, 404));
+    const client = new EgpClient(CONFIG);
+    await expect(client.searchProjects({ page: 1 })).rejects.toThrow(/404/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("EgpClient.downloadFile", () => {

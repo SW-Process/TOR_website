@@ -18,6 +18,18 @@ export interface EgpClientConfig {
 
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+/** HTTP error from the e-GP API. 4xx (except 429) are not retried. */
+export class EgpHttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = "EgpHttpError";
+  }
+
+  get retryable(): boolean {
+    return this.status === 429 || this.status >= 500;
+  }
+}
+
 function numFromEnv(value: string | undefined, fallback: number): number {
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? n : fallback;
@@ -63,12 +75,13 @@ export class EgpClient implements EgpClientLike {
             Accept: accept === "json" ? "application/json" : "application/pdf,application/octet-stream",
           },
         });
-        if (!res.ok) throw new Error(`e-GP ${res.status} for ${url}`);
+        if (!res.ok) throw new EgpHttpError(res.status, `e-GP ${res.status} for ${url}`);
         await this.sleep(this.cfg.delayMs); // politeness: pause after every successful call
         return res;
       } catch (err) {
         lastError = err;
         clearTimeout(timer);
+        if (err instanceof EgpHttpError && !err.retryable) throw err; // fail fast on genuine 4xx (NFR-07)
         if (attempt === this.cfg.maxRetries - 1) break;
         await this.sleep(2 ** attempt * 1000);
         continue;
