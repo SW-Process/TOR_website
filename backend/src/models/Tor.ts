@@ -2,6 +2,18 @@ import { Schema, model, type Types } from "mongoose";
 
 export type Confidence = "high" | "medium" | "low";
 export type TorStatus = "open" | "closing_soon" | "closed";
+export type SourceTextLayer = "digital" | "scanned" | "unreadable" | "missing";
+
+export interface ISourceDocument {
+  egpUrl: string;
+  filename: string;
+  storageKey: string | null;
+  textLayer: SourceTextLayer;
+  pageCount: number | null;
+  byteSize: number | null;
+  sha256: string | null;
+  fetchedAt: Date;
+}
 
 export interface IEvaluationCriterion {
   label: string;
@@ -38,6 +50,13 @@ export interface ITor {
   title: string;
   description?: string;
   sourceDocumentUrl?: string;
+  referencePrice?: number;
+  sourceListingUrl?: string;
+  procurementMethod?: string;
+  procurementType?: string;
+  goodsCategory?: string;
+  sourceContentHash?: string;
+  sourceDocument?: ISourceDocument | null;
   agency?: string;
   department?: string;
   projectCode?: string;
@@ -107,6 +126,28 @@ const fairnessFlagSchema = new Schema<IFairnessFlag>(
 );
 
 /**
+ * sourceDocument — the stored TOR PDF and what we know about it (FR-05 / FR-11).
+ * `storageKey` is null and `textLayer` is "missing" when the file could not be fetched.
+ */
+const sourceDocumentSchema = new Schema<ISourceDocument>(
+  {
+    egpUrl: { type: String, required: true },
+    filename: { type: String, required: true },
+    storageKey: { type: String, default: null },
+    textLayer: {
+      type: String,
+      enum: ["digital", "scanned", "unreadable", "missing"],
+      required: true,
+    },
+    pageCount: { type: Number, default: null },
+    byteSize: { type: Number, default: null },
+    sha256: { type: String, default: null },
+    fetchedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+/**
  * tors — the central entity.
  */
 const torSchema = new Schema<ITor>(
@@ -115,6 +156,16 @@ const torSchema = new Schema<ITor>(
     description: { type: String },
     // reference into GCS — the PDF binary is not stored in Mongo
     sourceDocumentUrl: { type: String },
+    // ราคากลาง — fairness compares budget against this (Section 5.2)
+    referencePrice: { type: Number, min: 0 },
+    // link back to the e-GP project page (FR-05)
+    sourceListingUrl: { type: String },
+    procurementMethod: { type: String },
+    procurementType: { type: String },
+    goodsCategory: { type: String },
+    // sha256 of the canonicalised e-GP detail JSON — drives create vs update vs unchanged
+    sourceContentHash: { type: String, index: true },
+    sourceDocument: { type: sourceDocumentSchema, default: null },
     agency: { type: String, index: true },
     department: { type: String },
     // stable identifier from the source system (e.g. e-GP project code)
