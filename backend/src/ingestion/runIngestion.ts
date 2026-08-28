@@ -152,6 +152,19 @@ async function crawl(
 }
 
 /**
+ * Mark any run still flagged "running" as failed. In-process runs cannot survive
+ * a restart, so a "running" row at boot is always an interrupted run.
+ * Returns the number of rows updated.
+ */
+export async function markInterruptedRunsFailed(): Promise<number> {
+  const res = await IngestionRun.updateMany(
+    { status: "running" },
+    { $set: { status: "failed", completedAt: new Date(), outcomeSummary: "interrupted by a server restart" } }
+  );
+  return res.modifiedCount;
+}
+
+/**
  * Start an ingestion run. Creates the IngestionRun row synchronously and returns
  * its id; the crawl itself runs in the background. `done` resolves when the crawl
  * finishes — production ignores it, tests await it.

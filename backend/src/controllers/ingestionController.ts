@@ -30,6 +30,9 @@ export async function createRun(req: Request, res: Response): Promise<void> {
   const searchText = parseSearchText(body.searchText);
   const announceAllTypes = body.announceAllTypes === true;
 
+  const active = await IngestionRun.exists({ status: "running" });
+  if (active) throw httpError(409, "An ingestion run is already in progress");
+
   const { runId } = await runIngestion({
     trigger: "manual",
     triggeredBy: req.user!.id,

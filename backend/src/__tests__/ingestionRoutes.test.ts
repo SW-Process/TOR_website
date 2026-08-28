@@ -76,6 +76,14 @@ describe("POST /api/ingestion/runs", () => {
     expect(res.status).toBe(400);
     expect(runIngestionMock).not.toHaveBeenCalled();
   });
+
+  it("409 when a run is already in progress", async () => {
+    await IngestionRun.create({ trigger: "manual", status: "running" });
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/runs").send({});
+    expect(res.status).toBe(409);
+    expect(runIngestionMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET /api/ingestion/runs", () => {

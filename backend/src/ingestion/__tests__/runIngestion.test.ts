@@ -8,7 +8,7 @@ import type {
   EgpSearchProject,
 } from "../../scraper/egpClient.types";
 import type { BlobStorage } from "../../storage/storage.types";
-import { runIngestion } from "../runIngestion";
+import { runIngestion, markInterruptedRunsFailed } from "../runIngestion";
 
 let mongod: MongoMemoryServer;
 
@@ -188,5 +188,19 @@ describe("runIngestion", () => {
     expect(await Tor.countDocuments({})).toBe(1);
     const run = await IngestionRun.findById(runId).lean();
     expect(run?.stats.torsFound).toBe(1);
+  });
+
+});
+
+describe("markInterruptedRunsFailed", () => {
+  it("flips running rows to failed and leaves finished ones alone", async () => {
+    await IngestionRun.create({ trigger: "manual", status: "running" });
+    await IngestionRun.create({ trigger: "manual", status: "success", completedAt: new Date() });
+    const n = await markInterruptedRunsFailed();
+    expect(n).toBe(1);
+    expect(await IngestionRun.countDocuments({ status: "running" })).toBe(0);
+    expect(await IngestionRun.countDocuments({ status: "success" })).toBe(1);
+    const failed = await IngestionRun.findOne({ status: "failed" }).lean();
+    expect(failed?.outcomeSummary).toBe("interrupted by a server restart");
   });
 });
