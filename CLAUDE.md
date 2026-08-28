@@ -8,7 +8,7 @@ BKK Software TOR Aggregator & Fairness Checker — aggregates software-procureme
 
 `docs/SRS.md` is the requirements source of truth. Code comments reference its `FR-XX` / `UC-XX` / `NFR-XX` identifiers — follow them back to the SRS when a schema field or behavior is unclear.
 
-**Defamation constraint:** fairness flags are worded as neutral review signals, never accusations of wrongdoing. This governs both UI copy and admin-facing explanation text (see `fairnessFlagSchema` in `backend/src/models/Tor.js`).
+**Defamation constraint:** fairness flags are worded as neutral review signals, never accusations of wrongdoing. This governs both UI copy and admin-facing explanation text (see `fairnessFlagSchema` in `backend/src/models/Tor.ts`).
 
 ## Repo layout
 
@@ -17,7 +17,7 @@ Monorepo with three independently-run parts:
 | Part | Stack | Run |
 |---|---|---|
 | `frontend/` | Next.js 16 (App Router), React 19, Tailwind v4, TypeScript | `npm run dev` (port 3000) |
-| `backend/` | Express 5, Mongoose 9, **CommonJS** | `npm run dev` (nodemon, port 8000) |
+| `backend/` | Express 5, Mongoose 9, **TypeScript** | `npm run dev` (tsx watch, port 8000) |
 | `munyin.py` | standalone Python e-GP ingestion client | `python munyin.py ...` |
 
 ### Commands
@@ -29,22 +29,25 @@ npm run build      # production build
 npm run lint       # eslint (flat config, eslint.config.mjs)
 
 # Backend (cd backend)
-npm run dev        # nodemon src/server.js
-npm start          # node src/server.js
+npm run dev        # tsx watch src/server.ts
+npm run build      # tsc -> dist/
+npm start          # node dist/server.js
+npm test           # jest --runInBand
+npm run typecheck  # tsc --noEmit
 
 # Full local stack via Docker (from repo root) — runs frontend + mongo ONLY, not backend
 docker compose up --build      # http://localhost:3000
 docker compose down -v         # also wipes local mongo volume
 ```
 
-No test framework is configured in either `package.json` yet, and there are no CI workflows despite `.github/` existing. Do not assume `npm test` works.
+The backend has a Jest suite (`npm test`); the frontend has no test framework configured. There are no CI workflows despite `.github/` existing.
 
 ## Architecture notes that span files
 
 ### Two separate MongoDB access layers
 The frontend does **not** only call the Express backend. It has its own Mongoose connection (`frontend/src/lib/mongodb.ts`, cached for serverless/HMR) and its own models (`frontend/src/models/`), used from Next.js route handlers under `frontend/src/app/api/`. The Express backend has a *different* set of Mongoose models in `backend/src/models/`. When changing a schema, check whether both sides need updating. The backend models are the fuller, documented set.
 
-### Backend data model (`backend/src/models/`, index in `models/index.js`)
+### Backend data model (`backend/src/models/`, index in `models/index.ts`)
 8 collections: `users`, `vendorprofiles` (1:1 with vendor user), `tors` (central entity), `bookmarks` (vendor↔TOR join + application status), `notifications`, `errorreports` (public-submitted TOR corrections), `ingestionruns`, `systemlogs`.
 
 `Tor` embeds `aiSummary` and `fairnessFlags` (fetched with the TOR, never queried alone). PDF binaries live in GCS, not Mongo — `sourceDocumentUrl` is a reference. `similarTORs` is a precomputed array of ObjectIds. There is a text index on `title`/`description`/`agency`.
@@ -72,7 +75,7 @@ Mongo. Progress and errors land in `IngestionRun` + `SystemLog` (source `ingesti
 
 ## Environment
 
-- `backend/.env` — needs `MONGODB_URI` (and `PORT`). `backend/.env.example` is minimal and slightly malformed; the real key is `MONGODB_URI`.
+- `backend/.env` — needs `MONGODB_URI` (and `PORT`). `backend/.env.example` lists every required key; `MONGODB_URI` is the one the app throws without.
 - `frontend/.env.local` — needs `MONGODB_URI` (the code throws on startup without it).
 - Inside Docker the frontend uses `mongodb://mongo:27017/tor_website`.
 - Always update `.env.example` when adding a new variable.
