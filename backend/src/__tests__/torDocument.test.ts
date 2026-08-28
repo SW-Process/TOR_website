@@ -83,4 +83,11 @@ describe("GET /api/tors/:id/document", () => {
     const res = await request(app).get(`/api/tors/${new mongoose.Types.ObjectId().toString()}/document`);
     expect(res.status).toBe(404);
   });
+
+  it("returns 400 for a malformed TOR id", async () => {
+    const res = await request(app).get("/api/tors/not-an-object-id/document");
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("Invalid id");
+    expect(JSON.stringify(res.body)).not.toMatch(/ObjectId|_id|Tor/);
+  });
 });
