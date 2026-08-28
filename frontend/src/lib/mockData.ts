@@ -60,8 +60,10 @@ export const agencies: string[] = [
   "สำนักงานเขตบางรัก",
 ];
 
+export const TODAY_ISO = "2026-08-09";
+
 function daysFromToday(days: number): string {
-  const d = new Date("2026-08-09");
+  const d = new Date(TODAY_ISO);
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 }
@@ -365,7 +367,7 @@ export function formatThaiDate(iso: string): string {
 }
 
 export function daysUntil(iso: string): number {
-  const today = new Date("2026-08-09");
+  const today = new Date(TODAY_ISO);
   const target = new Date(iso);
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }

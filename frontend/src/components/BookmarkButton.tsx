@@ -2,6 +2,7 @@
 
 import { Bookmark } from "lucide-react";
 import { useBookmarks } from "@/lib/useBookmarks";
+import { useAuth } from "@/lib/useAuth";
 
 export default function BookmarkButton({
   id,
@@ -11,7 +12,10 @@ export default function BookmarkButton({
   variant?: "icon" | "full";
 }) {
   const { isBookmarked, toggle, ready } = useBookmarks();
+  const { isLoggedIn, ready: authReady } = useAuth();
   const active = ready && isBookmarked(id);
+
+  if (!authReady || !isLoggedIn) return null;
 
   if (variant === "full") {
     return (

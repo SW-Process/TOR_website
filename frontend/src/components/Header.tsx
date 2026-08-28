@@ -1,18 +1,46 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Menu, X, Search, Bookmark, LogIn, FileSearch } from "lucide-react";
+import {
+  Menu,
+  X,
+  Search,
+  Bookmark,
+  LogIn,
+  LogOut,
+  FileSearch,
+  UserRound,
+  LayoutDashboard,
+} from "lucide-react";
+import { useAuth } from "@/lib/useAuth";
 
-const navLinks = [
-  { href: "/", label: "หน้าแรก" },
+const publicLinks = [
   { href: "/tor", label: "ค้นหา TOR" },
   { href: "/tor?sort=deadline", label: "ใกล้ปิดรับ" },
+];
+
+const memberLinks = [
+  { href: "/dashboard", label: "แดชบอร์ด" },
   { href: "/bookmarks", label: "รายการที่บันทึก" },
 ];
 
 export default function Header() {
   const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { user, ready, isLoggedIn, logout } = useAuth();
+  const router = useRouter();
+
+  const loggedIn = ready && isLoggedIn;
+  const navLinks = [...publicLinks, ...(loggedIn ? memberLinks : [])];
+
+  function handleLogout() {
+    logout();
+    setMenuOpen(false);
+    setOpen(false);
+    router.push("/");
+  }
 
   return (
     <header className="sticky top-0 z-40 bg-white">
@@ -46,17 +74,68 @@ export default function Header() {
           >
             <Search size={16} />
           </Link>
-          <Link
-            href="/bookmarks"
-            aria-label="รายการที่บันทึก"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-blush-soft)] transition-colors"
-          >
-            <Bookmark size={16} />
-          </Link>
-          <Link href="/login" className="btn-pill btn-pill-primary ml-1 px-4 py-2.5 text-[13px]">
-            <LogIn size={14} />
-            เข้าสู่ระบบ
-          </Link>
+
+          {loggedIn && (
+            <Link
+              href="/bookmarks"
+              aria-label="รายการที่บันทึก"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-blush-soft)] transition-colors"
+            >
+              <Bookmark size={16} />
+            </Link>
+          )}
+
+          {loggedIn ? (
+            <div className="relative ml-1">
+              <button
+                aria-label="เมนูบัญชี"
+                onClick={() => setMenuOpen((v) => !v)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ink)] text-xs font-bold text-white"
+              >
+                {(user?.name || "ส").trim().slice(0, 1).toUpperCase()}
+              </button>
+              {menuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
+                  <div className="absolute right-0 top-full z-40 mt-2 w-56 rounded-2xl border border-[var(--color-border)] bg-white p-1.5 shadow-[var(--shadow-lg)]">
+                    <div className="px-3 py-2">
+                      <p className="text-sm font-semibold text-[var(--color-text)] truncate">{user?.name}</p>
+                      <p className="text-xs text-[var(--color-text-faint)] truncate">{user?.email}</p>
+                    </div>
+                    <div className="my-1 h-px bg-[var(--color-border)]" />
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                    >
+                      <LayoutDashboard size={15} />
+                      แดชบอร์ด
+                    </Link>
+                    <Link
+                      href="/account/profile"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                    >
+                      <UserRound size={15} />
+                      โปรไฟล์ธุรกิจ
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-rose-dark)] hover:bg-[var(--color-blush-soft)]"
+                    >
+                      <LogOut size={15} />
+                      ออกจากระบบ
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <Link href="/login" className="btn-pill btn-pill-primary ml-1 px-4 py-2.5 text-[13px]">
+              <LogIn size={14} />
+              เข้าสู่ระบบ
+            </Link>
+          )}
         </div>
 
         <button
@@ -80,14 +159,34 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
-          <Link
-            href="/login"
-            onClick={() => setOpen(false)}
-            className="btn-pill btn-pill-primary mt-1 py-2.5 text-sm"
-          >
-            <LogIn size={15} />
-            เข้าสู่ระบบ
-          </Link>
+
+          {loggedIn ? (
+            <>
+              <Link
+                href="/account/profile"
+                onClick={() => setOpen(false)}
+                className="rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+              >
+                โปรไฟล์ธุรกิจ · {user?.name}
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="btn-pill mt-1 border border-[var(--color-border-strong)] py-2.5 text-sm text-[var(--color-rose-dark)]"
+              >
+                <LogOut size={15} />
+                ออกจากระบบ
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              onClick={() => setOpen(false)}
+              className="btn-pill btn-pill-primary mt-1 py-2.5 text-sm"
+            >
+              <LogIn size={15} />
+              เข้าสู่ระบบ
+            </Link>
+          )}
         </nav>
       )}
     </header>
