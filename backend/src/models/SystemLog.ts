@@ -1,9 +1,22 @@
-const { Schema, model } = require("mongoose");
+import { Schema, model, type Types } from "mongoose";
+
+export type LogSource = "ingestion" | "ai-pipeline" | "application";
+export type LogSeverity = "info" | "warning" | "error";
+
+export interface ISystemLog {
+  source: LogSource;
+  component?: string;
+  severity: LogSeverity;
+  message: string;
+  context?: unknown;
+  ingestionRunId: Types.ObjectId | null;
+  timestamp: Date;
+}
 
 /**
  * systemLogs — diagnostic logs surfaced in the Admin console (FR-37, FR-38).
  */
-const systemLogSchema = new Schema(
+const systemLogSchema = new Schema<ISystemLog>(
   {
     source: {
       type: String,
@@ -28,4 +41,5 @@ const systemLogSchema = new Schema(
   { timestamps: false }
 );
 
-module.exports = model("SystemLog", systemLogSchema);
+export const SystemLog = model<ISystemLog>("SystemLog", systemLogSchema);
+export default SystemLog;

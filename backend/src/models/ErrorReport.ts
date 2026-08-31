@@ -1,10 +1,23 @@
-const { Schema, model } = require("mongoose");
+import { Schema, model, type Types } from "mongoose";
+
+export interface IErrorReport {
+  torId: Types.ObjectId;
+  reportedBy: Types.ObjectId | null;
+  reporterEmail?: string;
+  description: string;
+  status: "open" | "resolved";
+  resolvedBy: Types.ObjectId | null;
+  resolutionNote?: string;
+  resolvedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /**
  * errorReports — TOR error reports submitted by public or vendor users,
  * routed to Admins (FR-41).
  */
-const errorReportSchema = new Schema(
+const errorReportSchema = new Schema<IErrorReport>(
   {
     torId: {
       type: Schema.Types.ObjectId,
@@ -34,4 +47,5 @@ const errorReportSchema = new Schema(
   { timestamps: true }
 );
 
-module.exports = model("ErrorReport", errorReportSchema);
+export const ErrorReport = model<IErrorReport>("ErrorReport", errorReportSchema);
+export default ErrorReport;

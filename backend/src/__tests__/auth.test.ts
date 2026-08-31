@@ -1,14 +1,14 @@
-const mongoose = require("mongoose");
-const request = require("supertest");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+import mongoose from "mongoose";
+import request from "supertest";
+import { MongoMemoryServer } from "mongodb-memory-server";
 
 process.env.JWT_SECRET = "test-secret";
 process.env.JWT_EXPIRES_IN = "7d";
 
-const app = require("../app");
-const { User } = require("../models");
+import app from "../app";
+import { User } from "../models";
 
-let mongod;
+let mongod: MongoMemoryServer;
 
 beforeAll(async () => {
   mongod = await MongoMemoryServer.create();
@@ -35,12 +35,12 @@ describe("POST /api/auth/register", () => {
     expect(res.body.user.role).toBe("vendor");
     expect(res.body.user).not.toHaveProperty("passwordHash");
 
-    const cookie = res.headers["set-cookie"][0];
+    const cookie = (res.headers["set-cookie"] as unknown as string[])[0]!;
     expect(cookie).toMatch(/token=/);
     expect(cookie).toMatch(/HttpOnly/i);
 
     const stored = await User.findOne({ email: creds.email }).select("+passwordHash");
-    expect(stored.passwordHash).not.toBe(creds.password);
+    expect(stored?.passwordHash).not.toBe(creds.password);
   });
 
   it("rejects a duplicate email with 409", async () => {
@@ -65,7 +65,7 @@ describe("POST /api/auth/login", () => {
   it("returns 200 and a session for valid credentials", async () => {
     const res = await request(app).post("/api/auth/login").send(creds);
     expect(res.status).toBe(200);
-    expect(res.headers["set-cookie"][0]).toMatch(/token=/);
+    expect((res.headers["set-cookie"] as unknown as string[])[0]).toMatch(/token=/);
   });
 
   it("returns 401 for a wrong password", async () => {
