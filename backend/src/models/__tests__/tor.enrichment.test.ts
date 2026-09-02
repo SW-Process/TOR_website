@@ -56,5 +56,6 @@ describe("Tor enrichment fields", () => {
     expect(keys).toContain(JSON.stringify({ category: 1, announcementDate: -1 }));
     expect(keys).toContain(JSON.stringify({ agency: 1, announcementDate: -1 }));
     expect(keys).toContain(JSON.stringify({ pipelineStatus: 1, announcementDate: -1 }));
+    expect(keys).toContain(JSON.stringify({ categoryTags: 1 }));
   });
 });

@@ -12,7 +12,8 @@ afterEach(async () => { await Tor.deleteMany({}); });
 async function seed() {
   const base = { pipelineStatus: "enriched" as const };
   await Tor.create([
-    { ...base, title: "ระบบสารบรรณ A", agency: "สำนักการแพทย์", category: "information-system", budget: 1_000_000, referencePrice: 900_000, announcementDate: new Date("2026-07-01") },
+    { ...base, title: "ระบบสารบรรณ A", agency: "สำนักการแพทย์", category: "information-system", budget: 1_000_000, referencePrice: 900_000, announcementDate: new Date("2026-07-01"),
+      sourceDocument: { egpUrl: "u", filename: "tor.pdf", storageKey: "tor-pdfs/a/b.pdf", textLayer: "scanned", pageCount: 2, byteSize: 10, sha256: "s".repeat(64), fetchedAt: new Date() } },
     { ...base, title: "ระบบสารบรรณ B", agency: "สำนักอนามัย", category: "information-system", budget: 2_000_000, referencePrice: 1_800_000, announcementDate: new Date("2026-08-01") },
     { ...base, title: "เว็บไซต์หน่วยงาน", agency: "สำนักการแพทย์", category: "web-application", budget: 500_000, referencePrice: 480_000, announcementDate: new Date("2026-08-15") },
     { title: "งานที่ยังไม่ enrich", agency: "สำนักการแพทย์", category: "information-system", pipelineStatus: "pending" },
@@ -59,9 +60,14 @@ describe("GET /api/tors", () => {
 describe("GET /api/tors/:id", () => {
   it("returns an enriched TOR, 404 for a non-enriched one, 400 for a bad id", async () => {
     await seed();
-    const enriched = await Tor.findOne({ pipelineStatus: "enriched" }).lean();
+    const enriched = await Tor.findOne({ pipelineStatus: "enriched", "sourceDocument.storageKey": { $ne: null } }).lean();
     const pending = await Tor.findOne({ pipelineStatus: "pending" }).lean();
-    expect((await request(app).get(`/api/tors/${enriched!._id}`)).status).toBe(200);
+    const detail = await request(app).get(`/api/tors/${enriched!._id}`);
+    expect(detail.status).toBe(200);
+    // internal storage pointers must not leak in the public detail body
+    expect(detail.body.tor.sourceDocument?.storageKey).toBeUndefined();
+    expect(detail.body.tor.sourceDocument?.sha256).toBeUndefined();
+    expect(detail.body.tor.sourceDocument?.filename).toBe("tor.pdf");
     expect((await request(app).get(`/api/tors/${pending!._id}`)).status).toBe(404);
     expect((await request(app).get("/api/tors/not-an-id")).status).toBe(400);
   });

@@ -86,7 +86,9 @@ export async function listTors(req: Request, res: Response): Promise<void> {
 /** GET /api/tors/:id */
 export async function getTor(req: Request, res: Response): Promise<void> {
   const tor = await Tor.findOne({ _id: req.params.id, pipelineStatus: "enriched" })
-    .select("-sourceContentHash -classification -ingestionRunId -__v")
+    .select(
+      "-sourceContentHash -classification -ingestionRunId -__v -sourceDocument.storageKey -sourceDocument.sha256"
+    )
     .lean();
   if (!tor) throw httpError(404, "TOR not found");
   res.status(200).json({ tor });

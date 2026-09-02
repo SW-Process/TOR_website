@@ -241,6 +241,7 @@ torSchema.index({ title: "text", description: "text", agency: "text" });
 torSchema.index({ category: 1, announcementDate: -1 });
 torSchema.index({ agency: 1, announcementDate: -1 });
 torSchema.index({ pipelineStatus: 1, announcementDate: -1 });
+torSchema.index({ categoryTags: 1 });
 
 export const Tor = model<ITor>("Tor", torSchema);
 export default Tor;
