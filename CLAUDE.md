@@ -73,6 +73,17 @@ downloads each TOR PDF through the `BlobStorage` adapter (`storage/`, `STORAGE_D
 `unreadable` / `missing`; OCR and AI stages consume that later. Binaries never go in
 Mongo. Progress and errors land in `IngestionRun` + `SystemLog` (source `ingestion`).
 
+### AI enrichment (`backend/src/ingestion/enrichment/`)
+Discovery (`runIngestion`) now also filters projects by `INGEST_AGENCIES` and, for
+each created/changed `Tor`, enqueues an `EnrichmentJob`. A separate batch
+(`drainEnrichmentQueue`, entrypoint `dist/jobs/enrichment.js`) claims jobs under a
+Mongo lease and runs one Gemini (`@google/genai`, Vertex) multimodal call per TOR
+that classifies software-relatedness, writes `aiSummary` + scalar fields, and sets
+`category` from `config/taxonomy.ts`. `Tor.pipelineStatus` gates the public read
+API (`GET /api/tors`, `/:id`, `/price-stats`) to `"enriched"` rows only. Extraction
+is behind the `TorExtractor` seam (`EXTRACTOR` env). Deploy: two Cloud Run Jobs on
+Cloud Scheduler — see `docs/deployment/gcp.md`.
+
 ## Environment
 
 - `backend/.env` — needs `MONGODB_URI` (and `PORT`). `backend/.env.example` lists every required key; `MONGODB_URI` is the one the app throws without.
