@@ -26,5 +26,5 @@ export type { ITor, IAiSummary, IFairnessFlag, ISourceDocument, SourceTextLayer,
 export type { IBookmark, ApplicationStatus } from "./Bookmark";
 export type { INotification, NotificationType } from "./Notification";
 export type { IErrorReport } from "./ErrorReport";
-export type { IIngestionRun } from "./IngestionRun";
+export type { IIngestionRun, IngestionPhase } from "./IngestionRun";
 export type { ISystemLog } from "./SystemLog";

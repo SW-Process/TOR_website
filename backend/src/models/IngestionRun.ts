@@ -2,16 +2,22 @@ import { Schema, model, type Types } from "mongoose";
 
 export type IngestionTrigger = "scheduled" | "manual";
 export type IngestionStatus = "running" | "success" | "partial" | "failed";
+export type IngestionPhase = "discovery" | "enrichment";
 
 export interface IIngestionRunStats {
   torsFound: number;
   torsCreated: number;
   torsUpdated: number;
   torsFailed: number;
+  torsSkipped: number;
+  enrichedOk: number;
+  enrichedRejected: number;
+  enrichedFailed: number;
 }
 
 export interface IIngestionRun {
   trigger: IngestionTrigger;
+  phase: IngestionPhase;
   triggeredBy: Types.ObjectId | null;
   startedAt: Date;
   completedAt: Date | null;
@@ -32,6 +38,12 @@ const ingestionRunSchema = new Schema<IIngestionRun>(
       enum: ["scheduled", "manual"],
       required: true,
     },
+    phase: {
+      type: String,
+      enum: ["discovery", "enrichment"],
+      default: "discovery",
+      index: true,
+    },
     // set when trigger === "manual"
     triggeredBy: {
       type: Schema.Types.ObjectId,
@@ -51,6 +63,10 @@ const ingestionRunSchema = new Schema<IIngestionRun>(
       torsCreated: { type: Number, default: 0 },
       torsUpdated: { type: Number, default: 0 },
       torsFailed: { type: Number, default: 0 },
+      torsSkipped: { type: Number, default: 0 },
+      enrichedOk: { type: Number, default: 0 },
+      enrichedRejected: { type: Number, default: 0 },
+      enrichedFailed: { type: Number, default: 0 },
     },
     outcomeSummary: { type: String },
   },
