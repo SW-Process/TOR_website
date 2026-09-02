@@ -10,6 +10,7 @@ export interface IIngestionRunStats {
   torsUpdated: number;
   torsFailed: number;
   torsSkipped: number;
+  torsUnchanged: number;
   enrichedOk: number;
   enrichedRejected: number;
   enrichedFailed: number;
@@ -64,6 +65,9 @@ const ingestionRunSchema = new Schema<IIngestionRun>(
       torsUpdated: { type: Number, default: 0 },
       torsFailed: { type: Number, default: 0 },
       torsSkipped: { type: Number, default: 0 },
+      // found, matched an existing Tor whose source content hash is identical — a
+      // deliberate no-op (FR-06/idempotency), not silently unaccounted for.
+      torsUnchanged: { type: Number, default: 0 },
       enrichedOk: { type: Number, default: 0 },
       enrichedRejected: { type: Number, default: 0 },
       enrichedFailed: { type: Number, default: 0 },

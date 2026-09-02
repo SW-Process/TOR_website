@@ -71,7 +71,7 @@ async function processProject(
   client: EgpClientLike,
   storage: BlobStorage,
   parse: PdfParseFn | undefined,
-  stats: { torsCreated: number; torsUpdated: number; torsSkipped: number },
+  stats: { torsCreated: number; torsUpdated: number; torsSkipped: number; torsUnchanged: number },
   ctx: ProcessContext
 ): Promise<void> {
   const detail = await client.projectDetail(project.projectId);
@@ -104,6 +104,10 @@ async function processProject(
     await tor.save();
     updated = true;
     stats.torsUpdated += 1;
+  } else {
+    // Found, but the source content hash matches what we already have — a
+    // deliberate idempotent no-op, not an unaccounted-for outcome.
+    stats.torsUnchanged += 1;
   }
 
   for (const message of mapped.ingestErrors) {
@@ -147,7 +151,7 @@ async function crawl(
   const run = await IngestionRun.findById(runId);
   if (!run) return;
   const parse = deps.parse;
-  const stats = { torsCreated: 0, torsUpdated: 0, torsSkipped: 0 };
+  const stats = { torsCreated: 0, torsUpdated: 0, torsSkipped: 0, torsUnchanged: 0 };
   const ctx: ProcessContext = {
     allowlist: parseAgencyAllowlist(process.env),
     enqueueEnrichment: deps.enqueueEnrichment ?? enqueueEnrichmentJob,
@@ -178,11 +182,12 @@ async function crawl(
     run.stats.torsCreated = stats.torsCreated;
     run.stats.torsUpdated = stats.torsUpdated;
     run.stats.torsSkipped = stats.torsSkipped;
+    run.stats.torsUnchanged = stats.torsUnchanged;
     run.stats.torsFailed = torsFailed;
     run.completedAt = new Date();
     run.status =
       torsFailed === 0 ? "success" : torsFailed === run.stats.torsFound ? "failed" : "partial";
-    run.outcomeSummary = `found ${run.stats.torsFound}, created ${stats.torsCreated}, updated ${stats.torsUpdated}, skipped ${stats.torsSkipped}, failed ${torsFailed}`;
+    run.outcomeSummary = `found ${run.stats.torsFound}, created ${stats.torsCreated}, updated ${stats.torsUpdated}, unchanged ${stats.torsUnchanged}, skipped ${stats.torsSkipped}, failed ${torsFailed}`;
     await run.save();
     await logIngestionEvent({ severity: "info", message: run.outcomeSummary, component: "runIngestion", ingestionRunId: runId });
   } catch (fatal) {

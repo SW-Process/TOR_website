@@ -141,7 +141,9 @@ describe("runIngestion", () => {
 
     expect(await Tor.countDocuments({})).toBe(2);
     const run = await IngestionRun.findById(runId).lean();
-    expect(run?.stats).toMatchObject({ torsCreated: 0, torsUpdated: 0 });
+    // Found-but-identical is accounted for explicitly, not silently dropped from the summary.
+    expect(run?.stats).toMatchObject({ torsFound: 2, torsCreated: 0, torsUpdated: 0, torsUnchanged: 2 });
+    expect(run?.outcomeSummary).toContain("unchanged 2");
   });
 
   it("updates a Tor when the e-GP detail changed", async () => {
