@@ -51,13 +51,24 @@ Placeholders: `<PROJECT>`, `<REGION>` (`asia-southeast1`), `<BUCKET>`, `<IMG>`,
     --member=serviceAccount:tor-api-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/storage.objectViewer
   gcloud secrets add-iam-policy-binding MONGODB_URI \
     --member=serviceAccount:tor-api-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
+
+  # tor-jobs-sa also acts as the Cloud Scheduler identity, so it needs run.invoker
+  # ON EACH JOB — this binding is what lets the cron actually trigger the job
+  # (without it the scheduled :run call returns 403). Run after the jobs exist.
+  gcloud run jobs add-iam-policy-binding tor-discovery \
+    --member="serviceAccount:tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com" \
+    --role="roles/run.invoker" --region asia-southeast1
+  gcloud run jobs add-iam-policy-binding tor-enrichment \
+    --member="serviceAccount:tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com" \
+    --role="roles/run.invoker" --region asia-southeast1
   ```
 
 ## Image
 
-The backend needs a `Dockerfile` that runs `npm ci && npm run build` and leaves
-`dist/` in the image; the `CMD` is overridden per Cloud Run resource via `--command`
-/ `--args`.
+`backend/Dockerfile` is a two-stage `node:22-slim` build: it runs `npm ci && npm
+run build`, then copies `dist/` plus production-only `node_modules` into the
+runtime image. Its `CMD` (`node dist/server.js`) is overridden per Cloud Run
+resource via `--command` / `--args`.
 
 ```sh
 gcloud builds submit backend --tag <REGION>-docker.pkg.dev/<PROJECT>/tor/backend:latest
@@ -102,6 +113,10 @@ gcloud run jobs deploy tor-enrichment \
 > values contain a comma.
 
 ## Schedules (cadence lives here — change with `gcloud scheduler jobs update`, no redeploy)
+
+> These cron jobs authenticate as `tor-jobs-sa` and call the job's `:run` endpoint.
+> They only work once `tor-jobs-sa` holds `roles/run.invoker` on each job (the
+> `gcloud run jobs add-iam-policy-binding` commands in the IAM section above).
 
 ```sh
 gcloud scheduler jobs create http tor-discovery-cron --location asia-southeast1 \
