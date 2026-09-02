@@ -65,6 +65,14 @@ describe("claimNext", () => {
     expect(await claimNext("worker-A")).toBeNull();
   });
 
+  it("does not claim a processing job whose lease is still valid", async () => {
+    const id = torId();
+    await enqueue(id, "h");
+    const t0 = new Date("2026-08-31T00:00:00Z");
+    await claimNext("worker-A", t0);
+    expect(await claimNext("worker-B", new Date(t0.getTime() + LEASE_MS - 1000))).toBeNull();
+  });
+
   it("reclaims a processing job whose lease expired", async () => {
     const id = torId();
     await enqueue(id, "h");
