@@ -205,6 +205,15 @@ describe("runIngestion", () => {
     expect(await Tor.countDocuments({})).toBe(0);
   });
 
+  it("passes a lookback window to searchProjects", async () => {
+    const client = fakeClient();
+    const spy = jest.spyOn(client, "searchProjects");
+    await (await runIngestion(baseOpts, { client, storage: fakeStorage(), parse })).done;
+    const arg = spy.mock.calls[0]?.[0];
+    expect(arg?.fromDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(arg?.toDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
   it("retries the PDF on the next run when the first download failed", async () => {
     const storage = fakeStorage();
     const failing: EgpClientLike = {

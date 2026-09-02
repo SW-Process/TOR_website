@@ -8,6 +8,9 @@ import { mapProject } from "./mapProject";
 import { fetchAndStoreTorPdf } from "./fetchAndStoreTorPdf";
 import { logIngestionEvent } from "./log";
 import type { PdfParseFn } from "./pdfInspect";
+import { parseAgencyAllowlist, isAgencyAllowed } from "./agencyFilter";
+import { looksSoftwareRelated } from "./softwareKeywordGate";
+import { enqueue as enqueueEnrichmentJob } from "./enrichment/enrichmentJobRepo";
 
 export interface RunIngestionOptions {
   trigger: "manual" | "scheduled";
@@ -21,6 +24,14 @@ export interface RunIngestionDeps {
   client?: EgpClientLike;
   storage?: BlobStorage;
   parse?: PdfParseFn;
+  enqueueEnrichment?: (torId: Types.ObjectId, hash: string) => Promise<void>;
+  now?: () => Date;
+}
+
+interface ProcessContext {
+  allowlist: Set<string>;
+  enqueueEnrichment: (torId: Types.ObjectId, hash: string) => Promise<void>;
+  now: () => Date;
 }
 
 export interface RunIngestionResult {
@@ -32,8 +43,12 @@ const PAGE_SIZE = 50;
 
 async function collectProjects(
   client: EgpClientLike,
-  opts: RunIngestionOptions
+  opts: RunIngestionOptions,
+  now: Date
 ): Promise<{ projectId: string; projectNumber: string }[]> {
+  const lookbackDays = Number(process.env.INGEST_LOOKBACK_DAYS) || 7;
+  const from = new Date(now.getTime() - lookbackDays * 86_400_000);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
   const out: { projectId: string; projectNumber: string }[] = [];
   for (let page = 1; out.length < opts.maxProjects; page += 1) {
     const batch = await client.searchProjects({
@@ -41,6 +56,8 @@ async function collectProjects(
       pageSize: PAGE_SIZE,
       announceTypeId: opts.announceAllTypes ? null : TOR_TYPE_ID,
       searchText: opts.searchText,
+      fromDate: iso(from),
+      toDate: iso(now),
     });
     out.push(...batch.data.map((p) => ({ projectId: p.projectId, projectNumber: p.projectNumber })));
     if (!batch.hasNextPage || batch.data.length === 0) break;
@@ -54,9 +71,16 @@ async function processProject(
   client: EgpClientLike,
   storage: BlobStorage,
   parse: PdfParseFn | undefined,
-  stats: { torsCreated: number; torsUpdated: number }
+  stats: { torsCreated: number; torsUpdated: number; torsSkipped: number },
+  ctx: ProcessContext
 ): Promise<void> {
   const detail = await client.projectDetail(project.projectId);
+
+  if (!isAgencyAllowed(detail.masterOrgGroupName, ctx.allowlist)) {
+    stats.torsSkipped += 1;
+    return;
+  }
+
   const announcements = await client.announcements(project.projectId);
   const mapped = mapProject(project, detail, announcements, {
     fileBase: egpConfigFromEnv().fileBase,
@@ -93,6 +117,24 @@ async function processProject(
   if (mapped.torAnnouncement && needsPdf) {
     await fetchAndStoreTorPdf(tor, mapped.torAnnouncement, runId, { client, storage, parse });
   }
+
+  if (!created && !updated) return; // unchanged — nothing to enqueue
+
+  const gateText = `${mapped.set.title} ${mapped.set.goodsCategory ?? ""} ${mapped.set.procurementType ?? ""}`;
+  if (!looksSoftwareRelated(gateText)) {
+    tor.pipelineStatus = "rejected";
+    tor.classification = {
+      isSoftwareRelated: false,
+      reason: "keyword pre-gate",
+      confidence: 0,
+      model: "keyword-gate",
+      at: ctx.now(),
+    };
+    await tor.save();
+    return;
+  }
+
+  await ctx.enqueueEnrichment(tor._id as Types.ObjectId, mapped.sourceContentHash);
 }
 
 async function crawl(
@@ -100,21 +142,27 @@ async function crawl(
   opts: RunIngestionOptions,
   client: EgpClientLike,
   storage: BlobStorage,
-  parse: PdfParseFn | undefined
+  deps: RunIngestionDeps
 ): Promise<void> {
   const run = await IngestionRun.findById(runId);
   if (!run) return;
-  const stats = { torsCreated: 0, torsUpdated: 0 };
+  const parse = deps.parse;
+  const stats = { torsCreated: 0, torsUpdated: 0, torsSkipped: 0 };
+  const ctx: ProcessContext = {
+    allowlist: parseAgencyAllowlist(process.env),
+    enqueueEnrichment: deps.enqueueEnrichment ?? enqueueEnrichmentJob,
+    now: deps.now ?? (() => new Date()),
+  };
   let torsFailed = 0;
 
   try {
-    const projects = await collectProjects(client, opts);
+    const projects = await collectProjects(client, opts, ctx.now());
     run.stats.torsFound = projects.length;
     await run.save();
 
     for (const project of projects) {
       try {
-        await processProject(project, runId, client, storage, parse, stats);
+        await processProject(project, runId, client, storage, parse, stats, ctx);
       } catch (err) {
         torsFailed += 1;
         await logIngestionEvent({
@@ -129,11 +177,12 @@ async function crawl(
 
     run.stats.torsCreated = stats.torsCreated;
     run.stats.torsUpdated = stats.torsUpdated;
+    run.stats.torsSkipped = stats.torsSkipped;
     run.stats.torsFailed = torsFailed;
     run.completedAt = new Date();
     run.status =
       torsFailed === 0 ? "success" : torsFailed === run.stats.torsFound ? "failed" : "partial";
-    run.outcomeSummary = `found ${run.stats.torsFound}, created ${stats.torsCreated}, updated ${stats.torsUpdated}, failed ${torsFailed}`;
+    run.outcomeSummary = `found ${run.stats.torsFound}, created ${stats.torsCreated}, updated ${stats.torsUpdated}, skipped ${stats.torsSkipped}, failed ${torsFailed}`;
     await run.save();
     await logIngestionEvent({ severity: "info", message: run.outcomeSummary, component: "runIngestion", ingestionRunId: runId });
   } catch (fatal) {
@@ -158,7 +207,7 @@ async function crawl(
  */
 export async function markInterruptedRunsFailed(): Promise<number> {
   const res = await IngestionRun.updateMany(
-    { status: "running" },
+    { status: "running", phase: "discovery" },
     { $set: { status: "failed", completedAt: new Date(), outcomeSummary: "interrupted by a server restart" } }
   );
   return res.modifiedCount;
@@ -182,7 +231,7 @@ export async function runIngestion(
     status: "running",
   });
 
-  const done = crawl(run._id as Types.ObjectId, opts, client, storage, deps.parse);
+  const done = crawl(run._id as Types.ObjectId, opts, client, storage, deps);
   void done.catch(() => undefined); // never surfaces as an unhandled rejection
 
   return { runId: (run._id as Types.ObjectId).toString(), done };
