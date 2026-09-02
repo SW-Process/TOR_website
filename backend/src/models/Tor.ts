@@ -3,6 +3,15 @@ import { Schema, model, type Types } from "mongoose";
 export type Confidence = "high" | "medium" | "low";
 export type TorStatus = "open" | "closing_soon" | "closed";
 export type SourceTextLayer = "digital" | "scanned" | "unreadable" | "missing";
+export type TorPipelineStatus = "pending" | "processing" | "enriched" | "rejected" | "failed";
+
+export interface IClassification {
+  isSoftwareRelated: boolean;
+  reason: string;
+  confidence: number;
+  model: string;
+  at: Date;
+}
 
 export interface ISourceDocument {
   egpUrl: string;
@@ -74,6 +83,11 @@ export interface ITor {
   fairnessFlags: Types.DocumentArray<IFairnessFlag>;
   similarTORs: Types.ObjectId[];
   ingestionRunId?: Types.ObjectId;
+  category?: string;
+  categoryTags: string[];
+  taxonomyVersion?: string;
+  classification?: IClassification | null;
+  pipelineStatus: TorPipelineStatus;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -148,6 +162,21 @@ const sourceDocumentSchema = new Schema<ISourceDocument>(
 );
 
 /**
+ * classification — AI enrichment classification for the TOR.
+ * Records whether the TOR is software-related with confidence and reasoning.
+ */
+const classificationSchema = new Schema<IClassification>(
+  {
+    isSoftwareRelated: { type: Boolean, required: true },
+    reason: { type: String, required: true },
+    confidence: { type: Number, min: 0, max: 1, required: true },
+    model: { type: String, required: true },
+    at: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+/**
  * tors — the central entity.
  */
 const torSchema = new Schema<ITor>(
@@ -192,12 +221,26 @@ const torSchema = new Schema<ITor>(
     similarTORs: { type: [{ type: Schema.Types.ObjectId, ref: "Tor" }], default: [] },
     // which ingestion run last created/updated this document
     ingestionRunId: { type: Schema.Types.ObjectId, ref: "IngestionRun" },
+    category: { type: String },
+    categoryTags: { type: [String], default: [] },
+    taxonomyVersion: { type: String },
+    classification: { type: classificationSchema, default: null },
+    pipelineStatus: {
+      type: String,
+      enum: ["pending", "processing", "enriched", "rejected", "failed"],
+      default: "pending",
+    },
   },
   { timestamps: true }
 );
 
 // Full-text search over the fields the public search UI queries
 torSchema.index({ title: "text", description: "text", agency: "text" });
+
+// Enrichment indexes
+torSchema.index({ category: 1, announcementDate: -1 });
+torSchema.index({ agency: 1, announcementDate: -1 });
+torSchema.index({ pipelineStatus: 1, announcementDate: -1 });
 
 export const Tor = model<ITor>("Tor", torSchema);
 export default Tor;
