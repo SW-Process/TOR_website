@@ -236,8 +236,12 @@ describe("runIngestion", () => {
 });
 
 describe("markInterruptedRunsFailed", () => {
-  it("flips running rows to failed and leaves finished ones alone", async () => {
-    await IngestionRun.create({ trigger: "manual", status: "running" });
+  it("flips stale running rows to failed and leaves finished ones alone", async () => {
+    await IngestionRun.create({
+      trigger: "manual",
+      status: "running",
+      startedAt: new Date(Date.now() - 60 * 60_000),
+    });
     await IngestionRun.create({ trigger: "manual", status: "success", completedAt: new Date() });
     const n = await markInterruptedRunsFailed();
     expect(n).toBe(1);
@@ -245,5 +249,16 @@ describe("markInterruptedRunsFailed", () => {
     expect(await IngestionRun.countDocuments({ status: "success" })).toBe(1);
     const failed = await IngestionRun.findOne({ status: "failed" }).lean();
     expect(failed?.outcomeSummary).toBe("interrupted by a server restart");
+  });
+
+  it("does not sweep a recently started running row", async () => {
+    await IngestionRun.create({
+      trigger: "manual",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+    });
+    const n = await markInterruptedRunsFailed();
+    expect(n).toBe(0);
+    expect(await IngestionRun.countDocuments({ status: "running" })).toBe(1);
   });
 });

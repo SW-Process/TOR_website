@@ -200,14 +200,22 @@ async function crawl(
   }
 }
 
+/** A "running" discovery row older than this is treated as interrupted. */
+const STALE_RUN_MS = 35 * 60_000; // longer than the Cloud Run Job 30-min task timeout
+
 /**
- * Mark any run still flagged "running" as failed. In-process runs cannot survive
- * a restart, so a "running" row at boot is always an interrupted run.
+ * Mark any *stale* run still flagged "running" as failed. In-process runs cannot
+ * survive a restart, so an old "running" row is always an interrupted run; a
+ * recent one may still be a live crawl, so the age guard leaves it alone.
  * Returns the number of rows updated.
  */
 export async function markInterruptedRunsFailed(): Promise<number> {
   const res = await IngestionRun.updateMany(
-    { status: "running", phase: "discovery" },
+    {
+      status: "running",
+      phase: "discovery",
+      startedAt: { $lt: new Date(Date.now() - STALE_RUN_MS) },
+    },
     { $set: { status: "failed", completedAt: new Date(), outcomeSummary: "interrupted by a server restart" } }
   );
   return res.modifiedCount;
