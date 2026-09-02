@@ -48,7 +48,7 @@ async function collectProjects(
 ): Promise<{ projectId: string; projectNumber: string }[]> {
   const lookbackDays = Number(process.env.INGEST_LOOKBACK_DAYS) || 7;
   const from = new Date(now.getTime() - lookbackDays * 86_400_000);
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const iso = (d: Date) => d.toISOString();
   const out: { projectId: string; projectNumber: string }[] = [];
   for (let page = 1; out.length < opts.maxProjects; page += 1) {
     const batch = await client.searchProjects({

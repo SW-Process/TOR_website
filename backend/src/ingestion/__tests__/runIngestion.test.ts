@@ -210,8 +210,9 @@ describe("runIngestion", () => {
     const spy = jest.spyOn(client, "searchProjects");
     await (await runIngestion(baseOpts, { client, storage: fakeStorage(), parse })).done;
     const arg = spy.mock.calls[0]?.[0];
-    expect(arg?.fromDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(arg?.toDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // e-GP's GetProjectFromFilter 500s on a bare YYYY-MM-DD date; it needs full ISO precision.
+    expect(arg?.fromDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(arg?.toDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
 
   it("retries the PDF on the next run when the first download failed", async () => {
