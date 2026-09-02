@@ -94,10 +94,12 @@ describe("drainEnrichmentQueue", () => {
     expect((await EnrichmentJob.findOne({ torId: tor._id }).lean())?.status).toBe("rejected");
   });
 
-  it("marks the job failed and the TOR failed on an extractor error, and keeps going", async () => {
+  it("marks the job failed and the TOR failed on a TERMINAL extractor error, and keeps going", async () => {
     setStorageForTest(fakeStorage);
     const a = await seedTorWithJob();
     const b = await seedTorWithJob();
+    // Push both jobs to their last attempt so the throw is terminal.
+    await EnrichmentJob.updateMany({}, { $set: { attempts: 4 } });
     const out = await drainEnrichmentQueue({
       extractor: extractorReturning(new Error("boom"), result()),
     });
@@ -110,6 +112,59 @@ describe("drainEnrichmentQueue", () => {
     expect(statuses).toEqual(["enriched", "failed"]);
     const run = await IngestionRun.findById(out.runId).lean();
     expect(run?.status).toBe("partial");
+  });
+
+  it("a transient extractor error leaves the TOR pending and does not count as failed", async () => {
+    setStorageForTest(fakeStorage);
+    const tor = await seedTorWithJob(); // fresh job: attempts 0, maxAttempts 5
+    const out = await drainEnrichmentQueue({
+      extractor: extractorReturning(new Error("boom")),
+    });
+    expect(out.enrichedFailed).toBe(0);
+    expect(out.enrichedOk).toBe(0);
+    expect((await Tor.findById(tor.id).lean())?.pipelineStatus).toBe("pending");
+    const job = await EnrichmentJob.findOne({ torId: tor._id }).lean();
+    expect(job?.status).toBe("failed"); // re-queued with backoff, not terminal
+    expect(job?.attempts).toBe(1);
+    const run = await IngestionRun.findById(out.runId).lean();
+    expect(run?.status).toBe("success"); // no terminal failures this run
+  });
+
+  it("writes no IngestionRun row when the queue is empty", async () => {
+    setStorageForTest(fakeStorage);
+    const out = await drainEnrichmentQueue({ extractor: extractorReturning(result()) });
+    expect(out.claimed).toBe(0);
+    expect(out.runId).toBe("");
+    expect(await IngestionRun.countDocuments({ phase: "enrichment" })).toBe(0);
+  });
+
+  it("respects an explicit maxCalls of 0 — claims nothing, writes no run", async () => {
+    setStorageForTest(fakeStorage);
+    await seedTorWithJob();
+    const out = await drainEnrichmentQueue({ extractor: extractorReturning(result()), maxCalls: 0 });
+    expect(out.claimed).toBe(0);
+    expect(await IngestionRun.countDocuments({ phase: "enrichment" })).toBe(0);
+    expect(await EnrichmentJob.countDocuments({ status: "queued" })).toBe(1);
+  });
+
+  it("sweeps a stale running enrichment run to failed, leaves a recent one alone", async () => {
+    setStorageForTest(fakeStorage);
+    const stale = await IngestionRun.create({
+      trigger: "scheduled",
+      phase: "enrichment",
+      status: "running",
+      startedAt: new Date(Date.now() - 60 * 60_000),
+    });
+    const recent = await IngestionRun.create({
+      trigger: "scheduled",
+      phase: "enrichment",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+    });
+    await drainEnrichmentQueue({ extractor: extractorReturning(result()) });
+    expect((await IngestionRun.findById(stale.id).lean())?.status).toBe("failed");
+    expect((await IngestionRun.findById(stale.id).lean())?.outcomeSummary).toMatch(/stale enrichment run/);
+    expect((await IngestionRun.findById(recent.id).lean())?.status).toBe("running");
   });
 
   it("stops after maxCalls and leaves the rest queued", async () => {

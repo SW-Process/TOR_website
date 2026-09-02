@@ -1,11 +1,14 @@
 // backend/src/ingestion/enrichment/drainEnrichmentQueue.ts
 import { randomUUID } from "node:crypto";
-import type { Types } from "mongoose";
-import { Tor, IngestionRun } from "../../models";
+import type { HydratedDocument, Types } from "mongoose";
+import { Tor, IngestionRun, type IIngestionRun } from "../../models";
 import { getStorage, type BlobStorage } from "../../storage";
 import { logIngestionEvent } from "../log";
 import { claimNext, complete, fail } from "./enrichmentJobRepo";
 import { applyExtractionToTor, type TorExtractor } from "./torExtractor";
+
+/** Runs older than this while still "running" are treated as interrupted. */
+export const STALE_ENRICHMENT_RUN_MS = 35 * 60_000;
 
 export interface DrainDeps {
   extractor: TorExtractor;
@@ -31,16 +34,40 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 
 export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult> {
   const storage = deps.storage ?? getStorage();
-  const maxCalls = (deps.maxCalls ?? Number(process.env.MAX_AI_CALLS_PER_RUN)) || 50;
+  const envMax = Number(process.env.MAX_AI_CALLS_PER_RUN);
+  const maxCalls = deps.maxCalls ?? (Number.isFinite(envMax) ? envMax : 50);
   const now = deps.now ?? (() => new Date());
   const workerId = `enrich-${randomUUID()}`;
 
-  const run = await IngestionRun.create({
-    trigger: "scheduled",
-    phase: "enrichment",
-    status: "running",
-  });
-  const runId = run._id as Types.ObjectId;
+  // Sweep enrichment runs left "running" by an interrupted Cloud Run Job task.
+  await IngestionRun.updateMany(
+    {
+      status: "running",
+      phase: "enrichment",
+      startedAt: { $lt: new Date(Date.now() - STALE_ENRICHMENT_RUN_MS) },
+    },
+    {
+      $set: {
+        status: "failed",
+        completedAt: new Date(),
+        outcomeSummary: "interrupted (stale enrichment run swept)",
+      },
+    }
+  );
+
+  // The IngestionRun row is created lazily — only once there is a job to do —
+  // so an empty queue writes no run row.
+  let run: HydratedDocument<IIngestionRun> | null = null;
+  const ensureRun = async (): Promise<HydratedDocument<IIngestionRun>> => {
+    if (!run) {
+      run = await IngestionRun.create({
+        trigger: "scheduled",
+        phase: "enrichment",
+        status: "running",
+      });
+    }
+    return run;
+  };
 
   let claimed = 0;
   let enrichedOk = 0;
@@ -51,6 +78,8 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
     while (claimed < maxCalls) {
       const job = await claimNext(workerId, now());
       if (!job) break;
+      const activeRun = await ensureRun();
+      const runId = activeRun._id as Types.ObjectId;
       claimed += 1;
 
       const tor = await Tor.findById(job.torId);
@@ -96,50 +125,76 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
           await complete(job._id, workerId, "done");
         }
       } catch (err) {
-        enrichedFailed += 1;
-        tor.pipelineStatus = "failed";
-        await tor.save().catch(() => undefined);
         await fail(job._id, workerId, err, now());
+        // `claimNext` already $inc'd attempts, so `job.attempts` is the attempt
+        // just consumed. Only a terminal failure marks the TOR "failed".
+        const terminal = job.attempts >= job.maxAttempts;
+        if (terminal) {
+          enrichedFailed += 1;
+          tor.pipelineStatus = "failed";
+        } else {
+          // Transient: leave it re-runnable, not stuck in "processing".
+          tor.pipelineStatus = "pending";
+        }
+        await tor.save().catch(() => undefined);
         await logIngestionEvent({
           severity: "error",
-          message: `enrichment failed for TOR ${tor.projectCode ?? tor.id}: ${(err as Error).message}`,
+          message: `enrichment ${terminal ? "failed" : "errored (will retry)"} for TOR ${
+            tor.projectCode ?? tor.id
+          }: ${(err as Error).message}`,
           component: "classifier.gemini",
-          context: { torId: tor.id, stack: (err as Error).stack },
+          context: { torId: tor.id, attempt: job.attempts, terminal, stack: (err as Error).stack },
           ingestionRunId: runId,
         });
       }
     }
 
-    run.stats.torsFound = claimed;
-    run.stats.enrichedOk = enrichedOk;
-    run.stats.enrichedRejected = enrichedRejected;
-    run.stats.enrichedFailed = enrichedFailed;
-    run.completedAt = new Date();
-    run.status =
+    if (!run) {
+      return { runId: "", claimed, enrichedOk, enrichedRejected, enrichedFailed };
+    }
+
+    const activeRun: HydratedDocument<IIngestionRun> = run;
+    const runId = activeRun._id as Types.ObjectId;
+    activeRun.stats.torsFound = claimed;
+    activeRun.stats.enrichedOk = enrichedOk;
+    activeRun.stats.enrichedRejected = enrichedRejected;
+    activeRun.stats.enrichedFailed = enrichedFailed;
+    activeRun.completedAt = new Date();
+    activeRun.status =
       enrichedFailed === 0 ? "success" : enrichedOk + enrichedRejected === 0 ? "failed" : "partial";
-    run.outcomeSummary = `claimed ${claimed}, ok ${enrichedOk}, rejected ${enrichedRejected}, failed ${enrichedFailed}`;
-    await run.save();
+    activeRun.outcomeSummary = `claimed ${claimed}, ok ${enrichedOk}, rejected ${enrichedRejected}, failed ${enrichedFailed}`;
+    await activeRun.save();
     await logIngestionEvent({
       severity: "info",
-      message: run.outcomeSummary,
+      message: activeRun.outcomeSummary,
       component: "drainEnrichmentQueue",
       ingestionRunId: runId,
     });
+    return { runId: runId.toString(), claimed, enrichedOk, enrichedRejected, enrichedFailed };
   } catch (fatal) {
-    run.completedAt = new Date();
-    run.status = "failed";
-    run.outcomeSummary = `enrichment aborted: ${(fatal as Error).message}`;
-    await run.save();
-    await logIngestionEvent({
-      severity: "error",
-      message: run.outcomeSummary,
-      component: "drainEnrichmentQueue",
-      context: { stack: (fatal as Error).stack },
-      ingestionRunId: runId,
-    });
+    if (run) {
+      const activeRun: HydratedDocument<IIngestionRun> = run;
+      activeRun.completedAt = new Date();
+      activeRun.status = "failed";
+      activeRun.outcomeSummary = `enrichment aborted: ${(fatal as Error).message}`;
+      await activeRun.save();
+      await logIngestionEvent({
+        severity: "error",
+        message: activeRun.outcomeSummary,
+        component: "drainEnrichmentQueue",
+        context: { stack: (fatal as Error).stack },
+        ingestionRunId: activeRun._id as Types.ObjectId,
+      });
+      return {
+        runId: (activeRun._id as Types.ObjectId).toString(),
+        claimed,
+        enrichedOk,
+        enrichedRejected,
+        enrichedFailed,
+      };
+    }
+    return { runId: "", claimed, enrichedOk, enrichedRejected, enrichedFailed };
   }
-
-  return { runId: runId.toString(), claimed, enrichedOk, enrichedRejected, enrichedFailed };
 }
 
 export default drainEnrichmentQueue;
