@@ -1,28 +1,44 @@
+import { Storage } from "@google-cloud/storage";
 import type { BlobPutResult, BlobStorage } from "./storage.types";
 
-const NOT_IMPLEMENTED = "gcs storage not implemented";
+interface GcsFileLike {
+  save(body: Buffer, opts: { contentType: string; resumable: boolean }): Promise<void>;
+  createReadStream(): NodeJS.ReadableStream;
+  exists(): Promise<[boolean]>;
+}
+interface GcsLike {
+  bucket(name: string): { file(key: string): GcsFileLike };
+}
 
-/**
- * Placeholder so `STORAGE_DRIVER=gcs` is a one-line switch later.
- * Real implementation (`@google-cloud/storage`, signed URLs) lands in the GCS phase.
- */
+/** Blob store backed by a private GCS bucket. Auth is Application Default Credentials. */
 export class GcsStorage implements BlobStorage {
-  constructor(private readonly bucket: string) {}
+  private readonly client: GcsLike;
 
-  put(_key: string, _body: Buffer, _opts: { contentType: string }): Promise<BlobPutResult> {
-    return Promise.reject(new Error(NOT_IMPLEMENTED));
+  constructor(private readonly bucket: string, deps: { storage?: GcsLike } = {}) {
+    if (!bucket) throw new Error("GCS_BUCKET is not set");
+    this.client = deps.storage ?? (new Storage() as unknown as GcsLike);
   }
 
-  getStream(_key: string): Promise<NodeJS.ReadableStream> {
-    return Promise.reject(new Error(NOT_IMPLEMENTED));
+  private file(key: string): GcsFileLike {
+    return this.client.bucket(this.bucket).file(key);
   }
 
-  exists(_key: string): Promise<boolean> {
-    return Promise.reject(new Error(NOT_IMPLEMENTED));
+  async put(key: string, body: Buffer, opts: { contentType: string }): Promise<BlobPutResult> {
+    await this.file(key).save(body, { contentType: opts.contentType, resumable: false });
+    return { key, size: body.length };
   }
 
-  publicUrl(key: string): string | null {
-    return `https://storage.googleapis.com/${this.bucket}/${key}`;
+  async getStream(key: string): Promise<NodeJS.ReadableStream> {
+    return this.file(key).createReadStream();
+  }
+
+  async exists(key: string): Promise<boolean> {
+    const [ok] = await this.file(key).exists();
+    return ok;
+  }
+
+  publicUrl(_key: string): string | null {
+    return null;
   }
 }
 

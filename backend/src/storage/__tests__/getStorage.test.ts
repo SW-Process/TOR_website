@@ -34,10 +34,3 @@ describe("getStorage", () => {
   });
 });
 
-describe("GcsStorage stub", () => {
-  it("rejects put until implemented", async () => {
-    await expect(
-      new GcsStorage("b").put("k", Buffer.from("x"), { contentType: "application/pdf" })
-    ).rejects.toThrow(/not implemented/i);
-  });
-});
