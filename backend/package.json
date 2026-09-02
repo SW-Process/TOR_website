@@ -9,7 +9,9 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
-    "create-admin": "tsx src/scripts/createAdmin.ts"
+    "create-admin": "tsx src/scripts/createAdmin.ts",
+    "job:discovery": "node dist/jobs/discovery.js",
+    "job:enrichment": "node dist/jobs/enrichment.js"
   },
   "keywords": [],
   "author": "",
