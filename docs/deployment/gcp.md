@@ -82,26 +82,24 @@ gcloud run deploy tor-api \
 
 ```sh
 gcloud run jobs deploy tor-discovery \
-  --image <IMG> --region asia-southeast1 \
-  --service-account tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com \
+  --image <IMG> --region asia-southeast1 --service-account tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com \
   --set-secrets MONGODB_URI=MONGODB_URI:latest \
-  --set-env-vars STORAGE_DRIVER=gcs,GCS_BUCKET=<BUCKET>,INGEST_AGENCIES=สำนักดิจิทัลกรุงเทพมหานคร,INGEST_LOOKBACK_DAYS=7,INGEST_DEFAULT_MAX_PROJECTS=200 \
-  --command node --args dist/jobs/discovery.js \
-  --max-retries 0 --task-timeout 1800s --memory 512Mi
+  --set-env-vars "^::^STORAGE_DRIVER=gcs::GCS_BUCKET=<BUCKET>::INGEST_AGENCIES=สำนักดิจิทัลกรุงเทพมหานคร,สำนักการแพทย์,สำนักอนามัย,สำนักสิ่งแวดล้อม,สำนักการจราจรและขนส่ง::INGEST_LOOKBACK_DAYS=7::INGEST_DEFAULT_MAX_PROJECTS=200" \
+  --command node --args dist/jobs/discovery.js --max-retries 0 --task-timeout 1800s --memory 512Mi
 
 gcloud run jobs deploy tor-enrichment \
-  --image <IMG> --region asia-southeast1 \
-  --service-account tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com \
+  --image <IMG> --region asia-southeast1 --service-account tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com \
   --set-secrets MONGODB_URI=MONGODB_URI:latest \
-  --set-env-vars STORAGE_DRIVER=gcs,GCS_BUCKET=<BUCKET>,GOOGLE_CLOUD_PROJECT=<PROJECT>,GOOGLE_CLOUD_LOCATION=us-central1,VERTEX_MODEL=gemini-2.5-flash,MAX_AI_CALLS_PER_RUN=50 \
-  --command node --args dist/jobs/enrichment.js \
-  --max-retries 0 --task-timeout 1800s --memory 1Gi
+  --set-env-vars "^::^STORAGE_DRIVER=gcs::GCS_BUCKET=<BUCKET>::GOOGLE_CLOUD_PROJECT=<PROJECT>::GOOGLE_CLOUD_LOCATION=us-central1::VERTEX_MODEL=gemini-2.5-flash::MAX_AI_CALLS_PER_RUN=50" \
+  --command node --args dist/jobs/enrichment.js --max-retries 0 --task-timeout 1800s --memory 1Gi
 ```
 
-> `--set-env-vars` splits on commas, so a multi-value `INGEST_AGENCIES` must use a
-> different delimiter: pass `--set-env-vars ^:^INGEST_AGENCIES=a,b,c:INGEST_LOOKBACK_DAYS=7`
-> (the `^:^` prefix makes `:` the separator) or set it with `--update-env-vars` after
-> deploy.
+> Both commands use gcloud's alternate-delimiter form `--set-env-vars "^::^k=v::k=v..."`
+> because `INGEST_AGENCIES` is itself a comma-separated list: with the default separator
+> gcloud would read each agency name after the first as its own `key=value` pair and
+> reject the command. `::` is the separator here (no value contains it); the
+> `tor-enrichment` command uses the same form for consistency even though none of its
+> values contain a comma.
 
 ## Schedules (cadence lives here — change with `gcloud scheduler jobs update`, no redeploy)
 
