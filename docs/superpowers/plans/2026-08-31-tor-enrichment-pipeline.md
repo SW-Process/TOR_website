@@ -71,41 +71,37 @@
 
 ---
 
-## Task 1: Merge the crawler branch onto the work branch
+## Task 1: Verify the crawler baseline (merge already done)
+
+Work happens on `feat/21-feature-backend-aiml-ai-summary-generation-pipeline`, which already
+contains the full `feat/tor-ingestion` merge (commit `3eb4554`). This task is a
+baseline check only — no merge to perform.
 
 **Files:**
-- Modify: none by hand — this is a git merge of `feat/tor-ingestion` into `feat/11-feature-backend-tor-scraper-bangkok-filter`
+- Modify: none
 
 **Interfaces:**
-- Produces: every file listed in the spec §1 (`scraper/egpClient.ts`, `ingestion/*`, `storage/*`, `models/Tor.ts` with `sourceDocument`, `models/IngestionRun.ts`, `models/SystemLog.ts`, `controllers/ingestionController.ts`, `controllers/torDocumentController.ts`, `routes/ingestionRoutes.ts`, `routes/torRoutes.ts`, `server.ts` with `markInterruptedRunsFailed`).
+- Produces: confirmation that spec §1's files are present (`scraper/egpClient.ts`, `ingestion/*`, `storage/*`, `models/Tor.ts` with `sourceDocument`, `models/IngestionRun.ts`, `models/SystemLog.ts`, `controllers/ingestionController.ts`, `controllers/torDocumentController.ts`, `routes/ingestionRoutes.ts`, `routes/torRoutes.ts`, `server.ts` with `markInterruptedRunsFailed`).
 
-- [ ] **Step 1: Verify current state**
+- [ ] **Step 1: Verify branch and baseline files**
 
 Run: `git branch --show-current`
-Expected: `feat/11-feature-backend-tor-scraper-bangkok-filter`
+Expected: `feat/21-feature-backend-aiml-ai-summary-generation-pipeline`
 
-Run: `git log --oneline -1 feat/tor-ingestion`
-Expected: `0cb61b5 test(ingestion): cover the fatal pre-loop path and the failed-download retry` (or later)
+Run: `ls backend/src/ingestion backend/src/scraper backend/src/storage`
+Expected: `runIngestion.ts`, `egpClient.ts`, `localDiskStorage.ts`, etc. all present.
 
-- [ ] **Step 2: Merge**
-
-```bash
-git merge --no-ff feat/tor-ingestion -m "merge(ingestion): bring the e-GP crawler onto the bangkok-filter branch"
-```
-
-Expected: clean merge (this branch has no commits past `main` except the two spec commits, which do not touch backend code).
-
-- [ ] **Step 3: Install deps and run the full suite**
+- [ ] **Step 2: Install deps and run the full suite**
 
 ```bash
-cd backend && npm ci && npm test
+cd backend && npm ci && npm test && npm run typecheck && npm run build
 ```
 
-Expected: all suites pass (64 tests as of `0cb61b5`), `npm run typecheck` clean.
+Expected: all suites pass (64 tests as of `0cb61b5`), typecheck + build clean. If anything fails here, stop and resolve before Task 2 — the plan assumes a green baseline.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: No commit**
 
-The merge commit from Step 2 is the deliverable. No extra commit.
+Nothing changed; proceed to Task 2.
 
 ---
 
