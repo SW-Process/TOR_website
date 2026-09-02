@@ -93,6 +93,18 @@ describe("applyExtractionToTor", () => {
     expect(tor.category).toBeUndefined();
   });
 
+  it("clamps an out-of-range evaluationCriteria weight to 0..100 and saves without throwing", async () => {
+    const tor = await Tor.create({ title: "จ้างพัฒนาระบบ" });
+    applyExtractionToTor(
+      tor,
+      ok({ evaluationCriteria: [{ label: "ราคา", weight: 500 }, { label: "ต่ำ", weight: -20 }] }),
+      { extractorId: "gemini-2.5-flash", fallbackText: "จ้างพัฒนาระบบ" }
+    );
+    expect(tor.aiSummary?.evaluationCriteria[0]?.weight).toBe(100);
+    expect(tor.aiSummary?.evaluationCriteria[1]?.weight).toBe(0);
+    await expect(tor.save()).resolves.toBeDefined();
+  });
+
   it("ignores an unparseable submissionDeadline", async () => {
     const tor = await Tor.create({ title: "x" });
     applyExtractionToTor(tor, ok({ submissionDeadline: "ภายใน 45 วัน" }), {

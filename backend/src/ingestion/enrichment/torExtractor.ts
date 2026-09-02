@@ -83,7 +83,9 @@ export function applyExtractionToTor(
     qualifications: result.qualifications,
     evaluationCriteria: result.evaluationCriteria.map((c) => ({
       label: c.label,
-      ...(c.weight != null ? { weight: c.weight } : {}),
+      // The Tor schema constrains weight to 0..100; clamp so an out-of-range
+      // model value does not make tor.save() throw a ValidationError.
+      ...(c.weight != null ? { weight: Math.max(0, Math.min(100, c.weight)) } : {}),
     })),
     confidence: bucketConfidence(result.confidence),
     model: opts.extractorId,
