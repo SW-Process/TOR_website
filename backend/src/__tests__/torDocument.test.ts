@@ -49,6 +49,7 @@ describe("GET /api/tors/:id/document", () => {
     const tor = await Tor.create({
       title: "t",
       projectCode: "69000000001",
+      pipelineStatus: "enriched",
       sourceDocument: {
         egpUrl: "u",
         filename: "tor.pdf",
@@ -71,6 +72,27 @@ describe("GET /api/tors/:id/document", () => {
     expect(res.headers["content-type"]).toMatch(/application\/pdf/);
     expect(res.headers["content-disposition"]).toMatch(/inline/);
     expect((res.body as Buffer).equals(PDF_BYTES)).toBe(true);
+  });
+
+  it("404 when the TOR is not enriched (pending/rejected), even with a stored document", async () => {
+    for (const pipelineStatus of ["pending", "rejected"] as const) {
+      const tor = await Tor.create({
+        title: "t",
+        pipelineStatus,
+        sourceDocument: {
+          egpUrl: "u",
+          filename: "tor.pdf",
+          storageKey: "tor-pdfs/69000000001/ann-1.pdf",
+          textLayer: "scanned",
+          pageCount: 3,
+          byteSize: PDF_BYTES.length,
+          sha256: "c".repeat(64),
+          fetchedAt: new Date(),
+        },
+      });
+      const res = await request(app).get(`/api/tors/${tor._id.toString()}/document`);
+      expect(res.status).toBe(404);
+    }
   });
 
   it("404 when the TOR has no stored document", async () => {
