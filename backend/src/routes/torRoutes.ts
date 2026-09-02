@@ -1,9 +1,13 @@
 import { Router } from "express";
 import { streamTorDocument } from "../controllers/torDocumentController";
+import { listTors, getTor, priceStats } from "../controllers/torController";
 
 const router = Router();
 
-// TOR search / detail endpoints land here later; for now just the document stream.
+// /price-stats is declared before /:id so it is not captured as an id.
+router.get("/", listTors);
+router.get("/price-stats", priceStats);
+router.get("/:id", getTor);
 router.get("/:id/document", streamTorDocument);
 
 export default router;
