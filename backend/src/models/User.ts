@@ -8,7 +8,7 @@ export type UserRole = "vendor" | "admin";
 export interface IUser {
   email: string;
   passwordHash: string | null;
-  googleOAuthId: string | null;
+  googleOAuthId?: string;
   role: UserRole;
   createdAt: Date;
   updatedAt: Date;
@@ -41,8 +41,9 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     },
     // bcrypt hash — never selected by default, set via the `password` virtual
     passwordHash: { type: String, default: null, select: false },
-    // null when the account has never used Google sign-in
-    googleOAuthId: { type: String, default: null, unique: true, sparse: true },
+    // Left unset (not null) for email/password accounts — a `null` default would
+    // put every such account into the sparse unique index and collide on the 2nd one.
+    googleOAuthId: { type: String, unique: true, sparse: true },
     role: {
       type: String,
       enum: ["vendor", "admin"],
