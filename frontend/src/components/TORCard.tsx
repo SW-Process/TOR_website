@@ -3,8 +3,15 @@ import { ArrowUpRight, Building2, Eye } from "lucide-react";
 import { TOR, daysUntil, formatBudget, formatThaiDate } from "@/lib/mockData";
 import StatusBadge from "./StatusBadge";
 import BookmarkButton from "./BookmarkButton";
+import MatchScoreBadge from "./MatchScoreBadge";
 
-export default function TORCard({ tor }: { tor: TOR }) {
+export default function TORCard({
+  tor,
+  showMatchScore = false,
+}: {
+  tor: TOR;
+  showMatchScore?: boolean;
+}) {
   const remaining = daysUntil(tor.deadline);
   const deadlineLabel =
     tor.status === "ปิดรับแล้ว"
@@ -64,6 +71,7 @@ export default function TORCard({ tor }: { tor: TOR }) {
           </Link>
         </div>
       </div>
+      {showMatchScore && <MatchScoreBadge tor={tor} />}
     </div>
   );
 }

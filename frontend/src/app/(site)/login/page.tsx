@@ -2,13 +2,28 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowUpRight, Lock, Mail } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
+import { useAuth } from "@/lib/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login, isLoggedIn, ready: authReady } = useAuth();
   const [signingIn, setSigningIn] = useState(false);
+  const [email, setEmail] = useState("");
+  const [nextPath, setNextPath] = useState("/");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setNextPath(params.get("next") || "/dashboard");
+  }, []);
+
+  useEffect(() => {
+    if (authReady && isLoggedIn && !signingIn) router.replace("/dashboard");
+  }, [authReady, isLoggedIn, signingIn, router]);
+
+  if (authReady && isLoggedIn && !signingIn) return null;
 
   return (
     <div className="relative flex min-h-screen flex-1 items-center overflow-hidden bg-[linear-gradient(135deg,_var(--color-blush-deep)_0%,_var(--color-blush)_45%,_var(--color-blush-soft)_100%)]">
@@ -65,7 +80,8 @@ export default function LoginPage() {
                 onSubmit={(e) => {
                   e.preventDefault();
                   setSigningIn(true);
-                  setTimeout(() => router.push("/"), 700);
+                  login({ name: email.split("@")[0] || "สมาชิก", email });
+                  setTimeout(() => router.push(nextPath), 700);
                 }}
                 className="mt-7 flex flex-col gap-4"
               >
@@ -76,6 +92,8 @@ export default function LoginPage() {
                     <input
                       required
                       type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@email.com"
                       className="w-full bg-transparent text-sm focus:outline-none"
                     />
@@ -111,6 +129,11 @@ export default function LoginPage() {
 
               <button
                 type="button"
+                onClick={() => {
+                  setSigningIn(true);
+                  login({ name: "ผู้ใช้ Google", email: "google.user@example.com" });
+                  router.push(nextPath);
+                }}
                 className="mt-4 flex w-full items-center justify-center gap-2.5 rounded-full border border-[var(--color-border)] bg-white py-3 text-sm font-semibold text-[var(--color-text)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-blush-soft)]/40"
               >
                 <GoogleIcon size={18} />

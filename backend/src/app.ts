@@ -4,6 +4,8 @@ import cookieParser from "cookie-parser";
 import "./types/http";
 import healthRoutes from "./routes/healthRoutes";
 import authRoutes from "./routes/authRoutes";
+import ingestionRoutes from "./routes/ingestionRoutes";
+import torRoutes from "./routes/torRoutes";
 import { notFound, errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -19,6 +21,8 @@ app.use(cookieParser());
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/ingestion", ingestionRoutes);
+app.use("/api/tors", torRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

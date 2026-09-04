@@ -2,16 +2,26 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowUpRight, Lock, Mail, User } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
+import { useAuth } from "@/lib/useAuth";
 
 export default function SignUpPage() {
   const router = useRouter();
+  const { login, isLoggedIn, ready: authReady } = useAuth();
   const [signingUp, setSigningUp] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+
+  useEffect(() => {
+    if (authReady && isLoggedIn && !signingUp) router.replace("/dashboard");
+  }, [authReady, isLoggedIn, signingUp, router]);
+
+  if (authReady && isLoggedIn && !signingUp) return null;
 
   return (
     <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-[linear-gradient(135deg,_var(--color-blush-deep)_0%,_var(--color-blush)_45%,_var(--color-blush-soft)_100%)] px-4 py-8">
@@ -44,7 +54,8 @@ export default function SignUpPage() {
             }
             setPasswordError("");
             setSigningUp(true);
-            setTimeout(() => router.push("/"), 700);
+            login({ name: name || email.split("@")[0] || "สมาชิก", email });
+            setTimeout(() => router.push("/account/profile?onboarding=1"), 700);
           }}
           className="mt-5 flex flex-col gap-3"
         >
@@ -55,6 +66,8 @@ export default function SignUpPage() {
               <input
                 required
                 type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="ชื่อ-นามสกุล"
                 className="w-full bg-transparent text-sm focus:outline-none"
               />
@@ -67,6 +80,8 @@ export default function SignUpPage() {
               <input
                 required
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@email.com"
                 className="w-full bg-transparent text-sm focus:outline-none"
               />
@@ -121,6 +136,11 @@ export default function SignUpPage() {
 
         <button
           type="button"
+          onClick={() => {
+            setSigningUp(true);
+            login({ name: "ผู้ใช้ Google", email: "google.user@example.com" });
+            router.push("/account/profile?onboarding=1");
+          }}
           className="mt-3 flex w-full items-center justify-center gap-2.5 rounded-full border border-[var(--color-border)] bg-white py-2.5 text-sm font-semibold text-[var(--color-text)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-blush-soft)]/40"
         >
           <GoogleIcon size={18} />
