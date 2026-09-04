@@ -1,0 +1,20 @@
+info:
+  name: run-detail
+  type: http
+
+http:
+  method: GET
+  url: http://localhost:8000/api/ingestion/runs/:id
+  auth: inherit
+
+params:
+  path:
+    - name: id
+      value: "REPLACE_WITH_RUN_ID"
+      enabled: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

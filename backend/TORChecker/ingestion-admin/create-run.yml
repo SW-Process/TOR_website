@@ -1,0 +1,28 @@
+info:
+  name: create-run
+  type: http
+
+http:
+  method: POST
+  url: http://localhost:8000/api/ingestion/runs
+  body: json
+  auth: inherit
+
+headers:
+  - name: Content-Type
+    value: application/json
+    enabled: true
+
+body:
+  json: |-
+    {
+      "maxProjects": 5,
+      "searchText": "ซอฟต์แวร์"
+    }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+​

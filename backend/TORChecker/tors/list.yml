@@ -1,0 +1,14 @@
+info:
+  name: list
+  type: http
+
+http:
+  method: GET
+  url: http://localhost:8000/api/tors?page=1&pageSize=20
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
