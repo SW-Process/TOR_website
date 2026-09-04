@@ -1,0 +1,68 @@
+name: CI
+
+# Run on every PR into main, and again on the commit that lands on main.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# If you push twice quickly to the same branch/PR, cancel the older run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend (typecheck · test · build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  frontend:
+    name: frontend (build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `next build` also runs `tsc`, so this gates on type errors too.
+      # `npm run lint` is NOT gated yet — see .github/workflows/README.md.
+      - name: Build
+        run: npm run build
+        env:
+          # src/lib/mongodb.ts throws at import time if this is unset.
+          # The build never opens a connection, so any non-empty value works.
+          MONGODB_URI: mongodb://127.0.0.1:27017/ci
