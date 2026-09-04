@@ -9,11 +9,15 @@ export interface ISavedSearch {
 
 export interface IVendorProfile {
   userId: Types.ObjectId;
+  companyName?: string;
   businessType?: string;
   registeredCapital?: number;
   yearsExperience?: number;
+  teamSize?: number;
   certifications: string[];
   technologyStack: string[];
+  // TOR categories the vendor wants to be matched against (FR-30)
+  interestedCategories: string[];
   budgetRange?: { min?: number; max?: number };
   serviceArea?: string;
   savedSearches: Types.DocumentArray<ISavedSearch>;
@@ -48,11 +52,14 @@ const vendorProfileSchema = new Schema<IVendorProfile>(
       required: true,
       unique: true, // 1:1 with users
     },
+    companyName: { type: String, trim: true },
     businessType: { type: String, trim: true },
     registeredCapital: { type: Number, min: 0 },
     yearsExperience: { type: Number, min: 0 },
+    teamSize: { type: Number, min: 0 },
     certifications: { type: [String], default: [] },
     technologyStack: { type: [String], default: [] },
+    interestedCategories: { type: [String], default: [] },
     budgetRange: {
       min: { type: Number, min: 0 },
       max: { type: Number, min: 0 },
