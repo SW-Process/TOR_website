@@ -47,6 +47,8 @@ export default function ProfilePage() {
   const { profile, ready, saveProfile } = useProfile();
   const [form, setForm] = useState<BusinessProfile>(emptyProfile);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [isOnboarding, setIsOnboarding] = useState(false);
 
   useEffect(() => {
@@ -72,9 +74,18 @@ export default function ProfilePage() {
 
   const formEl = !ready ? null : (
     <form
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
-        saveProfile(form);
+        setSaveError("");
+        setSaving(true);
+        try {
+          await saveProfile(form);
+        } catch {
+          setSaving(false);
+          setSaveError("บันทึกโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่");
+          return;
+        }
+        setSaving(false);
         if (isOnboarding) {
           router.push("/dashboard");
           return;
@@ -223,15 +234,22 @@ export default function ProfilePage() {
       </section>
 
       <div className="flex items-center gap-3 pt-1">
-        <button type="submit" className="btn-pill btn-pill-primary px-5 py-2.5 text-sm">
-          {isOnboarding ? "บันทึกและไปแดชบอร์ด" : "บันทึกโปรไฟล์"}
-          {isOnboarding && <ArrowRight size={14} />}
+        <button
+          type="submit"
+          disabled={saving}
+          className="btn-pill btn-pill-primary px-5 py-2.5 text-sm disabled:opacity-70"
+        >
+          {saving ? "กำลังบันทึก..." : isOnboarding ? "บันทึกและไปแดชบอร์ด" : "บันทึกโปรไฟล์"}
+          {isOnboarding && !saving && <ArrowRight size={14} />}
         </button>
         {saved && (
           <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-success)]">
             <CheckCircle2 size={16} />
             บันทึกแล้ว
           </span>
+        )}
+        {saveError && (
+          <span className="text-sm font-medium text-[var(--color-rose-dark)]">{saveError}</span>
         )}
       </div>
     </form>
@@ -308,7 +326,6 @@ export default function ProfilePage() {
         </h1>
         <p className="text-sm text-[var(--color-text-muted)] mt-1.5 max-w-2xl">
           กรอกข้อมูลธุรกิจของคุณเพื่อให้ระบบช่วยประเมินว่า TOR แต่ละงานเหมาะกับคุณแค่ไหน
-          ข้อมูลนี้จัดเก็บไว้ในเบราว์เซอร์นี้เท่านั้น
         </p>
 
         <div className="mt-6 max-w-3xl">{matchNote}</div>

@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { daysUntil, type Category, type TOR } from "@/lib/mockData";
-
-const STORAGE_KEY = "tor-insight:profile";
+import { apiFetch } from "@/lib/api";
 
 export interface BusinessProfile {
   businessName: string;
@@ -31,14 +30,66 @@ export const emptyProfile: BusinessProfile = {
   certifications: "",
 };
 
-function readStorage(): BusinessProfile | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as BusinessProfile) : null;
-  } catch {
-    return null;
-  }
+interface BackendVendorProfile {
+  companyName?: string;
+  businessType?: string;
+  registeredCapital?: number;
+  yearsExperience?: number;
+  teamSize?: number;
+  certifications?: string[];
+  interestedCategories?: string[];
+  budgetRange?: { min?: number; max?: number };
+  serviceArea?: string;
+}
+
+// The vendor profile is otherwise empty on first load (no companyName etc.)
+// once the account exists, so treat that as "no profile filled in yet".
+function isEmpty(p: BackendVendorProfile): boolean {
+  return (
+    !p.companyName &&
+    !p.businessType &&
+    !p.registeredCapital &&
+    !p.yearsExperience &&
+    !p.teamSize &&
+    !(p.certifications && p.certifications.length) &&
+    !(p.interestedCategories && p.interestedCategories.length) &&
+    !p.budgetRange?.min &&
+    !p.budgetRange?.max &&
+    !p.serviceArea
+  );
+}
+
+function fromBackend(p: BackendVendorProfile): BusinessProfile {
+  return {
+    businessName: p.companyName ?? "",
+    businessType: p.businessType ?? "",
+    interestedCategories: (p.interestedCategories ?? []) as Category[],
+    registeredCapital: p.registeredCapital ?? 0,
+    experienceYears: p.yearsExperience ?? 0,
+    teamSize: p.teamSize ?? 0,
+    budgetMin: p.budgetRange?.min ?? 0,
+    budgetMax: p.budgetRange?.max ?? 0,
+    serviceArea: p.serviceArea ?? "",
+    certifications: (p.certifications ?? []).join(", "),
+  };
+}
+
+function toBackend(p: BusinessProfile): Record<string, unknown> {
+  return {
+    companyName: p.businessName,
+    businessType: p.businessType,
+    registeredCapital: p.registeredCapital,
+    yearsExperience: p.experienceYears,
+    teamSize: p.teamSize,
+    certifications: p.certifications
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    interestedCategories: p.interestedCategories,
+    budgetMin: p.budgetMin,
+    budgetMax: p.budgetMax,
+    serviceArea: p.serviceArea,
+  };
 }
 
 export function useProfile() {
@@ -46,13 +97,18 @@ export function useProfile() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setProfile(readStorage());
-    setReady(true);
+    apiFetch<{ profile: BackendVendorProfile }>("/vendor/profile")
+      .then(({ profile: p }) => setProfile(isEmpty(p) ? null : fromBackend(p)))
+      .catch(() => setProfile(null))
+      .finally(() => setReady(true));
   }, []);
 
-  const saveProfile = useCallback((next: BusinessProfile) => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    setProfile(next);
+  const saveProfile = useCallback(async (next: BusinessProfile) => {
+    const { profile: p } = await apiFetch<{ profile: BackendVendorProfile }>("/vendor/profile", {
+      method: "PUT",
+      body: JSON.stringify(toBackend(next)),
+    });
+    setProfile(fromBackend(p));
   }, []);
 
   return { profile, ready, saveProfile, hasProfile: !!profile };
