@@ -30,6 +30,9 @@ export interface IEvaluationCriterion {
 }
 
 export interface IAiSummary {
+  // AI-generated from the source PDF — not the agency's own wording, shown
+  // to users as a summary, never as an official description.
+  summary: string | null;
   keyPoints: string[];
   qualifications: string[];
   evaluationCriteria: IEvaluationCriterion[];
@@ -57,7 +60,6 @@ export interface IFairnessFlag {
 
 export interface ITor {
   title: string;
-  description?: string;
   sourceDocumentUrl?: string;
   referencePrice?: number;
   sourceListingUrl?: string;
@@ -74,8 +76,6 @@ export interface ITor {
   submissionDeadline?: Date;
   technologyStack: string[];
   projectType?: string;
-  qualificationRequirements: string[];
-  evaluationCriteria?: string;
   location?: string;
   status: TorStatus;
   viewCount: number;
@@ -98,6 +98,7 @@ export interface ITor {
  */
 const aiSummarySchema = new Schema<IAiSummary>(
   {
+    summary: { type: String, default: null },
     keyPoints: { type: [String], default: [] },
     qualifications: { type: [String], default: [] },
     evaluationCriteria: {
@@ -182,7 +183,6 @@ const classificationSchema = new Schema<IClassification>(
 const torSchema = new Schema<ITor>(
   {
     title: { type: String, required: true, trim: true },
-    description: { type: String },
     // reference into GCS — the PDF binary is not stored in Mongo
     sourceDocumentUrl: { type: String },
     // ราคากลาง — fairness compares budget against this (Section 5.2)
@@ -204,8 +204,6 @@ const torSchema = new Schema<ITor>(
     submissionDeadline: { type: Date, index: true },
     technologyStack: { type: [String], default: [], index: true },
     projectType: { type: String, index: true },
-    qualificationRequirements: { type: [String], default: [] },
-    evaluationCriteria: { type: String },
     location: { type: String },
     // lifecycle status, derivable from submissionDeadline but denormalized for filtering
     status: {
@@ -235,7 +233,9 @@ const torSchema = new Schema<ITor>(
 );
 
 // Full-text search over the fields the public search UI queries
-torSchema.index({ title: "text", description: "text", agency: "text" });
+// (description text lives in aiSummary.summary — deliberately excluded, see
+// the RULING in torController.ts on why search uses a title regex, not $text)
+torSchema.index({ title: "text", agency: "text" });
 
 // Enrichment indexes
 torSchema.index({ category: 1, announcementDate: -1 });

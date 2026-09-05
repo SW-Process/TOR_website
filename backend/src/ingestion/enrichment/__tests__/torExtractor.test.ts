@@ -58,13 +58,13 @@ describe("applyExtractionToTor", () => {
     expect(tor.pipelineStatus).toBe("enriched");
     expect(tor.classification?.isSoftwareRelated).toBe(true);
     expect(tor.classification?.model).toBe("gemini-2.5-flash");
-    expect(tor.description).toBe("โครงการพัฒนาระบบ...");
+    expect(tor.aiSummary?.summary).toBe("โครงการพัฒนาระบบ...");
     expect(tor.aiSummary?.keyPoints).toEqual(["จัดทำระบบ", "อบรมผู้ใช้"]);
+    expect(tor.aiSummary?.qualifications).toEqual(["ทุนจดทะเบียน 5 ล้าน"]);
     expect(tor.aiSummary?.confidence).toBe("high");
     expect(tor.aiSummary?.model).toBe("gemini-2.5-flash");
     expect(tor.aiSummary?.evaluationCriteria.map((c) => c.label)).toEqual(["ราคา", "เทคนิค"]);
     expect(tor.technologyStack).toEqual(["React", "PostgreSQL"]);
-    expect(tor.qualificationRequirements).toEqual(["ทุนจดทะเบียน 5 ล้าน"]);
     expect(tor.category).toBe("information-system");
     expect(tor.categoryTags).toEqual(["mis"]);
     expect(tor.taxonomyVersion).toBe("2026-08-31");

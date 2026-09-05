@@ -74,11 +74,10 @@ export function applyExtractionToTor(
   }
 
   tor.pipelineStatus = "enriched";
-  if (result.summary) tor.description = result.summary;
   tor.technologyStack = result.technologyStack;
-  tor.qualificationRequirements = result.qualifications;
 
   tor.aiSummary = {
+    summary: result.summary,
     keyPoints: result.keyPoints,
     qualifications: result.qualifications,
     evaluationCriteria: result.evaluationCriteria.map((c) => ({
