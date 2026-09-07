@@ -29,16 +29,25 @@ feature — get the wording wrong and the product could defame a government agen
   3. **Qualification/specification narrowness** — eligibility or technical
      requirements are worded narrowly enough to plausibly match one specific
      product/brand/vendor.
-- Write these as `Tor.fairnessFlags` entries with `status: "open"`, ready for a
-  future Admin review UI (out of scope here — see Non-goals).
+- Write these as `Tor.fairnessFlags` entries with `status: "open"`, surfaced
+  wherever Admin already looks at a TOR (out of scope here — see Non-goals).
 - Keep the defamation constraint enforced at the prompt level: every flag message
   is a neutral, descriptive observation, never an accusation.
 
+**Clarified workflow (important — shapes the non-goals below):** an Admin does not
+triage flags one by one in a review queue. Their job is to fix whatever the AI got
+wrong when a flag looks off — correct the misread `category`/`budget`/extracted
+field, or otherwise fix the underlying data — not to click
+"acknowledge"/"dismiss" on the flag itself. `status` exists on the schema already
+but this feature does not build any workflow that changes it; it stays `"open"`
+for everything this pipeline writes.
+
 ## Non-goals (this phase)
 
-- **Admin review/dismiss endpoint.** No `PATCH` to change `status` from `"open"`
-  to `"acknowledged"`/`"dismissed"` is built here. This is intentionally deferred;
-  see "Known future concern" below for the interaction this creates.
+- **Any admin-facing correction/editing capability.** Whatever lets an Admin fix
+  an AI's wrong extraction (category, budget, a bad fairness signal, etc.) is a
+  separate, more general feature than "fairness flags" specifically — it would
+  apply to every AI-derived field, not just this one. Not designed here.
 - **Deterministic/rule-based thresholds.** Budget and deadline outliers are judged
   by Gemini holistically alongside the specification-narrowness signal, not by
   hand-coded percentage/day thresholds. This was a deliberate choice: rigid
@@ -166,14 +175,13 @@ Rationale:
   `qualificationRequirements` signal naturally comes back empty since the prompt
   requires document support — no special-case code needed. Budget/deadline
   signals can still be assessed from metadata alone.
-- **Re-enrichment overwrites `fairnessFlags`.** Not a problem in this phase since
-  `status` never becomes anything but `"open"` (no admin endpoint exists to change
-  it yet). **Known future concern:** once an admin review/dismiss endpoint exists,
-  a naive full-array overwrite on re-enrichment will silently discard an admin's
-  `"dismissed"`/`"acknowledged"` status. That future work must reconcile
-  (e.g. merge by `field`+`message` instead of replacing wholesale) — flagging here
-  so it isn't forgotten, not solving it now (YAGNI: no consumer of `status` exists
-  yet).
+- **Re-enrichment overwrites `fairnessFlags`.** This is fine, not just tolerable:
+  per the clarified workflow above, an Admin resolves a flag by fixing the
+  underlying data, not by dismissing the flag object itself. Fixing the data is
+  exactly what triggers a fresh `sourceContentHash` and a re-enrichment — so a
+  full-array overwrite naturally reflects the corrected state on the next run.
+  There is no `"dismissed"`/`"acknowledged"` state being produced by anything
+  today for an overwrite to destroy.
 - **Malformed severity/field enum value from Gemini:** zod rejects the whole
   object, which — per the existing `drainEnrichmentQueue` retry logic — becomes a
   transient failure and retries. This is the same failure mode already handled for
