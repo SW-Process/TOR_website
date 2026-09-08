@@ -15,7 +15,9 @@ RUN npm ci
 FROM deps AS dev
 COPY . .
 EXPOSE 3000
-CMD ["npm", "run", "dev", "--", "-H", "0.0.0.0"]
+# `npm install` on start reconciles the node_modules volume (which persists
+# across `up --build`) with package.json after a dependency changes.
+CMD ["sh", "-c", "npm install && npm run dev -- -H 0.0.0.0"]
 
 # ---- build: produce the standalone production bundle ----
 FROM deps AS build
