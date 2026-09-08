@@ -11,7 +11,13 @@ const noopSleep = async (): Promise<void> => undefined;
 
 const input: ExtractInput = {
   pdfs: [{ fileName: "tor.pdf", content: Buffer.from("%PDF-1.4 fake") }],
-  meta: { projectCode: "69000000001", title: "จ้างพัฒนาระบบสารสนเทศ", agency: "สำนักการแพทย์", budget: 5_000_000 },
+  meta: {
+    projectCode: "69000000001",
+    title: "จ้างพัฒนาระบบสารสนเทศ",
+    agency: "สำนักการแพทย์",
+    budget: 5_000_000,
+    announcementDate: "2026-08-01T00:00:00.000Z",
+  },
 };
 
 const goodJson = JSON.stringify({
@@ -26,6 +32,7 @@ const goodJson = JSON.stringify({
   evaluationCriteria: [{ label: "ราคา", weight: 30 }],
   technologyStack: ["Node.js"],
   submissionDeadline: null,
+  fairnessSignals: [{ field: "budget", severity: "medium", message: "งบต่างจากราคากลางพอสมควร" }],
 });
 
 describe("GeminiExtractor", () => {
@@ -69,6 +76,8 @@ describe("GeminiExtractor", () => {
     expect(RESPONSE_SCHEMA.properties?.categoryTags?.type).toBe(Type.ARRAY);
     expect(RESPONSE_SCHEMA.properties?.categoryTags?.items?.type).toBe(Type.STRING);
     expect(RESPONSE_SCHEMA.properties?.evaluationCriteria?.items?.type).toBe(Type.OBJECT);
+    expect(RESPONSE_SCHEMA.properties?.fairnessSignals?.type).toBe(Type.ARRAY);
+    expect(RESPONSE_SCHEMA.properties?.fairnessSignals?.items?.type).toBe(Type.OBJECT);
     const allTypes = [
       RESPONSE_SCHEMA.type,
       ...Object.values(RESPONSE_SCHEMA.properties ?? {}).map((p) => p.type),
@@ -130,6 +139,15 @@ describe("GeminiExtractor", () => {
     const x = new GeminiExtractor({ model: "gemini-2.5-flash", generate: async () => ({ text: bad }) });
     await expect(x.extract(input)).rejects.toThrow();
   });
+
+  it("carries fairnessSignals through to the validated result", async () => {
+    const generate = jest.fn().mockResolvedValue({ text: goodJson });
+    const x = new GeminiExtractor({ model: "gemini-2.5-flash", generate });
+    const result = await x.extract(input);
+    expect(result.fairnessSignals).toEqual([
+      { field: "budget", severity: "medium", message: "งบต่างจากราคากลางพอสมควร" },
+    ]);
+  });
 });
 
 // Spec §14: live Vertex smoke test. Skipped in CI; documents the wire contract.
@@ -163,5 +181,10 @@ describe("buildPrompt", () => {
     expect(p).toContain("69000000001");
     expect(p).toContain("สำนักการแพทย์");
     expect(p).toContain("<tor_document>");
+  });
+
+  it("includes the announcement date when known", () => {
+    const p = buildPrompt(input);
+    expect(p).toContain("2026-08-01T00:00:00.000Z");
   });
 });
