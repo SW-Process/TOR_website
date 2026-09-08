@@ -17,7 +17,9 @@ FROM deps AS dev
 ENV NODE_ENV=development
 COPY . .
 EXPOSE 8000
-CMD ["npm", "run", "dev"]
+# `npm install` on start reconciles the node_modules volume (which persists
+# across `up --build`) with package.json after a dependency changes.
+CMD ["sh", "-c", "npm install && npm run dev"]
 
 # ---- build: compile TypeScript to dist/ ----
 FROM deps AS build
