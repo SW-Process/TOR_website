@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/useAuth";
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { login, isLoggedIn, ready: authReady } = useAuth();
+  const { register, startGoogleLogin, isLoggedIn, ready: authReady } = useAuth();
   const [signingUp, setSigningUp] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -46,16 +46,25 @@ export default function SignUpPage() {
         </p>
 
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             if (password !== confirmPassword) {
               setPasswordError("รหัสผ่านไม่ตรงกัน");
               return;
             }
+            if (password.length < 8) {
+              setPasswordError("รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร");
+              return;
+            }
             setPasswordError("");
             setSigningUp(true);
-            login({ name: name || email.split("@")[0] || "สมาชิก", email });
-            setTimeout(() => router.push("/account/profile?onboarding=1"), 700);
+            const result = await register(email, password);
+            if (!result.ok) {
+              setPasswordError(result.error || "สมัครสมาชิกไม่สำเร็จ");
+              setSigningUp(false);
+              return;
+            }
+            router.push("/account/profile?onboarding=1");
           }}
           className="mt-5 flex flex-col gap-3"
         >
@@ -138,8 +147,7 @@ export default function SignUpPage() {
           type="button"
           onClick={() => {
             setSigningUp(true);
-            login({ name: "ผู้ใช้ Google", email: "google.user@example.com" });
-            router.push("/account/profile?onboarding=1");
+            startGoogleLogin();
           }}
           className="mt-3 flex w-full items-center justify-center gap-2.5 rounded-full border border-[var(--color-border)] bg-white py-2.5 text-sm font-semibold text-[var(--color-text)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-blush-soft)]/40"
         >

@@ -25,6 +25,10 @@ FROM deps AS build
 # itself never opens a connection, so any value works here.
 ARG MONGODB_URI=mongodb://mongo:27017/tor_website
 ENV MONGODB_URI=$MONGODB_URI
+# NEXT_PUBLIC_* is inlined at build time — pass the real backend URL here for
+# production images (the dev target reads it from the environment at runtime).
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 COPY . .
 RUN npm run build
 

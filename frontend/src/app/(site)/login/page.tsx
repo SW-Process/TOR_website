@@ -7,16 +7,27 @@ import { ArrowUpRight, Lock, Mail } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
 import { useAuth } from "@/lib/useAuth";
 
+const OAUTH_ERRORS: Record<string, string> = {
+  google_state: "การเข้าสู่ระบบด้วย Google หมดเวลา กรุณาลองใหม่",
+  google_exchange: "ไม่สามารถยืนยันตัวตนกับ Google ได้ กรุณาลองใหม่",
+  google_unverified_email: "อีเมล Google ของคุณยังไม่ได้รับการยืนยัน",
+  google_unavailable: "การเข้าสู่ระบบด้วย Google ไม่พร้อมใช้งานในขณะนี้",
+};
+
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoggedIn, ready: authReady } = useAuth();
+  const { login, startGoogleLogin, isLoggedIn, ready: authReady } = useAuth();
   const [signingIn, setSigningIn] = useState(false);
   const [email, setEmail] = useState("");
-  const [nextPath, setNextPath] = useState("/");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [nextPath, setNextPath] = useState("/dashboard");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setNextPath(params.get("next") || "/dashboard");
+    const oauthError = params.get("error");
+    if (oauthError) setError(OAUTH_ERRORS[oauthError] || "เข้าสู่ระบบด้วย Google ไม่สำเร็จ");
   }, []);
 
   useEffect(() => {
@@ -77,11 +88,17 @@ export default function LoginPage() {
               </p>
 
               <form
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
+                  setError("");
                   setSigningIn(true);
-                  login({ name: email.split("@")[0] || "สมาชิก", email });
-                  setTimeout(() => router.push(nextPath), 700);
+                  const result = await login(email, password);
+                  if (!result.ok) {
+                    setError(result.error || "เข้าสู่ระบบไม่สำเร็จ");
+                    setSigningIn(false);
+                    return;
+                  }
+                  router.push(nextPath);
                 }}
                 className="mt-7 flex flex-col gap-4"
               >
@@ -106,11 +123,18 @@ export default function LoginPage() {
                     <input
                       required
                       type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
                       className="w-full bg-transparent text-sm focus:outline-none"
                     />
                   </div>
                 </label>
+                {error && (
+                  <p className="rounded-xl bg-[var(--color-rose-light)] px-3 py-2 text-xs font-medium text-[var(--color-rose-dark)]">
+                    {error}
+                  </p>
+                )}
                 <button
                   type="submit"
                   disabled={signingIn}
@@ -131,8 +155,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => {
                   setSigningIn(true);
-                  login({ name: "ผู้ใช้ Google", email: "google.user@example.com" });
-                  router.push(nextPath);
+                  startGoogleLogin();
                 }}
                 className="mt-4 flex w-full items-center justify-center gap-2.5 rounded-full border border-[var(--color-border)] bg-white py-3 text-sm font-semibold text-[var(--color-text)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-blush-soft)]/40"
               >

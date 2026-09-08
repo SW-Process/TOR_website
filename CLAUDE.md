@@ -60,6 +60,8 @@ The frontend does **not** only call the Express backend. It has its own Mongoose
 ### Frontend runs on mock data
 Pages currently render from `frontend/src/lib/mockData.ts` and `frontend/src/lib/adminMockData.ts`. Domain types and enum values are **in Thai** (e.g. status `"เปิดรับ"`, categories). Route groups: `(site)/` for public+vendor pages, `admin/` for the admin panel. All frontend work is implementation from existing mockups — not UI design.
 
+**Auth is real**, though: `useAuth` (`frontend/src/lib/useAuth.ts`) calls the Express backend (`/api/auth/*` via `frontend/src/lib/api.ts`, `NEXT_PUBLIC_API_BASE_URL`) with `credentials: "include"` — email/password + Google OAuth, HttpOnly cookie. The other `use*` hooks (`useProfile`, `useBookmarks`, …) are still localStorage mocks.
+
 Next 16 note: `searchParams` in page components is a `Promise` and must be `await`ed.
 
 ### `munyin.py` — e-GP ingestion (not yet wired into the backend)
