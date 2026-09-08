@@ -108,8 +108,20 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
             budget: tor.budget,
             referencePrice: tor.referencePrice,
             goodsCategory: tor.goodsCategory,
+            announcementDate: tor.announcementDate?.toISOString(),
           },
         });
+
+        if (result.fairnessSignals.length > 0) {
+          console.log(
+            JSON.stringify({
+              component: "drainEnrichmentQueue",
+              event: "fairness-flags",
+              torId: tor.id,
+              count: result.fairnessSignals.length,
+            })
+          );
+        }
 
         applyExtractionToTor(tor, result, {
           extractorId: deps.extractor.id,

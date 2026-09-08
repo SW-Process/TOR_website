@@ -187,4 +187,62 @@ describe("drainEnrichmentQueue", () => {
     expect(out.enrichedOk).toBe(0);
     expect((await EnrichmentJob.findOne({ torId: tor._id }).lean())?.status).toBe("done");
   });
+
+  it("passes the TOR's announcementDate to the extractor", async () => {
+    setStorageForTest(fakeStorage);
+    const announcementDate = new Date("2026-08-01T00:00:00.000Z");
+    await seedTorWithJob({ announcementDate });
+    const extract = jest.fn().mockResolvedValue(result());
+    await drainEnrichmentQueue({ extractor: { id: "fake", extract } });
+    expect(extract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        meta: expect.objectContaining({ announcementDate: announcementDate.toISOString() }),
+      })
+    );
+  });
+
+  it("logs a fairness-flags observability line when signals are present", async () => {
+    setStorageForTest(fakeStorage);
+    const tor = await seedTorWithJob();
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      await drainEnrichmentQueue({
+        extractor: extractorReturning(
+          result({ fairnessSignals: [{ field: "budget", severity: "high", message: "x" }] })
+        ),
+      });
+      const payloads = logSpy.mock.calls.map((c) => {
+        try {
+          return JSON.parse(String(c[0]));
+        } catch {
+          return null;
+        }
+      });
+      const line = payloads.find((p) => p && p.event === "fairness-flags");
+      expect(line).toBeTruthy();
+      expect(line.torId).toBe(tor.id);
+      expect(line.count).toBe(1);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("does not log a fairness-flags line when there are no signals", async () => {
+    setStorageForTest(fakeStorage);
+    await seedTorWithJob();
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      await drainEnrichmentQueue({ extractor: extractorReturning(result()) });
+      const payloads = logSpy.mock.calls.map((c) => {
+        try {
+          return JSON.parse(String(c[0]));
+        } catch {
+          return null;
+        }
+      });
+      expect(payloads.some((p) => p && p.event === "fairness-flags")).toBe(false);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
 });
