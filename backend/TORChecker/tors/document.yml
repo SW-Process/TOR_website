@@ -6,12 +6,10 @@ http:
   method: GET
   url: http://localhost:8000/api/tors/:id/document
   auth: inherit
-
-params:
-  path:
+  params:
     - name: id
       value: "REPLACE_WITH_TOR_ID"
-      enabled: true
+      type: path
 
 settings:
   encodeUrl: true
