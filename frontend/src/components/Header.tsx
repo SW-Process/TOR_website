@@ -29,14 +29,14 @@ const memberLinks = [
 export default function Header() {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { user, ready, isLoggedIn, logout } = useAuth();
+  const { user, displayName, ready, isLoggedIn, logout } = useAuth();
   const router = useRouter();
 
   const loggedIn = ready && isLoggedIn;
   const navLinks = [...publicLinks, ...(loggedIn ? memberLinks : [])];
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     setMenuOpen(false);
     setOpen(false);
     router.push("/");
@@ -92,14 +92,14 @@ export default function Header() {
                 onClick={() => setMenuOpen((v) => !v)}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ink)] text-xs font-bold text-white"
               >
-                {(user?.name || "ส").trim().slice(0, 1).toUpperCase()}
+                {(displayName || "ส").trim().slice(0, 1).toUpperCase()}
               </button>
               {menuOpen && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
                   <div className="absolute right-0 top-full z-40 mt-2 w-56 rounded-2xl border border-[var(--color-border)] bg-white p-1.5 shadow-[var(--shadow-lg)]">
                     <div className="px-3 py-2">
-                      <p className="text-sm font-semibold text-[var(--color-text)] truncate">{user?.name}</p>
+                      <p className="text-sm font-semibold text-[var(--color-text)] truncate">{displayName}</p>
                       <p className="text-xs text-[var(--color-text-faint)] truncate">{user?.email}</p>
                     </div>
                     <div className="my-1 h-px bg-[var(--color-border)]" />
@@ -167,7 +167,7 @@ export default function Header() {
                 onClick={() => setOpen(false)}
                 className="rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
               >
-                โปรไฟล์ธุรกิจ · {user?.name}
+                โปรไฟล์ธุรกิจ · {displayName}
               </Link>
               <button
                 onClick={handleLogout}
