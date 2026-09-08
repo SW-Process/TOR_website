@@ -1,5 +1,12 @@
 # Local development stack: frontend + backend + mongo, all with hot reload.
 # Production images are the `runner` stage of each Dockerfile (not used here).
+#
+# To point the stack at a remote database (e.g. MongoDB Atlas) instead of the
+# bundled `mongo` container, put MONGODB_URI in a root `.env` file (gitignored):
+#
+#   MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/tor_website?retryWrites=true&w=majority
+#
+# The `mongo` service still starts but goes unused — `docker compose stop mongo`.
 services:
   frontend:
     build:
@@ -8,7 +15,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      MONGODB_URI: mongodb://mongo:27017/tor_website
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/tor_website}
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
       NEXT_TELEMETRY_DISABLED: "1"
       WATCHPACK_POLLING: "true"
@@ -31,7 +38,7 @@ services:
     environment:
       PORT: "8000"
       NODE_ENV: development
-      MONGODB_URI: mongodb://mongo:27017/tor_website
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/tor_website}
       JWT_SECRET: ${JWT_SECRET:-dev-insecure-secret-change-me}
       JWT_EXPIRES_IN: 7d
       CLIENT_ORIGIN: http://localhost:3000
