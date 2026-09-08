@@ -55,7 +55,7 @@ The frontend does **not** only call the Express backend. It has its own Mongoose
 ### Backend data model (`backend/src/models/`, index in `models/index.ts`)
 8 collections: `users`, `vendorprofiles` (1:1 with vendor user), `tors` (central entity), `bookmarks` (vendor↔TOR join + application status), `notifications`, `errorreports` (public-submitted TOR corrections), `ingestionruns`, `systemlogs`.
 
-`Tor` embeds `aiSummary` and `fairnessFlags` (fetched with the TOR, never queried alone). PDF binaries live in GCS, not Mongo — `sourceDocumentUrl` is a reference. `similarTORs` is a precomputed array of ObjectIds. There is a text index on `title`/`description`/`agency`.
+`Tor` embeds `aiSummary` and `fairnessFlags` (fetched with the TOR, never queried alone). The AI-written description lives at `aiSummary.summary` — never presented as the agency's own text, since it's a model-generated summary of a government document, not an official field. PDF binaries live in GCS, not Mongo — `sourceDocumentUrl` is a reference. `similarTORs` is a precomputed array of ObjectIds. There is a text index on `title`/`agency` (search actually uses a regex on `title`, not `$text` — see the RULING in `torController.ts`).
 
 ### Frontend runs on mock data
 Pages currently render from `frontend/src/lib/mockData.ts` and `frontend/src/lib/adminMockData.ts`. Domain types and enum values are **in Thai** (e.g. status `"เปิดรับ"`, categories). Route groups: `(site)/` for public+vendor pages, `admin/` for the admin panel. All frontend work is implementation from existing mockups — not UI design.
@@ -77,6 +77,17 @@ downloads each TOR PDF through the `BlobStorage` adapter (`storage/`, `STORAGE_D
 = `local` now, `gcs` later). `pdfInspect` tags each file `digital` / `scanned` /
 `unreadable` / `missing`; OCR and AI stages consume that later. Binaries never go in
 Mongo. Progress and errors land in `IngestionRun` + `SystemLog` (source `ingestion`).
+
+### AI enrichment (`backend/src/ingestion/enrichment/`)
+Discovery (`runIngestion`) now also filters projects by `INGEST_AGENCIES` and, for
+each created/changed `Tor`, enqueues an `EnrichmentJob`. A separate batch
+(`drainEnrichmentQueue`, entrypoint `dist/jobs/enrichment.js`) claims jobs under a
+Mongo lease and runs one Gemini (`@google/genai`, Vertex) multimodal call per TOR
+that classifies software-relatedness, writes `aiSummary` + scalar fields, and sets
+`category` from `config/taxonomy.ts`. `Tor.pipelineStatus` gates the public read
+API (`GET /api/tors`, `/:id`, `/price-stats`) to `"enriched"` rows only. Extraction
+is behind the `TorExtractor` seam (`EXTRACTOR` env). Deploy: two Cloud Run Jobs on
+Cloud Scheduler — see `docs/deployment/gcp.md`.
 
 ## Environment
 

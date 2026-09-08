@@ -19,12 +19,14 @@ export { Notification } from "./Notification";
 export { ErrorReport } from "./ErrorReport";
 export { IngestionRun } from "./IngestionRun";
 export { SystemLog } from "./SystemLog";
+export { EnrichmentJob } from "./EnrichmentJob";
 
 export type { IUser, UserRole, UserDocument } from "./User";
 export type { IVendorProfile, ISavedSearch } from "./VendorProfile";
-export type { ITor, IAiSummary, IFairnessFlag, ISourceDocument, SourceTextLayer } from "./Tor";
+export type { ITor, IAiSummary, IFairnessFlag, ISourceDocument, SourceTextLayer, TorPipelineStatus, IClassification } from "./Tor";
 export type { IBookmark, ApplicationStatus } from "./Bookmark";
 export type { INotification, NotificationType } from "./Notification";
 export type { IErrorReport } from "./ErrorReport";
-export type { IIngestionRun } from "./IngestionRun";
+export type { IIngestionRun, IngestionPhase } from "./IngestionRun";
 export type { ISystemLog } from "./SystemLog";
+export type { IEnrichmentJob, EnrichmentJobStatus } from "./EnrichmentJob";

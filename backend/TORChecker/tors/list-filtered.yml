@@ -1,0 +1,14 @@
+info:
+  name: list-filtered
+  type: http
+
+http:
+  method: GET
+  url: http://localhost:8000/api/tors?q=ระบบ&category=information-system&agency=สำนักการแพทย์&budgetMin=100000&budgetMax=5000000&page=1&pageSize=20
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

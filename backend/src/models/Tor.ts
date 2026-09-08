@@ -3,6 +3,15 @@ import { Schema, model, type Types } from "mongoose";
 export type Confidence = "high" | "medium" | "low";
 export type TorStatus = "open" | "closing_soon" | "closed";
 export type SourceTextLayer = "digital" | "scanned" | "unreadable" | "missing";
+export type TorPipelineStatus = "pending" | "processing" | "enriched" | "rejected" | "failed";
+
+export interface IClassification {
+  isSoftwareRelated: boolean;
+  reason: string;
+  confidence: number;
+  model: string;
+  at: Date;
+}
 
 export interface ISourceDocument {
   egpUrl: string;
@@ -21,6 +30,9 @@ export interface IEvaluationCriterion {
 }
 
 export interface IAiSummary {
+  // AI-generated from the source PDF — not the agency's own wording, shown
+  // to users as a summary, never as an official description.
+  summary: string | null;
   keyPoints: string[];
   qualifications: string[];
   evaluationCriteria: IEvaluationCriterion[];
@@ -48,7 +60,6 @@ export interface IFairnessFlag {
 
 export interface ITor {
   title: string;
-  description?: string;
   sourceDocumentUrl?: string;
   referencePrice?: number;
   sourceListingUrl?: string;
@@ -65,8 +76,6 @@ export interface ITor {
   submissionDeadline?: Date;
   technologyStack: string[];
   projectType?: string;
-  qualificationRequirements: string[];
-  evaluationCriteria?: string;
   location?: string;
   status: TorStatus;
   viewCount: number;
@@ -74,6 +83,11 @@ export interface ITor {
   fairnessFlags: Types.DocumentArray<IFairnessFlag>;
   similarTORs: Types.ObjectId[];
   ingestionRunId?: Types.ObjectId;
+  category?: string;
+  categoryTags: string[];
+  taxonomyVersion?: string;
+  classification?: IClassification | null;
+  pipelineStatus: TorPipelineStatus;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,6 +98,7 @@ export interface ITor {
  */
 const aiSummarySchema = new Schema<IAiSummary>(
   {
+    summary: { type: String, default: null },
     keyPoints: { type: [String], default: [] },
     qualifications: { type: [String], default: [] },
     evaluationCriteria: {
@@ -148,12 +163,26 @@ const sourceDocumentSchema = new Schema<ISourceDocument>(
 );
 
 /**
+ * classification — AI enrichment classification for the TOR.
+ * Records whether the TOR is software-related with confidence and reasoning.
+ */
+const classificationSchema = new Schema<IClassification>(
+  {
+    isSoftwareRelated: { type: Boolean, required: true },
+    reason: { type: String, required: true },
+    confidence: { type: Number, min: 0, max: 1, required: true },
+    model: { type: String, required: true },
+    at: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+/**
  * tors — the central entity.
  */
 const torSchema = new Schema<ITor>(
   {
     title: { type: String, required: true, trim: true },
-    description: { type: String },
     // reference into GCS — the PDF binary is not stored in Mongo
     sourceDocumentUrl: { type: String },
     // ราคากลาง — fairness compares budget against this (Section 5.2)
@@ -175,8 +204,6 @@ const torSchema = new Schema<ITor>(
     submissionDeadline: { type: Date, index: true },
     technologyStack: { type: [String], default: [], index: true },
     projectType: { type: String, index: true },
-    qualificationRequirements: { type: [String], default: [] },
-    evaluationCriteria: { type: String },
     location: { type: String },
     // lifecycle status, derivable from submissionDeadline but denormalized for filtering
     status: {
@@ -192,12 +219,29 @@ const torSchema = new Schema<ITor>(
     similarTORs: { type: [{ type: Schema.Types.ObjectId, ref: "Tor" }], default: [] },
     // which ingestion run last created/updated this document
     ingestionRunId: { type: Schema.Types.ObjectId, ref: "IngestionRun" },
+    category: { type: String },
+    categoryTags: { type: [String], default: [] },
+    taxonomyVersion: { type: String },
+    classification: { type: classificationSchema, default: null },
+    pipelineStatus: {
+      type: String,
+      enum: ["pending", "processing", "enriched", "rejected", "failed"],
+      default: "pending",
+    },
   },
   { timestamps: true }
 );
 
 // Full-text search over the fields the public search UI queries
-torSchema.index({ title: "text", description: "text", agency: "text" });
+// (description text lives in aiSummary.summary — deliberately excluded, see
+// the RULING in torController.ts on why search uses a title regex, not $text)
+torSchema.index({ title: "text", agency: "text" });
+
+// Enrichment indexes
+torSchema.index({ category: 1, announcementDate: -1 });
+torSchema.index({ agency: 1, announcementDate: -1 });
+torSchema.index({ pipelineStatus: 1, announcementDate: -1 });
+torSchema.index({ categoryTags: 1 });
 
 export const Tor = model<ITor>("Tor", torSchema);
 export default Tor;

@@ -1,0 +1,18 @@
+info:
+  name: detail
+  type: http
+
+http:
+  method: GET
+  url: http://localhost:8000/api/tors/:id
+  auth: inherit
+  params:
+    - name: id
+      value: "REPLACE_WITH_TOR_ID"
+      type: path
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -141,7 +141,9 @@ describe("runIngestion", () => {
 
     expect(await Tor.countDocuments({})).toBe(2);
     const run = await IngestionRun.findById(runId).lean();
-    expect(run?.stats).toMatchObject({ torsCreated: 0, torsUpdated: 0 });
+    // Found-but-identical is accounted for explicitly, not silently dropped from the summary.
+    expect(run?.stats).toMatchObject({ torsFound: 2, torsCreated: 0, torsUpdated: 0, torsUnchanged: 2 });
+    expect(run?.outcomeSummary).toContain("unchanged 2");
   });
 
   it("updates a Tor when the e-GP detail changed", async () => {
@@ -205,6 +207,16 @@ describe("runIngestion", () => {
     expect(await Tor.countDocuments({})).toBe(0);
   });
 
+  it("passes a lookback window to searchProjects", async () => {
+    const client = fakeClient();
+    const spy = jest.spyOn(client, "searchProjects");
+    await (await runIngestion(baseOpts, { client, storage: fakeStorage(), parse })).done;
+    const arg = spy.mock.calls[0]?.[0];
+    // e-GP's GetProjectFromFilter 500s on a bare YYYY-MM-DD date; it needs full ISO precision.
+    expect(arg?.fromDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(arg?.toDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+
   it("retries the PDF on the next run when the first download failed", async () => {
     const storage = fakeStorage();
     const failing: EgpClientLike = {
@@ -227,8 +239,12 @@ describe("runIngestion", () => {
 });
 
 describe("markInterruptedRunsFailed", () => {
-  it("flips running rows to failed and leaves finished ones alone", async () => {
-    await IngestionRun.create({ trigger: "manual", status: "running" });
+  it("flips stale running rows to failed and leaves finished ones alone", async () => {
+    await IngestionRun.create({
+      trigger: "manual",
+      status: "running",
+      startedAt: new Date(Date.now() - 60 * 60_000),
+    });
     await IngestionRun.create({ trigger: "manual", status: "success", completedAt: new Date() });
     const n = await markInterruptedRunsFailed();
     expect(n).toBe(1);
@@ -236,5 +252,16 @@ describe("markInterruptedRunsFailed", () => {
     expect(await IngestionRun.countDocuments({ status: "success" })).toBe(1);
     const failed = await IngestionRun.findOne({ status: "failed" }).lean();
     expect(failed?.outcomeSummary).toBe("interrupted by a server restart");
+  });
+
+  it("does not sweep a recently started running row", async () => {
+    await IngestionRun.create({
+      trigger: "manual",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+    });
+    const n = await markInterruptedRunsFailed();
+    expect(n).toBe(0);
+    expect(await IngestionRun.countDocuments({ status: "running" })).toBe(1);
   });
 });
