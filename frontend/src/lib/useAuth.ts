@@ -79,33 +79,37 @@ export function useAuth() {
     };
   }, []);
 
-  const login = useCallback(async (email: string, password: string): Promise<AuthResult> => {
-    const res = await apiFetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { message?: string };
-      return { ok: false, error: readError(res.status, body) };
-    }
-    await refreshSession();
-    return { ok: true };
-  }, []);
+  const submitCredentials = useCallback(
+    async (path: string, email: string, password: string): Promise<AuthResult> => {
+      let res: Response;
+      try {
+        res = await apiFetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+      } catch {
+        return { ok: false, error: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่" };
+      }
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { message?: string };
+        return { ok: false, error: readError(res.status, body) };
+      }
+      await refreshSession();
+      return { ok: true };
+    },
+    []
+  );
 
-  const register = useCallback(async (email: string, password: string): Promise<AuthResult> => {
-    const res = await apiFetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { message?: string };
-      return { ok: false, error: readError(res.status, body) };
-    }
-    await refreshSession();
-    return { ok: true };
-  }, []);
+  const login = useCallback(
+    (email: string, password: string) => submitCredentials("/api/auth/login", email, password),
+    [submitCredentials]
+  );
+
+  const register = useCallback(
+    (email: string, password: string) => submitCredentials("/api/auth/register", email, password),
+    [submitCredentials]
+  );
 
   const logout = useCallback(async () => {
     await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => {});

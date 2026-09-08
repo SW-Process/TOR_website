@@ -15,9 +15,10 @@ RUN npm ci
 FROM deps AS dev
 COPY . .
 EXPOSE 3000
-# `npm install` on start reconciles the node_modules volume (which persists
-# across `up --build`) with package.json after a dependency changes.
-CMD ["sh", "-c", "npm install && npm run dev -- -H 0.0.0.0"]
+# `npm ci` on start rebuilds the node_modules volume for this container's
+# platform (the volume persists across `up --build` and can go stale after a
+# dependency change). --prefer-offline keeps it fast via the mounted npm cache.
+CMD ["sh", "-c", "npm ci --prefer-offline --no-audit && npm run dev -- -H 0.0.0.0"]
 
 # ---- build: produce the standalone production bundle ----
 FROM deps AS build
