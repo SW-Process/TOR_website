@@ -25,6 +25,7 @@ const ok = (over: Partial<TorExtractionResult> = {}): TorExtractionResult => ({
   evaluationCriteria: [{ label: "ราคา", weight: 30 }, { label: "เทคนิค", weight: 70 }],
   technologyStack: ["React", "PostgreSQL"],
   submissionDeadline: "2026-09-30",
+  fairnessSignals: [],
   ...over,
 });
 
@@ -42,6 +43,16 @@ describe("torExtractionResultSchema", () => {
   });
   it("rejects confidence outside 0..1", () => {
     expect(torExtractionResultSchema.safeParse(ok({ confidence: 1.5 })).success).toBe(false);
+  });
+  it("coerces a null fairnessSignals to []", () => {
+    const parsed = torExtractionResultSchema.parse({ ...ok(), fairnessSignals: null });
+    expect(parsed.fairnessSignals).toEqual([]);
+  });
+  it("rejects an invalid fairnessSignals field enum", () => {
+    const bad = ok({
+      fairnessSignals: [{ field: "bogus", severity: "high", message: "x" }] as never,
+    });
+    expect(torExtractionResultSchema.safeParse(bad).success).toBe(false);
   });
 });
 
@@ -112,5 +123,30 @@ describe("applyExtractionToTor", () => {
       fallbackText: "x",
     });
     expect(tor.submissionDeadline).toBeUndefined();
+  });
+
+  it("maps fairnessSignals into tor.fairnessFlags with status 'open'", async () => {
+    const tor = await Tor.create({ title: "จ้างพัฒนาระบบ" });
+    applyExtractionToTor(
+      tor,
+      ok({ fairnessSignals: [{ field: "budget", severity: "high", message: "งบสูงกว่าราคากลางอย่างมีนัยสำคัญ" }] }),
+      { extractorId: "gemini-2.5-flash", fallbackText: "จ้างพัฒนาระบบ" }
+    );
+    expect(tor.fairnessFlags).toHaveLength(1);
+    expect(tor.fairnessFlags[0]?.field).toBe("budget");
+    expect(tor.fairnessFlags[0]?.severity).toBe("high");
+    expect(tor.fairnessFlags[0]?.message).toBe("งบสูงกว่าราคากลางอย่างมีนัยสำคัญ");
+    expect(tor.fairnessFlags[0]?.status).toBe("open");
+    expect(tor.fairnessFlags[0]?.detectedAt).toBeInstanceOf(Date);
+    await expect(tor.save()).resolves.toBeDefined();
+  });
+
+  it("leaves fairnessFlags empty when Gemini reports no signals", async () => {
+    const tor = await Tor.create({ title: "จ้างพัฒนาระบบ" });
+    applyExtractionToTor(tor, ok({ fairnessSignals: [] }), {
+      extractorId: "gemini-2.5-flash",
+      fallbackText: "จ้างพัฒนาระบบ",
+    });
+    expect(tor.fairnessFlags).toHaveLength(0);
   });
 });

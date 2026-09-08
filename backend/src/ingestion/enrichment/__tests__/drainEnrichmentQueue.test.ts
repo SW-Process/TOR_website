@@ -35,6 +35,7 @@ const result = (over: Partial<TorExtractionResult> = {}): TorExtractionResult =>
   evaluationCriteria: [],
   technologyStack: [],
   submissionDeadline: null,
+  fairnessSignals: [],
   ...over,
 });
 

@@ -5,6 +5,14 @@ import { TAXONOMY_VERSION, isTaxonomyCategory, fallbackCategory } from "../../co
 
 const strArray = z.preprocess((v) => (v == null ? [] : v), z.array(z.string()));
 
+export const fairnessSignalSchema = z.object({
+  field: z.enum(["budget", "deadline", "qualificationRequirements", "other"]),
+  severity: z.enum(["low", "medium", "high"]),
+  message: z.string().min(1),
+});
+
+export type FairnessSignal = z.infer<typeof fairnessSignalSchema>;
+
 export const torExtractionResultSchema = z.object({
   isSoftwareRelated: z.boolean(),
   classificationReason: z.string().min(1),
@@ -20,6 +28,7 @@ export const torExtractionResultSchema = z.object({
   ),
   technologyStack: strArray,
   submissionDeadline: z.string().nullable(),
+  fairnessSignals: z.preprocess((v) => (v == null ? [] : v), z.array(fairnessSignalSchema)),
 });
 
 export type TorExtractionResult = z.infer<typeof torExtractionResultSchema>;
@@ -33,6 +42,7 @@ export interface ExtractInput {
     budget?: number;
     referencePrice?: number;
     goodsCategory?: string;
+    announcementDate?: string;
   };
 }
 
@@ -100,4 +110,12 @@ export function applyExtractionToTor(
 
   const deadline = parseDeadline(result.submissionDeadline);
   if (deadline) tor.submissionDeadline = deadline;
+
+  tor.fairnessFlags = result.fairnessSignals.map((s) => ({
+    field: s.field,
+    severity: s.severity,
+    message: s.message,
+    detectedAt: now,
+    status: "open",
+  })) as unknown as typeof tor.fairnessFlags;
 }
