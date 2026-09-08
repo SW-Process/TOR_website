@@ -1,11 +1,19 @@
+import crypto from "crypto";
 import type { Request, Response } from "express";
 import { User } from "../models";
 import type { UserDocument } from "../models/User";
 import { signToken, cookieOptions, COOKIE_NAME } from "../utils/token";
 import { httpError } from "../utils/httpError";
+import {
+  isGoogleOAuthConfigured,
+  buildGoogleAuthUrl,
+  exchangeCodeForIdentity,
+  type GoogleIdentity,
+} from "../config/google";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
+const OAUTH_STATE_COOKIE = "oauth_state";
 
 interface Credentials {
   email: string;
@@ -23,10 +31,19 @@ function validateCredentials(body: unknown): Credentials {
   return { email, password };
 }
 
+/** Set the session cookie for `user`. */
+function issueSession(res: Response, user: UserDocument): void {
+  res.cookie(COOKIE_NAME, signToken(user), cookieOptions());
+}
+
 function sendSession(res: Response, user: UserDocument, status: number): void {
-  const token = signToken(user);
-  res.cookie(COOKIE_NAME, token, cookieOptions());
+  issueSession(res, user);
   res.status(status).json({ user });
+}
+
+function clientUrl(path: string): string {
+  const base = process.env.CLIENT_ORIGIN || "http://localhost:3000";
+  return `${base.replace(/\/$/, "")}${path}`;
 }
 
 /** POST /api/auth/register — create a vendor account and start a session. */
@@ -66,4 +83,63 @@ export async function me(req: Request, res: Response): Promise<void> {
   const user = await User.findById(req.user!.id);
   if (!user) throw httpError(401, "Account no longer exists");
   res.status(200).json({ user });
+}
+
+/* ------------------------------ Google OAuth ------------------------------- */
+
+/** GET /api/auth/google — redirect the browser to Google's consent screen (FR-21). */
+export async function googleStart(_req: Request, res: Response): Promise<void> {
+  if (!isGoogleOAuthConfigured()) throw httpError(503, "Google sign-in is not available");
+
+  const state = crypto.randomBytes(16).toString("hex");
+  res.cookie(OAUTH_STATE_COOKIE, state, {
+    ...cookieOptions(),
+    maxAge: 10 * 60 * 1000,
+  });
+  res.redirect(buildGoogleAuthUrl(state));
+}
+
+/**
+ * GET /api/auth/google/callback — Google redirects here with `code` + `state`.
+ * Verifies the identity, upserts the User, starts a session, and bounces the
+ * browser back to the frontend.
+ */
+export async function googleCallback(req: Request, res: Response): Promise<void> {
+  const fail = (reason: string) => res.redirect(clientUrl(`/login?error=${reason}`));
+
+  if (!isGoogleOAuthConfigured()) return fail("google_unavailable");
+
+  const { code, state } = req.query;
+  const expectedState = req.cookies?.[OAUTH_STATE_COOKIE] as string | undefined;
+  res.clearCookie(OAUTH_STATE_COOKIE, cookieOptions());
+
+  if (typeof code !== "string" || typeof state !== "string" || state !== expectedState) {
+    return fail("google_state");
+  }
+
+  let identity: GoogleIdentity;
+  try {
+    identity = await exchangeCodeForIdentity(code);
+  } catch {
+    return fail("google_exchange");
+  }
+  if (!identity.emailVerified) return fail("google_unverified_email");
+
+  const email = identity.email.toLowerCase();
+  let user = await User.findOne({ googleOAuthId: identity.googleId });
+  let isNew = false;
+
+  if (!user) {
+    user = await User.findOne({ email });
+    if (user) {
+      user.googleOAuthId = identity.googleId; // link Google to the existing account
+      await user.save();
+    } else {
+      user = await User.create({ email, role: "vendor", googleOAuthId: identity.googleId });
+      isNew = true;
+    }
+  }
+
+  issueSession(res, user);
+  res.redirect(clientUrl(isNew ? "/account/profile?onboarding=1" : "/dashboard"));
 }
