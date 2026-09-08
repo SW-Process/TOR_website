@@ -35,12 +35,17 @@ npm start          # node dist/server.js
 npm test           # jest --runInBand
 npm run typecheck  # tsc --noEmit
 
-# Full local stack via Docker (from repo root) — runs frontend + mongo ONLY, not backend
-docker compose up --build      # http://localhost:3000
-docker compose down -v         # also wipes local mongo volume
+# Full local stack via Docker (from repo root) — frontend + backend + mongo, all hot-reloading
+docker compose up --build      # frontend :3000, backend :8000
+docker compose down -v         # also wipes mongo + cached volumes
 ```
 
-The backend has a Jest suite (`npm test`); the frontend has no test framework configured. There are no CI workflows despite `.github/` existing.
+Each app's `Dockerfile` is multi-stage: `dev` target (used by compose) and a
+`runner` target that builds a production image (`docker build --target runner ...`).
+The frontend production image needs `output: "standalone"` in `next.config.ts`.
+
+The backend has a Jest suite (`npm test`); the frontend has no test framework configured.
+CI runs on PRs into `main` (`.github/workflows/ci.yml`): backend typecheck + test + build, frontend build.
 
 ## Architecture notes that span files
 

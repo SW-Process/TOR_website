@@ -1,7 +1,15 @@
 node_modules
 dist
-npm-debug.log
+coverage
+storage
 .env
 .env.*
-coverage
+!.env.example
+*.log
+npm-debug.log*
 .git
+.github
+.vscode
+Dockerfile
+.dockerignore
+README.md
