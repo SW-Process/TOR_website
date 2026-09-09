@@ -5,7 +5,9 @@ import {
   CalendarClock,
   ChevronRight,
   Download,
+  ExternalLink,
   Eye,
+  FileX2,
   Hash,
   MapPin,
   ShieldAlert,
@@ -130,14 +132,16 @@ export default async function TORDetailPage({
                   <div key={c.label}>
                     <div className="flex justify-between text-xs text-[var(--color-text-muted)] mb-1">
                       <span>{c.label}</span>
-                      <span>{c.weight}%</span>
+                      <span>{c.weight === undefined ? "ไม่ระบุน้ำหนัก" : `${c.weight}%`}</span>
                     </div>
-                    <div className="h-2 rounded-full bg-white overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-[var(--color-rose-dark)]"
-                        style={{ width: `${c.weight}%` }}
-                      />
-                    </div>
+                    {c.weight !== undefined && (
+                      <div className="h-2 rounded-full bg-white overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[var(--color-rose-dark)]"
+                          style={{ width: `${c.weight}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -159,7 +163,7 @@ export default async function TORDetailPage({
           {related.length > 0 && (
             <div className="mt-12">
               <h2 className="font-[family-name:var(--font-heading)] text-lg font-bold text-[var(--color-text)] mb-4">
-                TOR ที่เกี่ยวข้อง
+                TOR ในหมวดหมู่เดียวกัน
               </h2>
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
                 {related.map((t) => (
@@ -194,10 +198,38 @@ export default async function TORDetailPage({
             </div>
 
             <div className="mt-5 flex flex-col gap-2.5">
-              <a href={tor.documentUrl} className="btn-pill btn-pill-primary w-full py-2.5 text-sm">
-                <Download size={16} />
-                ดาวน์โหลดเอกสารต้นฉบับ (PDF)
-              </a>
+              {tor.documentUrl ? (
+                <a
+                  href={tor.documentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-pill btn-pill-primary w-full py-2.5 text-sm"
+                >
+                  <Download size={16} />
+                  ดาวน์โหลดเอกสารต้นฉบับ (PDF)
+                </a>
+              ) : (
+                <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-alt)] px-4 py-5 text-center">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[var(--color-rose-dark)] shadow-[var(--shadow-sm)]">
+                    <FileX2 size={18} />
+                  </span>
+                  <p className="text-xs font-semibold text-[var(--color-text)]">TOR นี้ไม่มีเอกสาร PDF</p>
+                  <p className="text-[11px] leading-relaxed text-[var(--color-text-faint)]">
+                    ลองดูประกาศต้นฉบับที่ e-GP แทนด้านล่างนี้
+                  </p>
+                </div>
+              )}
+              {tor.sourceListingUrl && (
+                <a
+                  href={tor.sourceListingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-pill w-full border border-[var(--color-border-strong)] py-2.5 text-sm text-[var(--color-text)]"
+                >
+                  <ExternalLink size={16} />
+                  ดูประกาศต้นฉบับที่ e-GP
+                </a>
+              )}
               <BookmarkButton id={tor.id} variant="full" />
               <ReportIssueButton torId={tor.projectCode} />
             </div>

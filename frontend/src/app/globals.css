@@ -52,6 +52,13 @@
   --font-heading: var(--font-heading);
 }
 
+html {
+  /* Always reserve the vertical scrollbar's width, even on short pages
+     (e.g. a search with 0 results), so centered layout (.container-page)
+     doesn't shift horizontally as page height crosses the scroll threshold. */
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family: var(--font-body), "Noto Sans Thai", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -68,6 +75,7 @@ h6 {
 }
 
 .container-page {
+  width: 100%;
   max-width: 1180px;
   margin-left: auto;
   margin-right: auto;
