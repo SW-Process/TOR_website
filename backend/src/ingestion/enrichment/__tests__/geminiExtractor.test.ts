@@ -3,6 +3,7 @@ import {
   GeminiExtractor,
   buildPrompt,
   RESPONSE_SCHEMA,
+  SYSTEM_INSTRUCTION,
   MAX_INLINE_PDF_BYTES,
 } from "../geminiExtractor";
 import type { ExtractInput } from "../torExtractor";
@@ -83,6 +84,14 @@ describe("GeminiExtractor", () => {
       ...Object.values(RESPONSE_SCHEMA.properties ?? {}).map((p) => p.type),
     ];
     for (const t of allTypes) expect(Object.values(Type)).toContain(t);
+  });
+
+  it("instructs the model to convert submissionDeadline out of the Thai Buddhist Era into Gregorian/ISO", () => {
+    // TOR source PDFs print dates in พ.ศ. (ค.ศ. + 543); Gemini must convert
+    // before returning submissionDeadline, or a date like "25 เมษายน 2567"
+    // comes back as the literal (wrong) year "2567" instead of "2024".
+    expect(SYSTEM_INSTRUCTION).toMatch(/พ\.ศ\..*(ค\.ศ\.|Gregorian)|Gregorian.*พ\.ศ\./);
+    expect(SYSTEM_INSTRUCTION.toLowerCase()).toContain("543");
   });
 
   it("logs a usageMetadata cost line under component classifier.gemini on the success path", async () => {

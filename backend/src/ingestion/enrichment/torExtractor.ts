@@ -57,10 +57,25 @@ export function bucketConfidence(n: number): "high" | "medium" | "low" {
   return "low";
 }
 
+// TOR source PDFs are dated in the Thai solar calendar (พ.ศ. = ค.ศ. + 543).
+// Gemini sometimes returns the year exactly as printed instead of converting
+// it (e.g. "2567-04-25" meaning 25 เมษายน 2567, which is 2024-04-25 CE). No
+// TOR on this site is dated anywhere near the 2400s CE, so any year that high
+// is unambiguously a Buddhist Era year that slipped through un-converted.
+const BUDDHIST_ERA_OFFSET = 543;
+const BUDDHIST_ERA_YEAR_THRESHOLD = 2400;
+
+function toGregorianYear(d: Date): Date {
+  if (d.getUTCFullYear() < BUDDHIST_ERA_YEAR_THRESHOLD) return d;
+  const fixed = new Date(d);
+  fixed.setUTCFullYear(d.getUTCFullYear() - BUDDHIST_ERA_OFFSET);
+  return fixed;
+}
+
 function parseDeadline(value: string | null): Date | undefined {
   if (!value) return undefined;
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? undefined : d;
+  return Number.isNaN(d.getTime()) ? undefined : toGregorianYear(d);
 }
 
 /** Mutates `tor` in place; caller saves. */
