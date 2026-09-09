@@ -7,15 +7,18 @@ import {
   Award,
   Building2,
   CheckCircle2,
+  ImagePlus,
   MapPin,
   PartyPopper,
   Sparkles,
   Tags,
+  UserRound,
   Wallet,
 } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import { categories, type Category } from "@/lib/mockData";
 import { emptyProfile, useProfile, type BusinessProfile } from "@/lib/useProfile";
+import { useAuth } from "@/lib/useAuth";
 
 function SectionHeading({
   icon: Icon,
@@ -45,9 +48,53 @@ const inputClass =
 export default function ProfilePage() {
   const router = useRouter();
   const { profile, ready, saveProfile } = useProfile();
+  const { avatarSrc, uploadAvatar } = useAuth();
   const [form, setForm] = useState<BusinessProfile>(emptyProfile);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [isOnboarding, setIsOnboarding] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAvatarError("");
+    setAvatarUploading(true);
+    const result = await uploadAvatar(file);
+    setAvatarUploading(false);
+    if (!result.ok) setAvatarError(result.error || "อัปโหลดรูปไม่สำเร็จ");
+  }
+
+  const avatarPicker = (
+    <div className="flex items-center gap-4">
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-surface-alt)] text-[var(--color-text-faint)]">
+        {avatarSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <UserRound size={26} />
+        )}
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="btn-pill cursor-pointer border border-[var(--color-border-strong)] px-3.5 py-2 text-xs font-semibold">
+          <ImagePlus size={14} />
+          {avatarUploading ? "กำลังอัปโหลด..." : avatarSrc ? "เปลี่ยนรูปโปรไฟล์" : "เพิ่มรูปโปรไฟล์"}
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            disabled={avatarUploading}
+            onChange={handleAvatarChange}
+          />
+        </label>
+        <span className="text-[11px] text-[var(--color-text-faint)]">ไม่บังคับ ข้ามได้</span>
+        {avatarError && <span className="text-xs font-medium text-[var(--color-rose-dark)]">{avatarError}</span>}
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     if (ready) setForm(profile ?? emptyProfile);
@@ -72,9 +119,18 @@ export default function ProfilePage() {
 
   const formEl = !ready ? null : (
     <form
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
-        saveProfile(form);
+        setSaveError("");
+        setSaving(true);
+        try {
+          await saveProfile(form);
+        } catch {
+          setSaving(false);
+          setSaveError("บันทึกโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่");
+          return;
+        }
+        setSaving(false);
         if (isOnboarding) {
           router.push("/dashboard");
           return;
@@ -223,15 +279,22 @@ export default function ProfilePage() {
       </section>
 
       <div className="flex items-center gap-3 pt-1">
-        <button type="submit" className="btn-pill btn-pill-primary px-5 py-2.5 text-sm">
-          {isOnboarding ? "บันทึกและไปแดชบอร์ด" : "บันทึกโปรไฟล์"}
-          {isOnboarding && <ArrowRight size={14} />}
+        <button
+          type="submit"
+          disabled={saving}
+          className="btn-pill btn-pill-primary px-5 py-2.5 text-sm disabled:opacity-70"
+        >
+          {saving ? "กำลังบันทึก..." : isOnboarding ? "บันทึกและไปแดชบอร์ด" : "บันทึกโปรไฟล์"}
+          {isOnboarding && !saving && <ArrowRight size={14} />}
         </button>
         {saved && (
           <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-success)]">
             <CheckCircle2 size={16} />
             บันทึกแล้ว
           </span>
+        )}
+        {saveError && (
+          <span className="text-sm font-medium text-[var(--color-rose-dark)]">{saveError}</span>
         )}
       </div>
     </form>
@@ -291,6 +354,7 @@ export default function ProfilePage() {
                 </button>
               </div>
 
+              <div className="mt-5">{avatarPicker}</div>
               <div className="mt-5">{matchNote}</div>
               <div className="mt-4">{formEl}</div>
             </div>
@@ -308,9 +372,9 @@ export default function ProfilePage() {
         </h1>
         <p className="text-sm text-[var(--color-text-muted)] mt-1.5 max-w-2xl">
           กรอกข้อมูลธุรกิจของคุณเพื่อให้ระบบช่วยประเมินว่า TOR แต่ละงานเหมาะกับคุณแค่ไหน
-          ข้อมูลนี้จัดเก็บไว้ในเบราว์เซอร์นี้เท่านั้น
         </p>
 
+        <div className="mt-6 max-w-3xl">{avatarPicker}</div>
         <div className="mt-6 max-w-3xl">{matchNote}</div>
         <div className="mt-6 max-w-3xl">{formEl}</div>
       </div>

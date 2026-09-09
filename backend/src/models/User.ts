@@ -10,6 +10,8 @@ export interface IUser {
   passwordHash: string | null;
   googleOAuthId?: string;
   role: UserRole;
+  avatarKey?: string;
+  avatarContentType?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,6 +51,10 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
       enum: ["vendor", "admin"],
       required: true,
     },
+    // storage key for the uploaded avatar image (see storage/); avatarUrl is
+    // derived from this in toJSON rather than exposed directly.
+    avatarKey: { type: String },
+    avatarContentType: { type: String },
   },
   { timestamps: true }
 );
@@ -81,7 +87,10 @@ userSchema.methods.comparePassword = function (this: UserDocument, candidate: st
 userSchema.set("toJSON", {
   transform: (_doc, ret) => {
     const out = ret as unknown as Record<string, unknown>;
+    out.avatarUrl = out.avatarKey ? `/api/auth/avatar/${out._id}` : null;
     delete out.passwordHash;
+    delete out.avatarKey;
+    delete out.avatarContentType;
     delete out.__v;
     return out;
   },

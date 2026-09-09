@@ -9,6 +9,7 @@ export interface AuthUser {
   id: string;
   email: string;
   role: UserRole;
+  avatarUrl: string | null;
 }
 
 export interface AuthResult {
@@ -31,9 +32,11 @@ async function loadSession(): Promise<void> {
   try {
     const res = await apiFetch("/api/auth/me");
     if (res.ok) {
-      const data = (await res.json()) as { user: { _id?: string; id?: string; email: string; role: UserRole } };
+      const data = (await res.json()) as {
+        user: { _id?: string; id?: string; email: string; role: UserRole; avatarUrl?: string | null };
+      };
       const u = data.user;
-      cachedUser = { id: u._id ?? u.id ?? "", email: u.email, role: u.role };
+      cachedUser = { id: u._id ?? u.id ?? "", email: u.email, role: u.role, avatarUrl: u.avatarUrl ?? null };
     } else {
       cachedUser = null;
     }
@@ -118,6 +121,24 @@ export function useAuth() {
     emit();
   }, []);
 
+  const uploadAvatar = useCallback(async (file: File): Promise<AuthResult> => {
+    const body = new FormData();
+    body.append("avatar", file);
+
+    let res: Response;
+    try {
+      res = await apiFetch("/api/auth/avatar", { method: "POST", body });
+    } catch {
+      return { ok: false, error: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่" };
+    }
+    if (!res.ok) {
+      const respBody = (await res.json().catch(() => ({}))) as { message?: string };
+      return { ok: false, error: respBody.message || "อัปโหลดรูปไม่สำเร็จ กรุณาลองใหม่" };
+    }
+    await refreshSession();
+    return { ok: true };
+  }, []);
+
   const startGoogleLogin = useCallback(() => {
     // Full-page navigation to the backend (a different origin), which then
     // redirects to Google — not an internal Next.js route.
@@ -128,12 +149,14 @@ export function useAuth() {
   return {
     user,
     displayName: user ? user.email.split("@")[0] : "",
+    avatarSrc: user?.avatarUrl ? `${API_BASE}${user.avatarUrl}` : null,
     ready,
     isLoggedIn: !!user,
     login,
     register,
     logout,
     startGoogleLogin,
+    uploadAvatar,
     refresh: refreshSession,
   };
 }

@@ -29,7 +29,7 @@ const memberLinks = [
 export default function Header() {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { user, displayName, ready, isLoggedIn, logout } = useAuth();
+  const { user, displayName, avatarSrc, ready, isLoggedIn, logout } = useAuth();
   const router = useRouter();
 
   const loggedIn = ready && isLoggedIn;
@@ -90,9 +90,14 @@ export default function Header() {
               <button
                 aria-label="เมนูบัญชี"
                 onClick={() => setMenuOpen((v) => !v)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ink)] text-xs font-bold text-white"
+                className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[var(--color-ink)] text-xs font-bold text-white"
               >
-                {(displayName || "ส").trim().slice(0, 1).toUpperCase()}
+                {avatarSrc ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  (displayName || "ส").trim().slice(0, 1).toUpperCase()
+                )}
               </button>
               {menuOpen && (
                 <>

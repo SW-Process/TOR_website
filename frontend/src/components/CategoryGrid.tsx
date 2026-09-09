@@ -4,26 +4,48 @@ import { useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react";
-import { Category, categories, torList } from "@/lib/mockData";
+import { Category, categories, type TOR } from "@/lib/mockData";
 
-import imgSoftwareDev from "./picture/พัฒนาระบบซอฟต์แวร์.jpg";
-import imgWebApp from "./picture/พัฒนาเว็บไซต์และแอปพลิเคชัน.jpg";
-import imgCloud from "./picture/โครงสร้างพื้นฐานและคลาวด์.jpg";
-import imgCyberSecurity from "./picture/ความมั่นคงปลอดภัยไซเบอร์.jpg";
-import imgDataAnalytics from "./picture/ข้อมูลและระบบวิเคราะห์.jpg";
-import imgMaintenance from "./picture/บำรุงรักษาระบบ.jpg";
-import imgITHardware from "./picture/จัดซื้อครุภัณฑ์ไอที.jpg";
-import imgDigitalConsulting from "./picture/ที่ปรึกษาด้านดิจิทัล.jpg";
-import imgOther from "./picture/อื่นๆ.jpg";
+import imgSoftwareDev from "./picture/software-development.jpg";
+import imgInformationSystem from "./picture/information-system.jpg";
+import imgErpBackOffice from "./picture/erp-back-office.jpg";
+import imgHospitalIS from "./picture/hospital-information-system.jpg";
+import imgWebApp from "./picture/web-application.jpg";
+import imgMobileApp from "./picture/mobile-application.jpg";
+import imgELearning from "./picture/e-learning.jpg";
+import imgChatbot from "./picture/chatbot-line-oa.jpg";
+import imgCloud from "./picture/cloud-infrastructure.jpg";
+import imgNetworkDatacenter from "./picture/network-datacenter.jpg";
+import imgIotSensor from "./picture/iot-sensor.jpg";
+import imgCctvIts from "./picture/cctv-its.jpg";
+import imgCyberSecurity from "./picture/cybersecurity.jpg";
+import imgDataAnalytics from "./picture/data-platform-analytics.jpg";
+import imgGis from "./picture/gis.jpg";
+import imgMaintenance from "./picture/system-maintenance.jpg";
+import imgSoftwareLicense from "./picture/software-license.jpg";
+import imgITHardware from "./picture/hardware-with-software.jpg";
+import imgDigitalConsulting from "./picture/it-consulting-sa.jpg";
+import imgOther from "./picture/other.jpg";
 
 const categoryImage: Record<Category, typeof imgSoftwareDev> = {
   พัฒนาระบบซอฟต์แวร์: imgSoftwareDev,
+  ระบบสารสนเทศ: imgInformationSystem,
+  "ระบบ ERP และงานหลังบ้าน": imgErpBackOffice,
+  ระบบสารสนเทศโรงพยาบาล: imgHospitalIS,
   พัฒนาเว็บไซต์และแอปพลิเคชัน: imgWebApp,
+  แอปพลิเคชันมือถือ: imgMobileApp,
+  "ระบบ e-Learning": imgELearning,
+  "แชทบอทและ Line OA": imgChatbot,
   โครงสร้างพื้นฐานและคลาวด์: imgCloud,
+  เครือข่ายและดาต้าเซ็นเตอร์: imgNetworkDatacenter,
+  "IoT และเซนเซอร์": imgIotSensor,
+  กล้องวงจรปิดและจราจรอัจฉริยะ: imgCctvIts,
   ความมั่นคงปลอดภัยไซเบอร์: imgCyberSecurity,
   ข้อมูลและระบบวิเคราะห์: imgDataAnalytics,
+  "ระบบภูมิสารสนเทศ (GIS)": imgGis,
   บำรุงรักษาระบบ: imgMaintenance,
   จัดซื้อครุภัณฑ์ไอที: imgITHardware,
+  จัดซื้อลิขสิทธิ์ซอฟต์แวร์: imgSoftwareLicense,
   ที่ปรึกษาด้านดิจิทัล: imgDigitalConsulting,
   อื่นๆ: imgOther,
 };
@@ -57,7 +79,7 @@ function centerInContainer(container: HTMLElement, target: HTMLElement, behavior
   container.scrollTo({ left: container.scrollLeft + delta, behavior });
 }
 
-export default function CategoryGrid() {
+export default function CategoryGrid({ torList }: { torList: TOR[] }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const [renderIndex, setRenderIndex] = useState(START_INDEX);

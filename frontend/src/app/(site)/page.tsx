@@ -16,11 +16,14 @@ import HeroSearch from "@/components/HeroSearch";
 import TORCard from "@/components/TORCard";
 import AlertSignup from "@/components/AlertSignup";
 import CategoryGrid from "@/components/CategoryGrid";
-import { agencies, formatBudget, torList } from "@/lib/mockData";
+import { formatBudget } from "@/lib/mockData";
+import { fetchTorList } from "@/lib/torApi";
 
-export default function Home() {
+export default async function Home() {
+  const torList = await fetchTorList();
   const openTOR = torList.filter((t) => t.status !== "ปิดรับแล้ว");
   const totalOpenBudget = openTOR.reduce((sum, t) => sum + t.budget, 0);
+  const agencyCount = new Set(torList.map((t) => t.agency)).size;
   const latest = [...torList]
     .sort((a, b) => (a.announceDate < b.announceDate ? 1 : -1))
     .slice(0, 6);
@@ -192,7 +195,7 @@ export default function Home() {
             เลือกดูตามหมวดหมู่งาน
           </h2>
         </div>
-        <CategoryGrid />
+        <CategoryGrid torList={torList} />
       </section>
 
       <section className="container-page mt-16">
@@ -226,7 +229,7 @@ export default function Home() {
               <div>
                 <Landmark size={18} className="text-[var(--color-rose-dark)]" />
                 <p className="mt-2 font-[family-name:var(--font-heading)] text-xl sm:text-2xl font-extrabold text-[var(--color-text)]">
-                  {agencies.length} หน่วยงาน
+                  {agencyCount} หน่วยงาน
                 </p>
                 <p className="text-xs text-[var(--color-text-muted)] mt-0.5">เผยแพร่ประกาศ</p>
               </div>
