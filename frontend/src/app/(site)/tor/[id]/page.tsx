@@ -7,6 +7,7 @@ import {
   Download,
   ExternalLink,
   Eye,
+  FileX2,
   Hash,
   MapPin,
   ShieldAlert,
@@ -14,7 +15,6 @@ import {
 } from "lucide-react";
 import { daysUntil, formatBudget, formatThaiDate } from "@/lib/mockData";
 import { fetchTorById, fetchTorList, isUnknownDeadline } from "@/lib/torApi";
-import { API_BASE } from "@/lib/api";
 import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
 import ReportIssueButton from "@/components/ReportIssueButton";
@@ -198,15 +198,27 @@ export default async function TORDetailPage({
             </div>
 
             <div className="mt-5 flex flex-col gap-2.5">
-              <a
-                href={`${API_BASE}/api/tors/${tor.id}/document`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-pill btn-pill-primary w-full py-2.5 text-sm"
-              >
-                <Download size={16} />
-                ดาวน์โหลดเอกสารต้นฉบับ (PDF)
-              </a>
+              {tor.documentUrl ? (
+                <a
+                  href={tor.documentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-pill btn-pill-primary w-full py-2.5 text-sm"
+                >
+                  <Download size={16} />
+                  ดาวน์โหลดเอกสารต้นฉบับ (PDF)
+                </a>
+              ) : (
+                <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-alt)] px-4 py-5 text-center">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[var(--color-rose-dark)] shadow-[var(--shadow-sm)]">
+                    <FileX2 size={18} />
+                  </span>
+                  <p className="text-xs font-semibold text-[var(--color-text)]">TOR นี้ไม่มีเอกสาร PDF</p>
+                  <p className="text-[11px] leading-relaxed text-[var(--color-text-faint)]">
+                    ลองดูประกาศต้นฉบับที่ e-GP แทนด้านล่างนี้
+                  </p>
+                </div>
+              )}
               {tor.sourceListingUrl && (
                 <a
                   href={tor.sourceListingUrl}
