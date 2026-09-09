@@ -125,6 +125,18 @@ describe("applyExtractionToTor", () => {
     expect(tor.submissionDeadline).toBeUndefined();
   });
 
+  it("converts a Buddhist-era (พ.ศ.) submissionDeadline year to Gregorian", async () => {
+    // TOR source PDFs are dated in the Thai solar calendar (พ.ศ. = ค.ศ. + 543);
+    // Gemini sometimes returns the year exactly as printed instead of
+    // converting it, e.g. "2567-04-25" meaning 25 เมษายน 2567 = 2024-04-25 CE.
+    const tor = await Tor.create({ title: "x" });
+    applyExtractionToTor(tor, ok({ submissionDeadline: "2567-04-25" }), {
+      extractorId: "gemini-2.5-flash",
+      fallbackText: "x",
+    });
+    expect(tor.submissionDeadline?.toISOString().slice(0, 10)).toBe("2024-04-25");
+  });
+
   it("maps fairnessSignals into tor.fairnessFlags with status 'open'", async () => {
     const tor = await Tor.create({ title: "จ้างพัฒนาระบบ" });
     applyExtractionToTor(
