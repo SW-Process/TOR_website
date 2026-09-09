@@ -4,6 +4,7 @@ import { User } from "../models";
 import type { UserDocument } from "../models/User";
 import { signToken, cookieOptions, COOKIE_NAME } from "../utils/token";
 import { httpError } from "../utils/httpError";
+import { getStorage } from "../storage";
 import {
   isGoogleOAuthConfigured,
   buildGoogleAuthUrl,
@@ -14,6 +15,7 @@ import {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 const OAUTH_STATE_COOKIE = "oauth_state";
+const ALLOWED_AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 interface Credentials {
   email: string;
@@ -83,6 +85,44 @@ export async function me(req: Request, res: Response): Promise<void> {
   const user = await User.findById(req.user!.id);
   if (!user) throw httpError(401, "Account no longer exists");
   res.status(200).json({ user });
+}
+
+/** POST /api/auth/avatar — upload/replace the caller's profile picture. */
+export async function uploadAvatar(req: Request, res: Response): Promise<void> {
+  const file = req.file;
+  if (!file) throw httpError(400, "An image file is required");
+  if (!ALLOWED_AVATAR_TYPES.has(file.mimetype)) {
+    throw httpError(400, "Avatar must be a JPEG, PNG, WebP, or GIF image");
+  }
+
+  const user = await User.findById(req.user!.id);
+  if (!user) throw httpError(401, "Account no longer exists");
+
+  const key = `avatars/${user.id}`;
+  await getStorage().put(key, file.buffer, { contentType: file.mimetype });
+  user.avatarKey = key;
+  user.avatarContentType = file.mimetype;
+  await user.save();
+
+  res.status(200).json({ user });
+}
+
+/** GET /api/auth/avatar/:userId — stream a user's avatar image (public, no auth). */
+export async function streamAvatar(req: Request, res: Response): Promise<void> {
+  const user = await User.findById(req.params.userId);
+  if (!user?.avatarKey) throw httpError(404, "No avatar for this user");
+
+  let stream: NodeJS.ReadableStream;
+  try {
+    stream = await getStorage().getStream(user.avatarKey);
+  } catch {
+    throw httpError(404, "Stored avatar is unavailable");
+  }
+
+  res.setHeader("Content-Type", user.avatarContentType ?? "application/octet-stream");
+  res.setHeader("Cache-Control", "private, max-age=300");
+  stream.on("error", () => res.destroy());
+  stream.pipe(res);
 }
 
 /* ------------------------------ Google OAuth ------------------------------- */

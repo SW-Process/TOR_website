@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { Error as MongooseError } from "mongoose";
+import { MulterError } from "multer";
 
 /** 404 fallthrough for unmatched routes. */
 export function notFound(req: Request, res: Response): void {
@@ -29,6 +30,11 @@ export function errorHandler(
   // Mongo duplicate key (e.g. email already registered)
   if (e.code === 11000) {
     res.status(409).json({ message: "Resource already exists" });
+    return;
+  }
+
+  if (err instanceof MulterError) {
+    res.status(400).json({ message: err.message });
     return;
   }
 

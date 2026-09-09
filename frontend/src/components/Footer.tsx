@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FileSearch, Mail, ShieldCheck } from "lucide-react";
 
-const HIDDEN_ON = ["/login", "/signup"];
+const HIDDEN_ON = ["/login", "/signup", "/account/profile"];
 
 export default function Footer() {
   const pathname = usePathname();
