@@ -130,14 +130,16 @@ export default async function TORDetailPage({
                   <div key={c.label}>
                     <div className="flex justify-between text-xs text-[var(--color-text-muted)] mb-1">
                       <span>{c.label}</span>
-                      <span>{c.weight}%</span>
+                      <span>{c.weight === undefined ? "ไม่ระบุน้ำหนัก" : `${c.weight}%`}</span>
                     </div>
-                    <div className="h-2 rounded-full bg-white overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-[var(--color-rose-dark)]"
-                        style={{ width: `${c.weight}%` }}
-                      />
-                    </div>
+                    {c.weight !== undefined && (
+                      <div className="h-2 rounded-full bg-white overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[var(--color-rose-dark)]"
+                          style={{ width: `${c.weight}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

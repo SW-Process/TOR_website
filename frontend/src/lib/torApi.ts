@@ -99,7 +99,7 @@ function mapSummary(raw: ApiAiSummary | null | undefined, fallbackDate: string):
     qualifications: raw?.qualifications ?? [],
     evaluationCriteria: (raw?.evaluationCriteria ?? []).map((c) => ({
       label: c.label,
-      weight: c.weight ?? 0,
+      weight: c.weight,
     })),
     generatedAt: raw?.generatedAt ?? fallbackDate,
     confidence: (raw?.confidence && CONFIDENCE_MAP[raw.confidence]) || "ปานกลาง",

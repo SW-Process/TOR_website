@@ -25,7 +25,7 @@ export type Category =
 export interface AISummary {
   keyPoints: string[];
   qualifications: string[];
-  evaluationCriteria: { label: string; weight: number }[];
+  evaluationCriteria: { label: string; weight?: number }[];
   generatedAt: string;
   confidence: "สูง" | "ปานกลาง" | "ต่ำ";
 }
