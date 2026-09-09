@@ -163,7 +163,7 @@ export default async function TORDetailPage({
           {related.length > 0 && (
             <div className="mt-12">
               <h2 className="font-[family-name:var(--font-heading)] text-lg font-bold text-[var(--color-text)] mb-4">
-                TOR ที่เกี่ยวข้อง
+                TOR ในหมวดหมู่เดียวกัน
               </h2>
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
                 {related.map((t) => (

@@ -7,6 +7,7 @@ import {
   Bookmark,
   CalendarClock,
   CheckCircle2,
+  Lock,
   Sparkles,
 } from "lucide-react";
 import TORCard from "@/components/TORCard";
@@ -159,16 +160,49 @@ function DashboardContent() {
             แนะนำสำหรับคุณ
           </h2>
         </div>
-        <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-          {hasProfile
-            ? "จัดอันดับตามความเหมาะสมกับโปรไฟล์ธุรกิจของคุณ"
-            : "ตอนนี้แนะนำจาก TOR ที่ใกล้ปิดรับและได้รับความสนใจสูง — กรอกโปรไฟล์เพื่อให้แม่นยิ่งขึ้น"}
-        </p>
-        <div className="mt-4 grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
-          {recommended.map((tor) => (
-            <TORCard key={tor.id} tor={tor} showMatchScore />
-          ))}
-        </div>
+        {hasProfile ? (
+          <>
+            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+              จัดอันดับตามความเหมาะสมกับโปรไฟล์ธุรกิจของคุณ
+            </p>
+            <div className="mt-4 grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+              {recommended.map((tor) => (
+                <TORCard key={tor.id} tor={tor} showMatchScore />
+              ))}
+            </div>
+          </>
+        ) : (
+          <Link
+            href="/account/profile"
+            className="group relative mt-4 block overflow-hidden rounded-[1.75rem] border border-white/60 bg-[linear-gradient(135deg,_var(--color-blush-deep)_0%,_var(--color-blush)_50%,_var(--color-blush-soft)_100%)] px-6 py-11 text-center transition-transform sm:px-10"
+          >
+            <div
+              className="animate-blob-a pointer-events-none absolute -top-12 -right-10 h-44 w-44 rounded-full bg-white/50 blur-3xl"
+              aria-hidden
+            />
+            <div
+              className="animate-blob-b pointer-events-none absolute -bottom-14 -left-10 h-40 w-40 rounded-full bg-[var(--color-rose-light)] blur-3xl opacity-80"
+              style={{ animationDelay: "-3s" }}
+              aria-hidden
+            />
+
+            <div className="relative flex flex-col items-center gap-3">
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-[var(--color-rose-dark)] shadow-[var(--shadow-md)] transition-transform group-hover:scale-105">
+                <Lock size={22} />
+              </span>
+              <h3 className="font-[family-name:var(--font-heading)] text-lg font-bold text-[var(--color-text)]">
+                ยังไม่เห็นคำแนะนำเฉพาะคุณ
+              </h3>
+              <p className="max-w-sm text-sm leading-relaxed text-[var(--color-ink-soft)]">
+                กรอกโปรไฟล์ธุรกิจครั้งเดียว ให้ AI ช่วยจัดอันดับ TOR ที่เหมาะกับคุณที่สุดจากทั้งหมด
+              </p>
+              <span className="btn-pill btn-pill-primary mt-1.5 px-5 py-2.5 text-sm">
+                กรอกโปรไฟล์ธุรกิจ
+                <ArrowRight size={14} />
+              </span>
+            </div>
+          </Link>
+        )}
       </section>
 
       <section className="mt-10">

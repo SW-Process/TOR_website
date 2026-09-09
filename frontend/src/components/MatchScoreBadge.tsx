@@ -2,14 +2,14 @@
 
 import { Sparkles } from "lucide-react";
 import type { TOR } from "@/lib/mockData";
-import { computeFallbackScore, computeMatchScore, useProfile } from "@/lib/useProfile";
+import { computeMatchScore, useProfile } from "@/lib/useProfile";
 
 export default function MatchScoreBadge({ tor }: { tor: TOR }) {
   const { profile, ready, hasProfile } = useProfile();
 
-  if (!ready) return null;
+  if (!ready || !hasProfile || !profile) return null;
 
-  const score = hasProfile && profile ? computeMatchScore(tor, profile) : computeFallbackScore(tor);
+  const score = computeMatchScore(tor, profile);
   const textColor =
     score >= 70
       ? "text-[var(--color-success)]"
@@ -28,11 +28,7 @@ export default function MatchScoreBadge({ tor }: { tor: TOR }) {
   return (
     <div
       className={`px-4 py-2.5 ${bgTint}`}
-      title={
-        hasProfile
-          ? "ประเมินเบื้องต้นจากโปรไฟล์ธุรกิจของคุณ (ยังไม่ใช่ผลจาก AI)"
-          : "ประเมินเบื้องต้นจาก TOR นี้เท่านั้น — กรอกโปรไฟล์ธุรกิจเพื่อความแม่นยำที่สูงขึ้น"
-      }
+      title="ประเมินเบื้องต้นจากโปรไฟล์ธุรกิจของคุณ (ยังไม่ใช่ผลจาก AI)"
     >
       <div className={`flex items-center justify-between text-[11px] font-semibold ${textColor}`}>
         <span className="flex items-center gap-1">
