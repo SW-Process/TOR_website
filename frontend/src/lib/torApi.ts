@@ -122,9 +122,16 @@ export function mapApiTor(raw: ApiTor): TOR {
     projectCode: raw.projectCode ?? raw._id,
     location: raw.location ?? raw.agency ?? "",
     views: raw.viewCount ?? 0,
+    // sourceDocumentUrl is only set when a PDF was actually fetched & stored during
+    // ingestion (backend/src/ingestion/fetchAndStoreTorPdf.ts) — either an absolute
+    // GCS URL or our own relative /api/tors/:id/document streaming path.
     documentUrl: raw.sourceDocumentUrl
-      ? `${API_BASE}${raw.sourceDocumentUrl}`
-      : raw.sourceListingUrl ?? "#",
+      ? raw.sourceDocumentUrl.startsWith("http")
+        ? raw.sourceDocumentUrl
+        : `${API_BASE}${raw.sourceDocumentUrl}`
+      : null,
+    // Always the original e-GP announcement page, regardless of whether we have a PDF.
+    sourceListingUrl: raw.sourceListingUrl ?? null,
     description: raw.aiSummary?.summary ?? "",
     summary: mapSummary(raw.aiSummary, announceDate),
   };

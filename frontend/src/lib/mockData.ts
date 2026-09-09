@@ -43,7 +43,10 @@ export interface TOR {
   projectCode: string;
   location: string;
   views: number;
-  documentUrl: string;
+  /** Direct link to our own stored PDF (streamed via the backend); null if none was ingested. */
+  documentUrl: string | null;
+  /** Link back to the TOR's original e-GP announcement page. */
+  sourceListingUrl: string | null;
   summary: AISummary;
   description: string;
 }
@@ -105,6 +108,7 @@ export const torList: TOR[] = [
     location: "กรุงเทพมหานคร",
     views: 1284,
     documentUrl: "#",
+    sourceListingUrl: "#",
     description:
       "จัดจ้างพัฒนาระบบเว็บแอปพลิเคชันสำหรับสืบค้น รวบรวม และแสดงผลประกาศจัดซื้อจัดจ้างของหน่วยงานในสังกัดกรุงเทพมหานคร เชื่อมต่อข้อมูลจากระบบ e-GP พร้อมระบบแจ้งเตือนผู้ใช้งาน",
     summary: {
@@ -141,6 +145,7 @@ export const torList: TOR[] = [
     location: "กรุงเทพมหานคร",
     views: 956,
     documentUrl: "#",
+    sourceListingUrl: "#",
     description:
       "จัดจ้างพัฒนาเว็บไซต์และแอปพลิเคชันมือถือสำหรับประชาชนติดตามสถานะโครงการก่อสร้างและซ่อมบำรุงถนนแบบเรียลไทม์ พร้อมระบบแจ้งเตือนการปิดเบี่ยงจราจร",
     summary: {
@@ -177,6 +182,7 @@ export const torList: TOR[] = [
     location: "กรุงเทพมหานคร",
     views: 641,
     documentUrl: "#",
+    sourceListingUrl: "#",
     description:
       "จัดจ้างพัฒนาโครงสร้างพื้นฐานระบบคลาวด์และศูนย์ข้อมูล เพื่อรองรับระบบเตือนภัยน้ำท่วมล่วงหน้าแบบเรียลไทม์ เชื่อมต่อข้อมูลเซนเซอร์ระดับน้ำทั่วกรุงเทพมหานคร",
     summary: {
@@ -213,6 +219,7 @@ export const torList: TOR[] = [
     location: "โรงพยาบาลกลาง",
     views: 512,
     documentUrl: "#",
+    sourceListingUrl: "#",
     description:
       "จัดจ้างประเมินความเสี่ยงด้านความมั่นคงปลอดภัยไซเบอร์และทดสอบเจาะระบบ (Penetration Testing) ระบบสารสนเทศและฐานข้อมูลผู้ป่วยของโรงพยาบาลกลาง พร้อมจัดทำแผนรับมือภัยคุกคาม",
     summary: {
@@ -248,6 +255,7 @@ export const torList: TOR[] = [
     location: "เขตบางรัก",
     views: 288,
     documentUrl: "#",
+    sourceListingUrl: "#",
     description:
       "จัดจ้างพัฒนาระบบแดชบอร์ดวิเคราะห์ข้อมูลการให้บริการประชาชน ณ สำนักงานเขต รวบรวมสถิติการใช้บริการ ระยะเวลารอคอย และความพึงพอใจ เพื่อสนับสนุนการตัดสินใจเชิงนโยบาย",
     summary: {
@@ -281,6 +289,7 @@ export const torList: TOR[] = [
     location: "กรุงเทพมหานคร",
     views: 402,
     documentUrl: "#",
+    sourceListingUrl: "#",
     description:
       "จ้างเหมาบำรุงรักษาระบบซอฟต์แวร์บริหารจัดการกล้องโทรทัศน์วงจรปิดและแพลตฟอร์มวิเคราะห์ภาพอัจฉริยะ (Video Analytics) ในพื้นที่สาธารณะ จำนวน 1,200 จุด ระยะเวลา 2 ปี พร้อมศูนย์ควบคุมและแจ้งเตือนเหตุการณ์",
     summary: {
@@ -316,6 +325,7 @@ export const torList: TOR[] = [
     location: "ศูนย์ข้อมูลสำนักสิ่งแวดล้อม",
     views: 197,
     documentUrl: "#",
+    sourceListingUrl: "#",
     description:
       "จัดซื้อเครื่องแม่ข่าย (Server) อุปกรณ์จัดเก็บข้อมูล และอุปกรณ์เครือข่าย เพื่อรองรับระบบตรวจวัดและจัดเก็บข้อมูลคุณภาพอากาศและสิ่งแวดล้อมแบบเรียลไทม์ของกรุงเทพมหานคร",
     summary: {
@@ -350,6 +360,7 @@ export const torList: TOR[] = [
     location: "โรงเรียนในสังกัดกรุงเทพมหานคร 437 แห่ง",
     views: 733,
     documentUrl: "#",
+    sourceListingUrl: "#",
     description:
       "จ้างที่ปรึกษาศึกษาและจัดทำแผนแม่บทการเปลี่ยนผ่านสู่ดิจิทัล (Digital Transformation Roadmap) สำหรับโรงเรียนในสังกัดกรุงเทพมหานคร ครอบคลุมการประเมินความพร้อมด้านเทคโนโลยีและหลักสูตรดิจิทัล",
     summary: {

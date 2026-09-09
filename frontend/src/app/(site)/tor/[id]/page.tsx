@@ -5,6 +5,7 @@ import {
   CalendarClock,
   ChevronRight,
   Download,
+  ExternalLink,
   Eye,
   Hash,
   MapPin,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { daysUntil, formatBudget, formatThaiDate } from "@/lib/mockData";
 import { fetchTorById, fetchTorList, isUnknownDeadline } from "@/lib/torApi";
+import { API_BASE } from "@/lib/api";
 import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
 import ReportIssueButton from "@/components/ReportIssueButton";
@@ -196,10 +198,26 @@ export default async function TORDetailPage({
             </div>
 
             <div className="mt-5 flex flex-col gap-2.5">
-              <a href={tor.documentUrl} className="btn-pill btn-pill-primary w-full py-2.5 text-sm">
+              <a
+                href={`${API_BASE}/api/tors/${tor.id}/document`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-pill btn-pill-primary w-full py-2.5 text-sm"
+              >
                 <Download size={16} />
                 ดาวน์โหลดเอกสารต้นฉบับ (PDF)
               </a>
+              {tor.sourceListingUrl && (
+                <a
+                  href={tor.sourceListingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-pill w-full border border-[var(--color-border-strong)] py-2.5 text-sm text-[var(--color-text)]"
+                >
+                  <ExternalLink size={16} />
+                  ดูประกาศต้นฉบับที่ e-GP
+                </a>
+              )}
               <BookmarkButton id={tor.id} variant="full" />
               <ReportIssueButton torId={tor.projectCode} />
             </div>
