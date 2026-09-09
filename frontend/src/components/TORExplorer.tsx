@@ -1,17 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import TORCard from "./TORCard";
 import {
-  agencies,
   categories,
   Category,
   daysUntil,
   formatBudget,
-  torList,
+  type TOR,
   TORStatus,
 } from "@/lib/mockData";
+import { fetchTorList } from "@/lib/torApi";
 
 type SortKey = "newest" | "deadline" | "budgetDesc" | "budgetAsc";
 
@@ -26,6 +26,20 @@ export default function TORExplorer({
   initialCategory?: string;
   initialSort?: string;
 }) {
+  const [torList, setTorList] = useState<TOR[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    fetchTorList().then((list) => {
+      setTorList(list);
+      setLoading(false);
+    });
+  }, []);
+
+  const agencies = useMemo(
+    () => [...new Set(torList.map((t) => t.agency))].sort((a, b) => a.localeCompare(b, "th")),
+    [torList]
+  );
+
   const [query, setQuery] = useState(initialQuery);
   const [selectedCategories, setSelectedCategories] = useState<Category[]>(
     initialCategory && categories.includes(initialCategory as Category)
@@ -89,7 +103,7 @@ export default function TORExplorer({
     });
 
     return list;
-  }, [query, selectedCategories, selectedAgencies, selectedStatuses, minBudget, maxBudget, sort]);
+  }, [torList, query, selectedCategories, selectedAgencies, selectedStatuses, minBudget, maxBudget, sort]);
 
   const activeFilterCount =
     selectedCategories.length +
@@ -260,7 +274,11 @@ export default function TORExplorer({
             </select>
           </div>
 
-          {results.length === 0 ? (
+          {loading ? (
+            <div className="card p-10 text-center text-sm text-[var(--color-text-muted)]">
+              กำลังโหลด TOR...
+            </div>
+          ) : results.length === 0 ? (
             <div className="card p-10 text-center text-sm text-[var(--color-text-muted)]">
               ไม่พบ TOR ที่ตรงกับเงื่อนไขการค้นหา ลองปรับตัวกรองหรือคำค้นหาใหม่
               {activeFilterCount > 0 && (

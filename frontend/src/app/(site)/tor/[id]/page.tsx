@@ -11,13 +11,8 @@ import {
   ShieldAlert,
   Sparkles,
 } from "lucide-react";
-import {
-  daysUntil,
-  formatBudget,
-  formatThaiDate,
-  getTORById,
-  torList,
-} from "@/lib/mockData";
+import { daysUntil, formatBudget, formatThaiDate } from "@/lib/mockData";
+import { fetchTorById, fetchTorList, isUnknownDeadline } from "@/lib/torApi";
 import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
 import ReportIssueButton from "@/components/ReportIssueButton";
@@ -29,10 +24,11 @@ export default async function TORDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const tor = getTORById(id);
+  const tor = await fetchTorById(id);
   if (!tor) notFound();
 
   const remaining = daysUntil(tor.deadline);
+  const torList = await fetchTorList();
   const related = torList
     .filter((t) => t.category === tor.category && t.id !== tor.id)
     .slice(0, 3);
@@ -184,9 +180,9 @@ export default async function TORDetailPage({
             <div className="mt-4 rounded-2xl bg-[var(--color-surface-alt)] px-3.5 py-3">
               <p className="text-xs text-[var(--color-text-muted)]">กำหนดยื่นข้อเสนอ</p>
               <p className="text-sm font-medium text-[var(--color-text)] mt-0.5">
-                {formatThaiDate(tor.deadline)}
+                {isUnknownDeadline(tor.deadline) ? "ไม่ระบุ" : formatThaiDate(tor.deadline)}
               </p>
-              {tor.status !== "ปิดรับแล้ว" && (
+              {tor.status !== "ปิดรับแล้ว" && !isUnknownDeadline(tor.deadline) && (
                 <p
                   className={`text-xs mt-1 font-medium ${
                     remaining <= 5 ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"

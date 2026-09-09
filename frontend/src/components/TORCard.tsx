@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Building2, Eye } from "lucide-react";
 import { TOR, daysUntil, formatBudget, formatThaiDate } from "@/lib/mockData";
+import { isUnknownDeadline } from "@/lib/torApi";
 import StatusBadge from "./StatusBadge";
 import BookmarkButton from "./BookmarkButton";
 import MatchScoreBadge from "./MatchScoreBadge";
@@ -13,12 +14,13 @@ export default function TORCard({
   showMatchScore?: boolean;
 }) {
   const remaining = daysUntil(tor.deadline);
-  const deadlineLabel =
-    tor.status === "ปิดรับแล้ว"
-      ? `ปิดรับเมื่อ ${formatThaiDate(tor.deadline)}`
-      : remaining <= 0
-      ? "ปิดรับวันนี้"
-      : `เหลือ ${remaining} วัน`;
+  const deadlineLabel = isUnknownDeadline(tor.deadline)
+    ? "ไม่ระบุวันปิดรับ"
+    : tor.status === "ปิดรับแล้ว"
+    ? `ปิดรับเมื่อ ${formatThaiDate(tor.deadline)}`
+    : remaining <= 0
+    ? "ปิดรับวันนี้"
+    : `เหลือ ${remaining} วัน`;
 
   return (
     <div className="group isolate card overflow-hidden flex flex-col transition-shadow duration-300 hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5">

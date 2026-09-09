@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -15,7 +15,8 @@ import { useAuth } from "@/lib/useAuth";
 import { useBookmarks } from "@/lib/useBookmarks";
 import { useTracking } from "@/lib/useTracking";
 import { computeMatchScore, useProfile } from "@/lib/useProfile";
-import { torList, daysUntil, categories, type Category } from "@/lib/mockData";
+import { torList as mockTorList, daysUntil, categories, type Category, type TOR } from "@/lib/mockData";
+import { fetchTorList } from "@/lib/torApi";
 
 const catalogFilters: (Category | "ทั้งหมด")[] = ["ทั้งหมด", ...categories];
 
@@ -25,10 +26,19 @@ function DashboardContent() {
   const { statusOf, ready: trackingReady } = useTracking();
   const { profile, ready: profileReady, hasProfile } = useProfile();
   const [activeCategory, setActiveCategory] = useState<Category | "ทั้งหมด">("ทั้งหมด");
+  const [torList, setTorList] = useState<TOR[]>([]);
+  const [torsReady, setTorsReady] = useState(false);
 
-  const ready = bookmarksReady && trackingReady && profileReady;
+  useEffect(() => {
+    fetchTorList().then((list) => {
+      setTorList(list);
+      setTorsReady(true);
+    });
+  }, []);
 
-  const openTor = useMemo(() => torList.filter((t) => t.status !== "ปิดรับแล้ว"), []);
+  const ready = bookmarksReady && trackingReady && profileReady && torsReady;
+
+  const openTor = useMemo(() => torList.filter((t) => t.status !== "ปิดรับแล้ว"), [torList]);
 
   const recommended = useMemo(() => {
     if (hasProfile && profile) {
@@ -51,7 +61,7 @@ function DashboardContent() {
 
   if (!ready) return null;
 
-  const saved = torList.filter((t) => ids.includes(t.id));
+  const saved = mockTorList.filter((t) => ids.includes(t.id));
   const upcoming = saved
     .filter((t) => {
       const r = daysUntil(t.deadline);
