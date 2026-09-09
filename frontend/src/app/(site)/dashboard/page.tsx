@@ -20,7 +20,7 @@ import { torList, daysUntil, categories, type Category } from "@/lib/mockData";
 const catalogFilters: (Category | "ทั้งหมด")[] = ["ทั้งหมด", ...categories];
 
 function DashboardContent() {
-  const { user } = useAuth();
+  const { displayName } = useAuth();
   const { ids, ready: bookmarksReady } = useBookmarks();
   const { statusOf, ready: trackingReady } = useTracking();
   const { profile, ready: profileReady, hasProfile } = useProfile();
@@ -65,11 +65,11 @@ function DashboardContent() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-ink)] text-lg font-bold text-white">
-            {(user?.name || "ส").trim().slice(0, 1).toUpperCase()}
+            {(displayName || "ส").trim().slice(0, 1).toUpperCase()}
           </span>
           <div>
             <h1 className="font-[family-name:var(--font-heading)] text-xl sm:text-2xl font-extrabold text-[var(--color-text)]">
-              สวัสดี, {user?.name}
+              สวัสดี, {displayName}
             </h1>
             <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
               นี่คือสรุป TOR ที่คุณติดตามอยู่วันนี้

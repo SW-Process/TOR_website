@@ -1,93 +1,139 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { API_BASE, apiFetch } from "./api";
 
-const STORAGE_KEY = "tor-insight:auth";
-const AUTH_EVENT = "tor-insight:auth-changed";
+export type UserRole = "vendor" | "admin";
 
 export interface AuthUser {
   id: string;
   email: string;
-  name: string;
-  role: "vendor" | "admin";
+  role: UserRole;
 }
 
-interface BackendUser {
-  _id: string;
-  email: string;
-  role: "vendor" | "admin";
+export interface AuthResult {
+  ok: boolean;
+  error?: string;
 }
 
-function toAuthUser(u: BackendUser): AuthUser {
-  return { id: u._id, email: u.email, role: u.role, name: u.email.split("@")[0] };
+// Module-level cache so every useAuth() shares one session check, and a
+// navigation doesn't re-hit /api/auth/me. A hard reload re-checks.
+let cachedUser: AuthUser | null = null;
+let checked = false;
+let inFlight: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function emit() {
+  for (const l of listeners) l();
 }
 
-function readStorage(): AuthUser | null {
-  if (typeof window === "undefined") return null;
+async function loadSession(): Promise<void> {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
+    const res = await apiFetch("/api/auth/me");
+    if (res.ok) {
+      const data = (await res.json()) as { user: { _id?: string; id?: string; email: string; role: UserRole } };
+      const u = data.user;
+      cachedUser = { id: u._id ?? u.id ?? "", email: u.email, role: u.role };
+    } else {
+      cachedUser = null;
+    }
   } catch {
-    return null;
+    cachedUser = null;
   }
+  checked = true;
 }
 
-function writeStorage(user: AuthUser | null): void {
-  if (user) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-  else window.localStorage.removeItem(STORAGE_KEY);
-  window.dispatchEvent(new Event(AUTH_EVENT));
+async function ensureLoaded(): Promise<void> {
+  if (checked) return;
+  inFlight ??= loadSession();
+  await inFlight;
+  inFlight = null;
+  emit();
+}
+
+async function refreshSession(): Promise<void> {
+  checked = false;
+  inFlight = null;
+  await ensureLoaded();
+}
+
+function readError(status: number, body: { message?: string }): string {
+  if (status === 409) return "อีเมลนี้ถูกใช้สมัครแล้ว";
+  if (status === 401) return "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+  return body.message || "เกิดข้อผิดพลาด กรุณาลองใหม่";
 }
 
 export function useAuth() {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(cachedUser);
+  const [ready, setReady] = useState(checked);
 
   useEffect(() => {
-    setUser(readStorage());
-
-    const sync = () => setUser(readStorage());
-    window.addEventListener(AUTH_EVENT, sync);
-    window.addEventListener("storage", sync);
-
-    // The auth token lives in an HttpOnly cookie, so this is the only way to
-    // know whether the session is still valid (also refreshes the cached
-    // profile shown before this resolves).
-    apiFetch<{ user: BackendUser }>("/auth/me")
-      .then(({ user: me }) => writeStorage(toAuthUser(me)))
-      .catch(() => writeStorage(null))
-      .finally(() => setReady(true));
-
+    const sync = () => {
+      setUser(cachedUser);
+      setReady(checked);
+    };
+    listeners.add(sync);
+    void ensureLoaded().then(sync);
     return () => {
-      window.removeEventListener(AUTH_EVENT, sync);
-      window.removeEventListener("storage", sync);
+      listeners.delete(sync);
     };
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const { user: me } = await apiFetch<{ user: BackendUser }>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
-    writeStorage(toAuthUser(me));
-  }, []);
+  const submitCredentials = useCallback(
+    async (path: string, email: string, password: string): Promise<AuthResult> => {
+      let res: Response;
+      try {
+        res = await apiFetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+      } catch {
+        return { ok: false, error: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่" };
+      }
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { message?: string };
+        return { ok: false, error: readError(res.status, body) };
+      }
+      await refreshSession();
+      return { ok: true };
+    },
+    []
+  );
 
-  const register = useCallback(async (email: string, password: string) => {
-    const { user: me } = await apiFetch<{ user: BackendUser }>("/auth/register", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
-    writeStorage(toAuthUser(me));
-  }, []);
+  const login = useCallback(
+    (email: string, password: string) => submitCredentials("/api/auth/login", email, password),
+    [submitCredentials]
+  );
+
+  const register = useCallback(
+    (email: string, password: string) => submitCredentials("/api/auth/register", email, password),
+    [submitCredentials]
+  );
 
   const logout = useCallback(async () => {
-    writeStorage(null);
-    try {
-      await apiFetch("/auth/logout", { method: "POST" });
-    } catch {
-      // session cookie is already gone from the client's perspective
-    }
+    await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    cachedUser = null;
+    checked = true;
+    emit();
   }, []);
 
-  return { user, ready, isLoggedIn: !!user, login, register, logout };
+  const startGoogleLogin = useCallback(() => {
+    // Full-page navigation to the backend (a different origin), which then
+    // redirects to Google — not an internal Next.js route.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = `${API_BASE}/api/auth/google`;
+  }, []);
+
+  return {
+    user,
+    displayName: user ? user.email.split("@")[0] : "",
+    ready,
+    isLoggedIn: !!user,
+    login,
+    register,
+    logout,
+    startGoogleLogin,
+    refresh: refreshSession,
+  };
 }

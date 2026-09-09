@@ -97,17 +97,24 @@ export function useProfile() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    apiFetch<{ profile: BackendVendorProfile }>("/vendor/profile")
-      .then(({ profile: p }) => setProfile(isEmpty(p) ? null : fromBackend(p)))
+    apiFetch("/api/vendor/profile")
+      .then(async (res) => {
+        if (!res.ok) throw new Error("failed to load profile");
+        const { profile: p } = (await res.json()) as { profile: BackendVendorProfile };
+        setProfile(isEmpty(p) ? null : fromBackend(p));
+      })
       .catch(() => setProfile(null))
       .finally(() => setReady(true));
   }, []);
 
   const saveProfile = useCallback(async (next: BusinessProfile) => {
-    const { profile: p } = await apiFetch<{ profile: BackendVendorProfile }>("/vendor/profile", {
+    const res = await apiFetch("/api/vendor/profile", {
       method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(toBackend(next)),
     });
+    if (!res.ok) throw new Error("failed to save profile");
+    const { profile: p } = (await res.json()) as { profile: BackendVendorProfile };
     setProfile(fromBackend(p));
   }, []);
 

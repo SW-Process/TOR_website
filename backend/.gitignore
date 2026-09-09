@@ -1,3 +1,7 @@
 node_modules/
 dist/
 /storage/
+
+# GCP service account keys — never commit credentials
+gcp-sa.json
+*.gcp-sa.json

@@ -35,12 +35,17 @@ npm start          # node dist/server.js
 npm test           # jest --runInBand
 npm run typecheck  # tsc --noEmit
 
-# Full local stack via Docker (from repo root) — runs frontend + mongo ONLY, not backend
-docker compose up --build      # http://localhost:3000
-docker compose down -v         # also wipes local mongo volume
+# Full local stack via Docker (from repo root) — frontend + backend + mongo, all hot-reloading
+docker compose up --build      # frontend :3000, backend :8000
+docker compose down -v         # also wipes mongo + cached volumes
 ```
 
-The backend has a Jest suite (`npm test`); the frontend has no test framework configured. There are no CI workflows despite `.github/` existing.
+Each app's `Dockerfile` is multi-stage: `dev` target (used by compose) and a
+`runner` target that builds a production image (`docker build --target runner ...`).
+The frontend production image needs `output: "standalone"` in `next.config.ts`.
+
+The backend has a Jest suite (`npm test`); the frontend has no test framework configured.
+CI runs on PRs into `main` (`.github/workflows/ci.yml`): backend typecheck + test + build, frontend build.
 
 ## Architecture notes that span files
 
@@ -50,10 +55,12 @@ The frontend does **not** only call the Express backend. It has its own Mongoose
 ### Backend data model (`backend/src/models/`, index in `models/index.ts`)
 8 collections: `users`, `vendorprofiles` (1:1 with vendor user), `tors` (central entity), `bookmarks` (vendor↔TOR join + application status), `notifications`, `errorreports` (public-submitted TOR corrections), `ingestionruns`, `systemlogs`.
 
-`Tor` embeds `aiSummary` and `fairnessFlags` (fetched with the TOR, never queried alone). PDF binaries live in GCS, not Mongo — `sourceDocumentUrl` is a reference. `similarTORs` is a precomputed array of ObjectIds. There is a text index on `title`/`description`/`agency`.
+`Tor` embeds `aiSummary` and `fairnessFlags` (fetched with the TOR, never queried alone). The AI-written description lives at `aiSummary.summary` — never presented as the agency's own text, since it's a model-generated summary of a government document, not an official field. PDF binaries live in GCS, not Mongo — `sourceDocumentUrl` is a reference. `similarTORs` is a precomputed array of ObjectIds. There is a text index on `title`/`agency` (search actually uses a regex on `title`, not `$text` — see the RULING in `torController.ts`).
 
 ### Frontend runs on mock data
 Pages currently render from `frontend/src/lib/mockData.ts` and `frontend/src/lib/adminMockData.ts`. Domain types and enum values are **in Thai** (e.g. status `"เปิดรับ"`, categories). Route groups: `(site)/` for public+vendor pages, `admin/` for the admin panel. All frontend work is implementation from existing mockups — not UI design.
+
+**Auth is real**, though: `useAuth` (`frontend/src/lib/useAuth.ts`) calls the Express backend (`/api/auth/*` via `frontend/src/lib/api.ts`, `NEXT_PUBLIC_API_BASE_URL`) with `credentials: "include"` — email/password + Google OAuth, HttpOnly cookie. The other `use*` hooks (`useProfile`, `useBookmarks`, …) are still localStorage mocks.
 
 Next 16 note: `searchParams` in page components is a `Promise` and must be `await`ed.
 
@@ -72,6 +79,17 @@ downloads each TOR PDF through the `BlobStorage` adapter (`storage/`, `STORAGE_D
 = `local` now, `gcs` later). `pdfInspect` tags each file `digital` / `scanned` /
 `unreadable` / `missing`; OCR and AI stages consume that later. Binaries never go in
 Mongo. Progress and errors land in `IngestionRun` + `SystemLog` (source `ingestion`).
+
+### AI enrichment (`backend/src/ingestion/enrichment/`)
+Discovery (`runIngestion`) now also filters projects by `INGEST_AGENCIES` and, for
+each created/changed `Tor`, enqueues an `EnrichmentJob`. A separate batch
+(`drainEnrichmentQueue`, entrypoint `dist/jobs/enrichment.js`) claims jobs under a
+Mongo lease and runs one Gemini (`@google/genai`, Vertex) multimodal call per TOR
+that classifies software-relatedness, writes `aiSummary` + scalar fields, and sets
+`category` from `config/taxonomy.ts`. `Tor.pipelineStatus` gates the public read
+API (`GET /api/tors`, `/:id`, `/price-stats`) to `"enriched"` rows only. Extraction
+is behind the `TorExtractor` seam (`EXTRACTOR` env). Deploy: two Cloud Run Jobs on
+Cloud Scheduler — see `docs/deployment/gcp.md`.
 
 ## Environment
 

@@ -128,11 +128,34 @@ export class EgpClient implements EgpClientLike {
   async downloadFile(announcementId: string, filename: string): Promise<Buffer> {
     const url = `${this.cfg.fileBase}/${announcementId}/${encodeURIComponent(filename)}`;
     const res = await this.request(url, "bytes");
+
     const len = res.headers.get("content-length");
     if (len && Number(len) > this.cfg.maxFileBytes) {
       throw new Error(`e-GP file too large: ${len} bytes > ${this.cfg.maxFileBytes}`);
     }
-    return Buffer.from(await res.arrayBuffer());
+
+    if (!res.body) {
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length > this.cfg.maxFileBytes) {
+        throw new Error(`e-GP file too large: ${buf.length} bytes > ${this.cfg.maxFileBytes}`);
+      }
+      return buf;
+    }
+
+    const reader = res.body.getReader();
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > this.cfg.maxFileBytes) {
+        await reader.cancel("oversize");
+        throw new Error(`e-GP file too large: >${this.cfg.maxFileBytes} bytes`);
+      }
+      chunks.push(Buffer.from(value));
+    }
+    return Buffer.concat(chunks, total);
   }
 }
 

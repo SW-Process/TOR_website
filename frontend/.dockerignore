@@ -1,6 +1,12 @@
 node_modules
 .next
+.git
+.github
+.vscode
 .env
 .env.local
+.env.*.local
 npm-debug.log*
 Dockerfile
+.dockerignore
+README.md

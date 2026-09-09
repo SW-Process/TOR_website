@@ -3,15 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Lock, Mail } from "lucide-react";
+import { ArrowUpRight, Lock, Mail, User } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
 import { useAuth } from "@/lib/useAuth";
-import { ApiError } from "@/lib/api";
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { register, isLoggedIn, ready: authReady } = useAuth();
+  const { register, startGoogleLogin, isLoggedIn, ready: authReady } = useAuth();
   const [signingUp, setSigningUp] = useState(false);
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -52,18 +52,36 @@ export default function SignUpPage() {
               setPasswordError("รหัสผ่านไม่ตรงกัน");
               return;
             }
+            if (password.length < 8) {
+              setPasswordError("รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร");
+              return;
+            }
             setPasswordError("");
             setSigningUp(true);
-            try {
-              await register(email, password);
-              router.push("/account/profile?onboarding=1");
-            } catch (err) {
+            const result = await register(email, password);
+            if (!result.ok) {
+              setPasswordError(result.error || "สมัครสมาชิกไม่สำเร็จ");
               setSigningUp(false);
-              setPasswordError(err instanceof ApiError ? err.message : "สมัครสมาชิกไม่สำเร็จ กรุณาลองใหม่");
+              return;
             }
+            router.push("/account/profile?onboarding=1");
           }}
           className="mt-5 flex flex-col gap-3"
         >
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-[var(--color-text)]">ชื่อ</span>
+            <div className="flex items-center gap-2.5 rounded-2xl border border-[var(--color-border)] bg-white px-3.5 py-2 shadow-[var(--shadow-sm)] transition-colors focus-within:border-[var(--color-rose-dark)]">
+              <User size={16} className="shrink-0 text-[var(--color-text-faint)]" />
+              <input
+                required
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="ชื่อ-นามสกุล"
+                className="w-full bg-transparent text-sm focus:outline-none"
+              />
+            </div>
+          </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-[var(--color-text)]">อีเมล</span>
             <div className="flex items-center gap-2.5 rounded-2xl border border-[var(--color-border)] bg-white px-3.5 py-2 shadow-[var(--shadow-sm)] transition-colors focus-within:border-[var(--color-rose-dark)]">
@@ -127,6 +145,10 @@ export default function SignUpPage() {
 
         <button
           type="button"
+          onClick={() => {
+            setSigningUp(true);
+            startGoogleLogin();
+          }}
           className="mt-3 flex w-full items-center justify-center gap-2.5 rounded-full border border-[var(--color-border)] bg-white py-2.5 text-sm font-semibold text-[var(--color-text)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-blush-soft)]/40"
         >
           <GoogleIcon size={18} />
