@@ -17,6 +17,7 @@ export interface RunIngestionOptions {
   triggeredBy: string | null;
   maxProjects: number;
   searchText: string;
+  lookbackDays?: number;
   announceAllTypes?: boolean;
 }
 
@@ -46,7 +47,7 @@ async function collectProjects(
   opts: RunIngestionOptions,
   now: Date
 ): Promise<{ projectId: string; projectNumber: string }[]> {
-  const lookbackDays = Number(process.env.INGEST_LOOKBACK_DAYS) || 7;
+  const lookbackDays = opts.lookbackDays ?? (Number(process.env.INGEST_LOOKBACK_DAYS) || 7);
   const from = new Date(now.getTime() - lookbackDays * 86_400_000);
   const iso = (d: Date) => d.toISOString();
   const out: { projectId: string; projectNumber: string }[] = [];
