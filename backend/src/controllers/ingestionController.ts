@@ -2,8 +2,11 @@ import type { Request, Response } from "express";
 import { IngestionRun } from "../models";
 import { httpError } from "../utils/httpError";
 import { runIngestion } from "../ingestion/runIngestion";
+import { drainEnrichmentQueue } from "../ingestion/enrichment/drainEnrichmentQueue";
+import { selectExtractor } from "../jobs/enrichment";
 
 const MAX_PROJECTS_CEILING = 500;
+const LOOKBACK_DAYS_CEILING = 90;
 
 function parseMaxProjects(raw: unknown): number {
   const fallback = Number(process.env.INGEST_DEFAULT_MAX_PROJECTS) || 50;
@@ -11,6 +14,16 @@ function parseMaxProjects(raw: unknown): number {
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1 || n > MAX_PROJECTS_CEILING) {
     throw httpError(400, `maxProjects must be an integer between 1 and ${MAX_PROJECTS_CEILING}`);
+  }
+  return n;
+}
+
+function parseLookbackDays(raw: unknown): number {
+  const fallback = Number(process.env.INGEST_LOOKBACK_DAYS) || 7;
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > LOOKBACK_DAYS_CEILING) {
+    throw httpError(400, `lookbackDays must be an integer between 1 and ${LOOKBACK_DAYS_CEILING}`);
   }
   return n;
 }
@@ -28,6 +41,7 @@ export async function createRun(req: Request, res: Response): Promise<void> {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const maxProjects = parseMaxProjects(body.maxProjects);
   const searchText = parseSearchText(body.searchText);
+  const lookbackDays = parseLookbackDays(body.lookbackDays);
   const announceAllTypes = body.announceAllTypes === true;
 
   const active = await IngestionRun.exists({ status: "running" });
@@ -38,10 +52,24 @@ export async function createRun(req: Request, res: Response): Promise<void> {
     triggeredBy: req.user!.id,
     maxProjects,
     searchText,
+    lookbackDays,
     announceAllTypes,
   });
 
   res.status(202).json({ runId, status: "running" });
+}
+
+/** POST /api/ingestion/enrichment/runs — admin-triggered enrichment drain. */
+export async function createEnrichmentRun(_req: Request, res: Response): Promise<void> {
+  const active = await IngestionRun.exists({ status: "running", phase: "enrichment" });
+  if (active) throw httpError(409, "An enrichment run is already in progress");
+
+  const extractor = selectExtractor();
+  void drainEnrichmentQueue({ extractor }).catch((err) => {
+    console.error("enrichment run failed:", err);
+  });
+
+  res.status(202).json({ status: "running" });
 }
 
 /** GET /api/ingestion/runs — recent run history (FR-34). */
