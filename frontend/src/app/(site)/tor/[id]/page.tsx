@@ -8,17 +8,34 @@ import {
   ExternalLink,
   Eye,
   FileX2,
+  Flag,
   Hash,
   MapPin,
   ShieldAlert,
   Sparkles,
 } from "lucide-react";
-import { daysUntil, formatBudget, formatThaiDate } from "@/lib/mockData";
+import { daysUntil, formatBudget, formatThaiDate, type FairnessField, type FairnessFlag } from "@/lib/mockData";
 import { fetchTorById, fetchTorList, isUnknownDeadline } from "@/lib/torApi";
 import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
 import ReportIssueButton from "@/components/ReportIssueButton";
 import TORCard from "@/components/TORCard";
+
+const FAIRNESS_FIELD_LABELS: Record<FairnessField, string> = {
+  budget: "งบประมาณ",
+  deadline: "กำหนดเวลา",
+  category: "หมวดหมู่",
+  agency: "หน่วยงาน",
+  title: "ชื่อโครงการ",
+  qualificationRequirements: "คุณสมบัติผู้เสนอราคา",
+  other: "อื่นๆ",
+};
+
+const FAIRNESS_SEVERITY_LABELS: Record<FairnessFlag["severity"], string> = {
+  low: "ควรสังเกตเล็กน้อย",
+  medium: "ควรพิจารณาเพิ่มเติม",
+  high: "ควรตรวจสอบเพิ่มเติม",
+};
 
 export default async function TORDetailPage({
   params,
@@ -153,6 +170,39 @@ export default async function TORDetailPage({
             </div>
           </div>
 
+          {tor.fairnessFlags.length > 0 && (
+            <div className="mt-8 card p-6 sm:p-7">
+              <span className="badge bg-[var(--color-warning-bg)] text-[var(--color-warning)] py-1.5">
+                <Flag size={14} />
+                สัญญาณที่ควรตรวจสอบเพิ่มเติม · วิเคราะห์โดย AI
+              </span>
+
+              <ul className="mt-4 space-y-3">
+                {tor.fairnessFlags.map((flag, i) => (
+                  <li key={i} className="rounded-2xl bg-[var(--color-surface-alt)] px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-semibold text-[var(--color-text)]">
+                        {FAIRNESS_FIELD_LABELS[flag.field]}
+                      </p>
+                      <span className="rounded-full bg-[var(--color-warning-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-warning)]">
+                        {FAIRNESS_SEVERITY_LABELS[flag.severity]}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-sm text-[var(--color-text-muted)] leading-relaxed">
+                      {flag.message}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-5 flex items-start gap-2 rounded-2xl bg-[var(--color-warning-bg)] px-3.5 py-3 text-xs text-[var(--color-warning)]">
+                <ShieldAlert size={15} className="mt-0.5 shrink-0" />
+                สัญญาณเหล่านี้สร้างขึ้นโดยระบบ AI เพื่อใช้ประกอบการตรวจสอบเบื้องต้นเท่านั้น ไม่ใช่ข้อสรุปหรือข้อกล่าวหาว่ามีการกระทำผิดใดๆ
+                โปรดตรวจสอบร่วมกับเอกสารต้นฉบับก่อนใช้ประกอบการตัดสินใจ
+              </div>
+            </div>
+          )}
+
           <div className="mt-8">
             <h2 className="font-[family-name:var(--font-heading)] font-bold text-[var(--color-text)] mb-2.5">
               รายละเอียดโครงการ
@@ -231,7 +281,7 @@ export default async function TORDetailPage({
                 </a>
               )}
               <BookmarkButton id={tor.id} variant="full" />
-              <ReportIssueButton torId={tor.projectCode} />
+              <ReportIssueButton torId={tor.id} projectCode={tor.projectCode} />
             </div>
 
             <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-text-muted)]">

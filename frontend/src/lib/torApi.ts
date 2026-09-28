@@ -1,5 +1,5 @@
 import { API_BASE } from "@/lib/api";
-import type { AISummary, Category, TOR, TORStatus } from "@/lib/mockData";
+import type { AISummary, Category, FairnessField, FairnessFlag, TOR, TORStatus } from "@/lib/mockData";
 
 /**
  * Real ingested TORs frequently have no submissionDeadline yet (most rows in
@@ -74,6 +74,13 @@ interface ApiAiSummary {
   generatedAt?: string;
 }
 
+interface ApiFairnessFlag {
+  field?: string;
+  severity?: string;
+  message: string;
+  detectedAt?: string;
+}
+
 export interface ApiTor {
   _id: string;
   title: string;
@@ -91,6 +98,30 @@ export interface ApiTor {
   sourceDocumentUrl?: string;
   sourceListingUrl?: string;
   aiSummary?: ApiAiSummary | null;
+  fairnessFlags?: ApiFairnessFlag[];
+}
+
+const FAIRNESS_FIELDS: readonly FairnessField[] = [
+  "budget",
+  "deadline",
+  "category",
+  "agency",
+  "title",
+  "qualificationRequirements",
+  "other",
+];
+
+function mapFairnessField(raw: string | undefined): FairnessField {
+  return (FAIRNESS_FIELDS as readonly string[]).includes(raw ?? "") ? (raw as FairnessField) : "other";
+}
+
+function mapFairnessFlags(raw: ApiFairnessFlag[] | undefined, fallbackDate: string): FairnessFlag[] {
+  return (raw ?? []).map((f) => ({
+    field: mapFairnessField(f.field),
+    severity: f.severity === "high" || f.severity === "low" ? f.severity : "medium",
+    message: f.message,
+    detectedAt: f.detectedAt ?? fallbackDate,
+  }));
 }
 
 function mapSummary(raw: ApiAiSummary | null | undefined, fallbackDate: string): AISummary {
@@ -134,6 +165,7 @@ export function mapApiTor(raw: ApiTor): TOR {
     sourceListingUrl: raw.sourceListingUrl ?? null,
     description: raw.aiSummary?.summary ?? "",
     summary: mapSummary(raw.aiSummary, announceDate),
+    fairnessFlags: mapFairnessFlags(raw.fairnessFlags, announceDate),
   };
 }
 

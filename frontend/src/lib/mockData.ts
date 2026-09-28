@@ -30,6 +30,27 @@ export interface AISummary {
   confidence: "สูง" | "ปานกลาง" | "ต่ำ";
 }
 
+export type FairnessField =
+  | "budget"
+  | "deadline"
+  | "category"
+  | "agency"
+  | "title"
+  | "qualificationRequirements"
+  | "other";
+
+/**
+ * AI-detected review signal (backend/src/models/Tor.ts `fairnessFlagSchema`).
+ * Worded as a neutral observation, never an accusation — see the defamation
+ * constraint in CLAUDE.md.
+ */
+export interface FairnessFlag {
+  field: FairnessField;
+  severity: "low" | "medium" | "high";
+  message: string;
+  detectedAt: string;
+}
+
 export interface TOR {
   id: string;
   title: string;
@@ -49,6 +70,7 @@ export interface TOR {
   sourceListingUrl: string | null;
   summary: AISummary;
   description: string;
+  fairnessFlags: FairnessFlag[];
 }
 
 export const categories: Category[] = [
@@ -130,6 +152,15 @@ export const torList: TOR[] = [
       generatedAt: daysFromToday(-5),
       confidence: "สูง",
     },
+    fairnessFlags: [
+      {
+        field: "budget",
+        severity: "medium",
+        message:
+          "งบประมาณโครงการต่ำกว่าค่าเฉลี่ยของโครงการลักษณะใกล้เคียงกันในหมวดหมู่เดียวกันอย่างมีนัยสำคัญ อาจเกิดจากขอบเขตงานที่แคบกว่าปกติ",
+        detectedAt: daysFromToday(-5),
+      },
+    ],
   },
   {
     id: "tor-2026-0138",
@@ -167,6 +198,7 @@ export const torList: TOR[] = [
       generatedAt: daysFromToday(-13),
       confidence: "สูง",
     },
+    fairnessFlags: [],
   },
   {
     id: "tor-2026-0135",
@@ -204,6 +236,7 @@ export const torList: TOR[] = [
       generatedAt: daysFromToday(-19),
       confidence: "ปานกลาง",
     },
+    fairnessFlags: [],
   },
   {
     id: "tor-2026-0129",
@@ -240,6 +273,15 @@ export const torList: TOR[] = [
       generatedAt: daysFromToday(-8),
       confidence: "สูง",
     },
+    fairnessFlags: [
+      {
+        field: "deadline",
+        severity: "low",
+        message:
+          "ระยะเวลาที่กำหนดให้ยื่นข้อเสนอสั้นกว่าค่าเฉลี่ยของโครงการลักษณะใกล้เคียงกัน อาจจำกัดจำนวนผู้เสนอราคาที่สามารถเตรียมเอกสารได้ทัน",
+        detectedAt: daysFromToday(-8),
+      },
+    ],
   },
   {
     id: "tor-2026-0121",
@@ -274,6 +316,7 @@ export const torList: TOR[] = [
       generatedAt: daysFromToday(-29),
       confidence: "ปานกลาง",
     },
+    fairnessFlags: [],
   },
   {
     id: "tor-2026-0118",
@@ -310,6 +353,7 @@ export const torList: TOR[] = [
       generatedAt: daysFromToday(-2),
       confidence: "สูง",
     },
+    fairnessFlags: [],
   },
   {
     id: "tor-2026-0111",
@@ -345,6 +389,7 @@ export const torList: TOR[] = [
       generatedAt: daysFromToday(-10),
       confidence: "สูง",
     },
+    fairnessFlags: [],
   },
   {
     id: "tor-2026-0104",
@@ -380,6 +425,7 @@ export const torList: TOR[] = [
       generatedAt: daysFromToday(-24),
       confidence: "ปานกลาง",
     },
+    fairnessFlags: [],
   },
 ];
 
