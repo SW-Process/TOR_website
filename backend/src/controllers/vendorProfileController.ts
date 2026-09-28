@@ -111,7 +111,7 @@ function validateSavedSearch(body: Record<string, unknown>, partial: boolean): S
 /* -------------------------------- handlers --------------------------------- */
 
 /** Find the caller's profile, creating an empty one on first access (UC-2). */
-async function loadOrCreateProfile(userId: string) {
+export async function loadOrCreateProfile(userId: string) {
   return VendorProfile.findOneAndUpdate(
     { userId },
     { $setOnInsert: { userId } },
