@@ -2,11 +2,41 @@
 
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
-export default function ReportIssueButton({ torId }: { torId: string }) {
+export default function ReportIssueButton({
+  torId,
+  projectCode,
+}: {
+  /** Mongo `_id` of the TOR — used to address the report at the backend. */
+  torId: string;
+  /** Human-readable project code shown to the reporter for confirmation. */
+  projectCode: string;
+}) {
   const [open, setOpen] = useState(false);
   const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/tors/${torId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: detail }),
+      });
+      if (!res.ok) throw new Error();
+      setSent(true);
+    } catch {
+      setError("ส่งเรื่องแจ้งไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <>
@@ -39,18 +69,12 @@ export default function ReportIssueButton({ torId }: { torId: string }) {
             {sent ? (
               <div className="mt-5 flex items-center gap-2 rounded-md bg-[var(--color-success-bg)] px-4 py-3 text-sm text-[var(--color-success)]">
                 <CheckCircle2 size={18} />
-                ได้รับแจ้งเรื่องเรียบร้อย ทีมงานจะตรวจสอบและติดต่อกลับ (ตัวอย่างการทำงาน)
+                ได้รับแจ้งเรื่องเรียบร้อย ทีมงานจะตรวจสอบและติดต่อกลับ
               </div>
             ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  setSent(true);
-                }}
-                className="mt-4 flex flex-col gap-3"
-              >
+              <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
                 <p className="text-xs text-[var(--color-text-muted)]">
-                  อ้างอิงโครงการ: {torId} — โปรดระบุจุดที่พบว่าข้อมูลไม่ตรงกับเอกสารต้นฉบับ เช่น
+                  อ้างอิงโครงการ: {projectCode} — โปรดระบุจุดที่พบว่าข้อมูลไม่ตรงกับเอกสารต้นฉบับ เช่น
                   งบประมาณ วันปิดรับ หรือคุณสมบัติผู้ยื่นข้อเสนอ
                 </p>
                 <textarea
@@ -61,8 +85,13 @@ export default function ReportIssueButton({ torId }: { torId: string }) {
                   placeholder="รายละเอียดข้อผิดพลาดที่พบ..."
                   className="w-full rounded-2xl border border-[var(--color-border)] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[var(--color-ink)]"
                 />
-                <button type="submit" className="btn-pill btn-pill-primary py-2.5 text-sm">
-                  ส่งเรื่องแจ้ง
+                {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="btn-pill btn-pill-primary py-2.5 text-sm disabled:opacity-60"
+                >
+                  {submitting ? "กำลังส่ง..." : "ส่งเรื่องแจ้ง"}
                 </button>
               </form>
             )}
