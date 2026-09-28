@@ -14,7 +14,8 @@ http:
     data: |-
       {
         "maxProjects": 5,
-        "searchText": "ซอฟต์แวร์"
+        "searchText": "ซอฟต์แวร์",
+        "lookbackDays": 7
       }
 
 settings:
@@ -22,3 +23,4 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+​

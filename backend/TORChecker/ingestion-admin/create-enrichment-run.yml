@@ -1,0 +1,17 @@
+info:
+  name: create-enrichment-run
+  type: http
+
+http:
+  method: POST
+  url: http://localhost:8000/api/ingestion/enrichment/runs
+  auth: inherit
+  headers:
+    - name: Content-Type
+      value: application/json
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -10,7 +10,7 @@ import type { TorExtractor } from "../ingestion/enrichment/torExtractor";
  * Vertex-backed `GeminiExtractor`; any other value is a misconfiguration and
  * throws (caught by the entrypoint, which then sets `process.exitCode = 1`).
  */
-function selectExtractor(): TorExtractor {
+export function selectExtractor(): TorExtractor {
   const name = process.env.EXTRACTOR;
   if (!name || name === "gemini") return new GeminiExtractor();
   throw new Error(`unknown EXTRACTOR: ${name}`);

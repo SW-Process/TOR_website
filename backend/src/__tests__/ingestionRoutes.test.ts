@@ -10,6 +10,16 @@ jest.mock("../ingestion/runIngestion", () => ({
   runIngestion: (...args: unknown[]) => runIngestionMock(...args),
 }));
 
+const drainEnrichmentQueueMock = jest.fn();
+jest.mock("../ingestion/enrichment/drainEnrichmentQueue", () => ({
+  drainEnrichmentQueue: (...args: unknown[]) => drainEnrichmentQueueMock(...args),
+}));
+
+const selectExtractorMock = jest.fn();
+jest.mock("../jobs/enrichment", () => ({
+  selectExtractor: () => selectExtractorMock(),
+}));
+
 import app from "../app";
 import { User } from "../models";
 import { IngestionRun } from "../models";
@@ -77,12 +87,71 @@ describe("POST /api/ingestion/runs", () => {
     expect(runIngestionMock).not.toHaveBeenCalled();
   });
 
+  it("400 when lookbackDays is out of range", async () => {
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/runs").send({ lookbackDays: 91 });
+    expect(res.status).toBe(400);
+    expect(runIngestionMock).not.toHaveBeenCalled();
+  });
+
+  it("passes lookbackDays through to runIngestion", async () => {
+    runIngestionMock.mockResolvedValue({ runId: "run-789", done: Promise.resolve() });
+    const agent = await adminAgent();
+
+    const res = await agent.post("/api/ingestion/runs").send({ lookbackDays: 14 });
+
+    expect(res.status).toBe(202);
+    expect(runIngestionMock.mock.calls[0][0]).toMatchObject({ lookbackDays: 14 });
+  });
+
   it("409 when a run is already in progress", async () => {
     await IngestionRun.create({ trigger: "manual", status: "running" });
     const agent = await adminAgent();
     const res = await agent.post("/api/ingestion/runs").send({});
     expect(res.status).toBe(409);
     expect(runIngestionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/ingestion/enrichment/runs", () => {
+  it("401 without a session", async () => {
+    const res = await request(app).post("/api/ingestion/enrichment/runs").send({});
+    expect(res.status).toBe(401);
+  });
+
+  it("403 for a vendor", async () => {
+    const agent = request.agent(app);
+    await agent.post("/api/auth/register").send({ email: "v2@test.com", password: "secret123" });
+    const res = await agent.post("/api/ingestion/enrichment/runs").send({});
+    expect(res.status).toBe(403);
+  });
+
+  it("202 for an admin and drains the enrichment queue once", async () => {
+    const extractor = { id: "fake", extract: jest.fn() };
+    selectExtractorMock.mockReturnValue(extractor);
+    drainEnrichmentQueueMock.mockResolvedValue({
+      runId: "run-456",
+      claimed: 0,
+      enrichedOk: 0,
+      enrichedRejected: 0,
+      enrichedFailed: 0,
+    });
+    const agent = await adminAgent();
+
+    const res = await agent.post("/api/ingestion/enrichment/runs").send({});
+
+    expect(res.status).toBe(202);
+    expect(res.body).toEqual({ status: "running" });
+    expect(drainEnrichmentQueueMock).toHaveBeenCalledTimes(1);
+    expect(drainEnrichmentQueueMock.mock.calls[0][0]).toMatchObject({ extractor });
+  });
+
+  it("409 when an enrichment run is already in progress", async () => {
+    await IngestionRun.create({ trigger: "scheduled", phase: "enrichment", status: "running" });
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/enrichment/runs").send({});
+    expect(res.status).toBe(409);
+    expect(drainEnrichmentQueueMock).not.toHaveBeenCalled();
   });
 });
 
