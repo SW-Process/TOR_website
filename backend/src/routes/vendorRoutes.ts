@@ -7,6 +7,7 @@ import {
   updateSavedSearch,
   deleteSavedSearch,
 } from "../controllers/vendorProfileController";
+import { listMatches } from "../controllers/matchController";
 import { requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
@@ -20,5 +21,7 @@ router.get("/profile/saved-searches", listSavedSearches);
 router.post("/profile/saved-searches", addSavedSearch);
 router.patch("/profile/saved-searches/:searchId", updateSavedSearch);
 router.delete("/profile/saved-searches/:searchId", deleteSavedSearch);
+
+router.get("/matches", listMatches);
 
 export default router;
