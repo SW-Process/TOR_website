@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { daysUntil, type Category, type TOR } from "@/lib/mockData";
+import type { Category } from "@/lib/mockData";
 import { apiFetch } from "@/lib/api";
+import { categoryToSlug, slugToCategory } from "@/lib/torApi";
 
 export interface BusinessProfile {
   businessName: string;
@@ -63,7 +64,9 @@ function fromBackend(p: BackendVendorProfile): BusinessProfile {
   return {
     businessName: p.companyName ?? "",
     businessType: p.businessType ?? "",
-    interestedCategories: (p.interestedCategories ?? []) as Category[],
+    interestedCategories: (p.interestedCategories ?? [])
+      .map(slugToCategory)
+      .filter((c): c is Category => c !== null),
     registeredCapital: p.registeredCapital ?? 0,
     experienceYears: p.yearsExperience ?? 0,
     teamSize: p.teamSize ?? 0,
@@ -85,7 +88,8 @@ function toBackend(p: BusinessProfile): Record<string, unknown> {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
-    interestedCategories: p.interestedCategories,
+    // Sent as taxonomy slugs so the backend matcher can compare them to Tor.category.
+    interestedCategories: p.interestedCategories.map(categoryToSlug),
     budgetMin: p.budgetMin,
     budgetMax: p.budgetMax,
     serviceArea: p.serviceArea,
@@ -119,41 +123,4 @@ export function useProfile() {
   }, []);
 
   return { profile, ready, saveProfile, hasProfile: !!profile };
-}
-
-// Placeholder heuristic only — matches user-facing copy that says the real
-// scoring will come once the data team defines what the AI model needs.
-export function computeMatchScore(tor: TOR, profile: BusinessProfile): number {
-  let score = 40;
-
-  if (profile.interestedCategories.includes(tor.category)) score += 35;
-
-  if (profile.budgetMin || profile.budgetMax) {
-    const min = profile.budgetMin || 0;
-    const max = profile.budgetMax || Infinity;
-    if (tor.budget >= min && tor.budget <= max) {
-      score += 20;
-    } else {
-      const mid = (min + (Number.isFinite(max) ? max : min * 2 || tor.budget)) / 2;
-      const diffRatio = mid ? Math.abs(tor.budget - mid) / mid : 1;
-      score += Math.max(0, 20 - diffRatio * 20);
-    }
-  }
-
-  if (profile.experienceYears >= 3) score += 5;
-
-  return Math.max(5, Math.min(97, Math.round(score)));
-}
-
-// Used before a profile is filled in, so the recommendation UI still has a
-// number to show — based only on signals from the TOR itself (urgency,
-// interest, AI-summary confidence), not personalized to any business.
-export function computeFallbackScore(tor: TOR): number {
-  const confidenceBonus =
-    tor.summary.confidence === "สูง" ? 15 : tor.summary.confidence === "ปานกลาง" ? 8 : 0;
-  const viewsBonus = Math.min(25, Math.round(tor.views / 50));
-  const remaining = daysUntil(tor.deadline);
-  const urgencyBonus = remaining >= 0 && remaining <= 7 ? 10 : 0;
-
-  return Math.max(35, Math.min(92, 45 + confidenceBonus + viewsBonus + urgencyBonus));
 }

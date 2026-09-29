@@ -15,9 +15,10 @@ import RequireAuth from "@/components/RequireAuth";
 import { useAuth } from "@/lib/useAuth";
 import { useBookmarks } from "@/lib/useBookmarks";
 import { useTracking } from "@/lib/useTracking";
-import { computeMatchScore, useProfile } from "@/lib/useProfile";
+import { useProfile } from "@/lib/useProfile";
+import { useMatches } from "@/lib/useMatches";
 import { torList as mockTorList, daysUntil, categories, type Category, type TOR } from "@/lib/mockData";
-import { fetchTorList } from "@/lib/torApi";
+import { fetchTorList, mapApiTor } from "@/lib/torApi";
 
 const catalogFilters: (Category | "ทั้งหมด")[] = ["ทั้งหมด", ...categories];
 
@@ -25,7 +26,8 @@ function DashboardContent() {
   const { displayName } = useAuth();
   const { ids, ready: bookmarksReady } = useBookmarks();
   const { statusOf, ready: trackingReady } = useTracking();
-  const { profile, ready: profileReady, hasProfile } = useProfile();
+  const { ready: profileReady, hasProfile } = useProfile();
+  const { matches, loading: matchesLoading } = useMatches(profileReady && hasProfile);
   const [activeCategory, setActiveCategory] = useState<Category | "ทั้งหมด">("ทั้งหมด");
   const [torList, setTorList] = useState<TOR[]>([]);
   const [torsReady, setTorsReady] = useState(false);
@@ -41,21 +43,29 @@ function DashboardContent() {
 
   const openTor = useMemo(() => torList.filter((t) => t.status !== "ปิดรับแล้ว"), [torList]);
 
-  const recommended = useMemo(() => {
-    if (hasProfile && profile) {
-      return [...openTor]
-        .map((tor) => ({ tor, score: computeMatchScore(tor, profile) }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 6)
-        .map((x) => x.tor);
-    }
-    return [...openTor]
-      .sort((a, b) => {
-        const byDeadline = daysUntil(a.deadline) - daysUntil(b.deadline);
-        return byDeadline !== 0 ? byDeadline : b.views - a.views;
-      })
-      .slice(0, 6);
-  }, [hasProfile, profile, openTor]);
+  // Deadline/views ordering: shown without a score before a profile exists,
+  // and as the placeholder list while the backend scores are loading.
+  const byUrgency = useMemo(
+    () =>
+      [...openTor]
+        .sort((a, b) => {
+          const byDeadline = daysUntil(a.deadline) - daysUntil(b.deadline);
+          return byDeadline !== 0 ? byDeadline : b.views - a.views;
+        })
+        .slice(0, 6),
+    [openTor],
+  );
+
+  // Prefer the full row from /api/tors (the matches projection omits views,
+  // summary, etc.) and fall back to the match's own slim TOR.
+  const recommended = useMemo<{ tor: TOR; score: number | null }[]>(() => {
+    if (matchesLoading) return byUrgency.map((tor) => ({ tor, score: null }));
+    const byId = new Map(torList.map((t) => [t.id, t]));
+    return matches.map((m) => ({
+      tor: byId.get(m.tor._id) ?? mapApiTor(m.tor),
+      score: m.matchScore,
+    }));
+  }, [matchesLoading, matches, byUrgency, torList]);
 
   const catalog =
     activeCategory === "ทั้งหมด" ? torList : torList.filter((t) => t.category === activeCategory);
@@ -166,10 +176,13 @@ function DashboardContent() {
               จัดอันดับตามความเหมาะสมกับโปรไฟล์ธุรกิจของคุณ
             </p>
             <div className="mt-4 grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
-              {recommended.map((tor) => (
-                <TORCard key={tor.id} tor={tor} showMatchScore />
+              {recommended.map(({ tor, score }) => (
+                <TORCard key={tor.id} tor={tor} matchScore={score} />
               ))}
             </div>
+            {recommended.length === 0 && (
+              <p className="mt-4 text-sm text-[var(--color-text-muted)]">ยังไม่มี TOR ที่เปิดรับอยู่ในขณะนี้</p>
+            )}
           </>
         ) : (
           <Link

@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 :root {
+  /* Fixed header height, so full-height pages can subtract it (login). */
+  --header-h: 4.5rem;
   --color-bg: #ffffff;
   --color-surface: #ffffff;
   --color-surface-alt: #fdf6f5;
