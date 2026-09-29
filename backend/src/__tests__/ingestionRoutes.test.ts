@@ -89,7 +89,7 @@ describe("POST /api/ingestion/runs", () => {
 
   it("400 when lookbackDays is out of range", async () => {
     const agent = await adminAgent();
-    const res = await agent.post("/api/ingestion/runs").send({ lookbackDays: 91 });
+    const res = await agent.post("/api/ingestion/runs").send({ lookbackDays: 6001 });
     expect(res.status).toBe(400);
     expect(runIngestionMock).not.toHaveBeenCalled();
   });

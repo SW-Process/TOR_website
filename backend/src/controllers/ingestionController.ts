@@ -6,7 +6,7 @@ import { drainEnrichmentQueue } from "../ingestion/enrichment/drainEnrichmentQue
 import { selectExtractor } from "../jobs/enrichment";
 
 const MAX_PROJECTS_CEILING = 500;
-const LOOKBACK_DAYS_CEILING = 90;
+const LOOKBACK_DAYS_CEILING = 6000; // ~200 months
 
 function parseMaxProjects(raw: unknown): number {
   const fallback = Number(process.env.INGEST_DEFAULT_MAX_PROJECTS) || 50;
