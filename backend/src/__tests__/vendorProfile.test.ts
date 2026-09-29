@@ -363,21 +363,16 @@ describe("PUT /api/vendor/profile — other fields and edge cases", () => {
     expect(res.status).toBe(400);
   });
 
-  // KNOWN GAP: asNonNegativeNumber() runs Number(raw) on any type, so these
-  // are coerced and saved instead of rejected. `it.failing` passes while the
-  // bug exists and starts failing once validation is fixed — then flip to `it`.
-  describe("known gap: non-numeric types coerced by Number()", () => {
-    it.failing.each([
-      ["true", true],
-      ["false", false],
-      ["an array holding a number", [5]],
-      ["an empty array", []],
-      ["a hex string", "0x10"],
-    ])("should reject %s with 400", async (_label, value) => {
-      const agent = await vendorAgent();
-      const res = await agent.put("/api/vendor/profile").send({ teamSize: value });
-      expect(res.status).toBe(400);
-    });
+  it.each([
+    ["true", true],
+    ["false", false],
+    ["an array holding a number", [5]],
+    ["an empty array", []],
+    ["a hex string", "0x10"],
+  ])("rejects %s with 400", async (_label, value) => {
+    const agent = await vendorAgent();
+    const res = await agent.put("/api/vendor/profile").send({ teamSize: value });
+    expect(res.status).toBe(400);
   });
 
   it("accepts the nested budgetRange shape", async () => {
