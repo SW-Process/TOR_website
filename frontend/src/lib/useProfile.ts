@@ -9,6 +9,8 @@ export interface BusinessProfile {
   businessName: string;
   businessType: string;
   interestedCategories: Category[];
+  /** Comma-separated in the form; sent as an array (matched against Tor.technologyStack). */
+  technologyStack: string;
   registeredCapital: number;
   experienceYears: number;
   teamSize: number;
@@ -22,6 +24,7 @@ export const emptyProfile: BusinessProfile = {
   businessName: "",
   businessType: "",
   interestedCategories: [],
+  technologyStack: "",
   registeredCapital: 0,
   experienceYears: 0,
   teamSize: 0,
@@ -38,6 +41,7 @@ interface BackendVendorProfile {
   yearsExperience?: number;
   teamSize?: number;
   certifications?: string[];
+  technologyStack?: string[];
   interestedCategories?: string[];
   budgetRange?: { min?: number; max?: number };
   serviceArea?: string;
@@ -53,6 +57,7 @@ function isEmpty(p: BackendVendorProfile): boolean {
     !p.yearsExperience &&
     !p.teamSize &&
     !(p.certifications && p.certifications.length) &&
+    !(p.technologyStack && p.technologyStack.length) &&
     !(p.interestedCategories && p.interestedCategories.length) &&
     !p.budgetRange?.min &&
     !p.budgetRange?.max &&
@@ -67,6 +72,7 @@ function fromBackend(p: BackendVendorProfile): BusinessProfile {
     interestedCategories: (p.interestedCategories ?? [])
       .map(slugToCategory)
       .filter((c): c is Category => c !== null),
+    technologyStack: (p.technologyStack ?? []).join(", "),
     registeredCapital: p.registeredCapital ?? 0,
     experienceYears: p.yearsExperience ?? 0,
     teamSize: p.teamSize ?? 0,
@@ -77,6 +83,13 @@ function fromBackend(p: BackendVendorProfile): BusinessProfile {
   };
 }
 
+function splitList(value: string): string[] {
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function toBackend(p: BusinessProfile): Record<string, unknown> {
   return {
     companyName: p.businessName,
@@ -84,10 +97,8 @@ function toBackend(p: BusinessProfile): Record<string, unknown> {
     registeredCapital: p.registeredCapital,
     yearsExperience: p.experienceYears,
     teamSize: p.teamSize,
-    certifications: p.certifications
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
+    certifications: splitList(p.certifications),
+    technologyStack: splitList(p.technologyStack),
     // Sent as taxonomy slugs so the backend matcher can compare them to Tor.category.
     interestedCategories: p.interestedCategories.map(categoryToSlug),
     budgetMin: p.budgetMin,

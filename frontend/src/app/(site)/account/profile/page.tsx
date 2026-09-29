@@ -7,6 +7,7 @@ import {
   Award,
   Building2,
   CheckCircle2,
+  Cpu,
   ImagePlus,
   MapPin,
   PartyPopper,
@@ -191,6 +192,23 @@ export default function ProfilePage() {
             );
           })}
         </div>
+      </section>
+
+      <div className="h-px bg-[var(--color-border)]" />
+
+      <section className="flex flex-col gap-3">
+        <SectionHeading
+          icon={Cpu}
+          title="เทคโนโลยีที่ใช้"
+          subtitle="ใช้จับคู่กับเทคโนโลยีที่ TOR ต้องการ"
+        />
+        <textarea
+          value={form.technologyStack}
+          onChange={(e) => field("technologyStack", e.target.value)}
+          placeholder="เช่น React, Node.js, PostgreSQL, Docker (คั่นด้วยจุลภาค)"
+          rows={2}
+          className={`${inputClass} resize-none`}
+        />
       </section>
 
       <div className="h-px bg-[var(--color-border)]" />
