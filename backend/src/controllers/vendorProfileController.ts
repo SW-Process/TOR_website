@@ -17,9 +17,23 @@ function asString(raw: unknown, field: string, max = MAX_STR): string | undefine
   return trimmed || undefined;
 }
 
+// Plain decimal only — no hex/exponent/Infinity notation, so a numeric-looking
+// string like "0x10" or "Infinity" can't sneak through Number()'s coercion.
+const PLAIN_DECIMAL = /^-?\d+(\.\d+)?$/;
+
 function asNonNegativeNumber(raw: unknown, field: string): number | undefined {
   if (raw === undefined || raw === null || raw === "") return undefined;
-  const n = typeof raw === "number" ? raw : Number(raw);
+
+  let n: number;
+  if (typeof raw === "number") {
+    n = raw;
+  } else if (typeof raw === "string" && PLAIN_DECIMAL.test(raw.trim())) {
+    n = Number(raw);
+  } else {
+    // booleans, arrays, objects, and non-decimal strings all land here
+    throw httpError(400, `${field} must be a number >= 0`);
+  }
+
   if (!Number.isFinite(n) || n < 0) throw httpError(400, `${field} must be a number >= 0`);
   return n;
 }
