@@ -225,7 +225,7 @@ export default function ScraperHealth() {
               {runsReady ? "ยังไม่มีประวัติการรัน" : "กำลังโหลด..."}
             </p>
           ) : (
-            <div className="divide-y divide-[var(--color-border)]">
+            <div className="divide-y divide-[var(--color-border)] max-h-[400px] overflow-y-auto">
               {runs.map((run) => (
                 <div key={run._id} className="px-5 py-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
