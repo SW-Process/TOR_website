@@ -101,8 +101,13 @@ function toBackend(p: BusinessProfile): Record<string, unknown> {
     technologyStack: splitList(p.technologyStack),
     // Sent as taxonomy slugs so the backend matcher can compare them to Tor.category.
     interestedCategories: p.interestedCategories.map(categoryToSlug),
-    budgetMin: p.budgetMin,
-    budgetMax: p.budgetMax,
+    // 0 means "left empty" in this form (see the budget inputs' value={... || ""}),
+    // not a real ฿0 budget — omit it so the backend treats it as not provided,
+    // instead of saving an explicit {min:0,max:0} range that then penalizes
+    // every TOR's match score, and instead of a lone budgetMax:0 tripping the
+    // backend's budgetMin > budgetMax check when only budgetMin was entered.
+    budgetMin: p.budgetMin || undefined,
+    budgetMax: p.budgetMax || undefined,
     serviceArea: p.serviceArea,
   };
 }
