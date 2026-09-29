@@ -129,6 +129,26 @@ describe("PUT /api/vendor/profile", () => {
     expect(res.status).toBe(400);
   });
 
+  // Regression: the frontend previously sent an untouched budget field as the
+  // literal number 0 rather than omitting it, so entering only a minimum
+  // tripped this same budgetMin > budgetMax check (900 > 0) and saving failed.
+  it("accepts a budgetMin with no budgetMax at all", async () => {
+    const agent = await vendorAgent();
+    const res = await agent.put("/api/vendor/profile").send({ budgetMin: 900 });
+    expect(res.status).toBe(200);
+    expect(res.body.profile.budgetRange).toEqual({ min: 900 });
+  });
+
+  // Regression: an omitted budget must stay unset, not become an explicit
+  // {min:0,max:0} range — that would read as "only TORs priced ฿0" and
+  // (via computeMatch) penalize every real TOR's match score.
+  it("leaves budgetRange unset when neither budgetMin nor budgetMax is sent", async () => {
+    const agent = await vendorAgent();
+    const res = await agent.put("/api/vendor/profile").send({ companyName: "Acme" });
+    expect(res.status).toBe(200);
+    expect(res.body.profile.budgetRange).toBeUndefined();
+  });
+
   it("keeps profiles isolated per vendor", async () => {
     const a = await vendorAgent("a@test.com");
     const b = await vendorAgent("b@test.com");
