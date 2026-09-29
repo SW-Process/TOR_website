@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  /* Fixed header height, so full-height pages can subtract it (login). */
+  /* Header height (py-4 + 40px login button), subtracted by full-height pages (login). */
   --header-h: 4.5rem;
   --color-bg: #ffffff;
   --color-surface: #ffffff;

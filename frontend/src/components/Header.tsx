@@ -44,7 +44,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 bg-white">
-      <div className="container-page flex h-[var(--header-h)] items-center justify-between">
+      <div className="container-page flex items-center justify-between py-4">
         <Link href="/" className="flex items-center gap-2 shrink-0">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-ink)] text-white">
             <FileSearch size={16} />
