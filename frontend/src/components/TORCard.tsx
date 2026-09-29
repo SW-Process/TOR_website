@@ -8,10 +8,11 @@ import MatchScoreBadge from "./MatchScoreBadge";
 
 export default function TORCard({
   tor,
-  showMatchScore = false,
+  matchScore,
 }: {
   tor: TOR;
-  showMatchScore?: boolean;
+  /** Omit to hide the badge; null shows its loading state. */
+  matchScore?: number | null;
 }) {
   const remaining = daysUntil(tor.deadline);
   const deadlineLabel = isUnknownDeadline(tor.deadline)
@@ -73,7 +74,7 @@ export default function TORCard({
           </Link>
         </div>
       </div>
-      {showMatchScore && <MatchScoreBadge tor={tor} />}
+      {matchScore !== undefined && <MatchScoreBadge score={matchScore} />}
     </div>
   );
 }

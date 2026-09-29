@@ -1,15 +1,27 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
-import type { TOR } from "@/lib/mockData";
-import { computeMatchScore, useProfile } from "@/lib/useProfile";
 
-export default function MatchScoreBadge({ tor }: { tor: TOR }) {
-  const { profile, ready, hasProfile } = useProfile();
+/**
+ * Renders the backend match score (GET /api/vendor/matches). `score` is null
+ * while the scores are still loading.
+ */
+export default function MatchScoreBadge({ score }: { score: number | null }) {
+  if (score === null) {
+    return (
+      <div className="px-4 py-2.5 bg-[var(--color-surface-alt)]" aria-busy="true">
+        <div className="flex items-center justify-between text-[11px] font-semibold text-[var(--color-text-faint)]">
+          <span className="flex items-center gap-1">
+            <Sparkles size={11} />
+            เหมาะกับคุณ
+          </span>
+          <span>…</span>
+        </div>
+        <div className="mt-1.5 h-1.5 w-full animate-pulse rounded-full bg-white/70" />
+      </div>
+    );
+  }
 
-  if (!ready || !hasProfile || !profile) return null;
-
-  const score = computeMatchScore(tor, profile);
   const textColor =
     score >= 70
       ? "text-[var(--color-success)]"
@@ -28,7 +40,7 @@ export default function MatchScoreBadge({ tor }: { tor: TOR }) {
   return (
     <div
       className={`px-4 py-2.5 ${bgTint}`}
-      title="ประเมินเบื้องต้นจากโปรไฟล์ธุรกิจของคุณ (ยังไม่ใช่ผลจาก AI)"
+      title="คำนวณจากหมวดหมู่ เทคโนโลยี และช่วงงบประมาณในโปรไฟล์ธุรกิจของคุณ"
     >
       <div className={`flex items-center justify-between text-[11px] font-semibold ${textColor}`}>
         <span className="flex items-center gap-1">
