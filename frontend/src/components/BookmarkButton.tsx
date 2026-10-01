@@ -2,7 +2,6 @@
 
 import { Bookmark } from "lucide-react";
 import { useBookmarks } from "@/lib/useBookmarks";
-import { useAuth } from "@/lib/useAuth";
 
 export default function BookmarkButton({
   id,
@@ -11,15 +10,15 @@ export default function BookmarkButton({
   id: string;
   variant?: "icon" | "full";
 }) {
-  const { isBookmarked, toggle, ready } = useBookmarks();
-  const { isLoggedIn, ready: authReady } = useAuth();
+  const { isBookmarked, toggle, ready, canBookmark } = useBookmarks();
   const active = ready && isBookmarked(id);
 
-  if (!authReady || !isLoggedIn) return null;
+  // Bookmarking is a vendor feature (the API rejects other roles).
+  if (!canBookmark) return null;
 
   if (variant === "full") {
     return (
-      <button onClick={() => toggle(id)} className="btn-pill w-full px-4 py-2.5 text-sm border border-[var(--color-border-strong)] bg-white text-[var(--color-text)] hover:border-[var(--color-ink)] transition-colors">
+      <button onClick={() => void toggle(id)} disabled={!ready} className="btn-pill w-full px-4 py-2.5 text-sm border border-[var(--color-border-strong)] bg-white text-[var(--color-text)] hover:border-[var(--color-ink)] transition-colors">
         <Bookmark size={16} className={active ? "text-[var(--color-rose-dark)]" : ""} fill={active ? "currentColor" : "none"} />
         {active ? "บันทึกแล้ว" : "บันทึก TOR นี้"}
       </button>
@@ -32,8 +31,9 @@ export default function BookmarkButton({
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        toggle(id);
+        void toggle(id);
       }}
+      disabled={!ready}
       className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition-colors hover:bg-white"
     >
       <Bookmark

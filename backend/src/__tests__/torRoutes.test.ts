@@ -95,9 +95,161 @@ describe("GET /api/tors", () => {
     expect(none.body.totalCount).toBe(0);
   });
 
+  it("filters by tech stack (whole value, case-insensitive) and project type (FR-6)", async () => {
+    await seed();
+    await Tor.updateOne({ title: "ระบบสารบรรณ A" }, { technologyStack: ["Linux", "PostgreSQL"], projectType: "maintenance" });
+    await Tor.updateOne({ title: "ระบบสารบรรณ B" }, { technologyStack: ["Oracle Linux"], projectType: "new-development" });
+    const titles = async (qs: string) =>
+      (await request(app).get(`/api/tors?${qs}`)).body.data.map((t: { title: string }) => t.title);
+
+    expect(await titles("tech=linux")).toEqual(["ระบบสารบรรณ A"]);
+    expect(await titles("tech=linux&tech=oracle%20linux")).toEqual(["ระบบสารบรรณ B", "ระบบสารบรรณ A"]);
+    expect(await titles("projectType=new-development")).toEqual(["ระบบสารบรรณ B"]);
+    expect(await titles("tech=linux&projectType=new-development")).toEqual([]);
+  });
+
+  it("400s on an unknown projectType", async () => {
+    const res = await request(app).get("/api/tors?projectType=bogus");
+    expect(res.status).toBe(400);
+  });
+
+  it("treats the budget range as inclusive and 400s when budgetMin > budgetMax (FR-3)", async () => {
+    await seed();
+    const exact = await request(app).get("/api/tors?budgetMin=1000000&budgetMax=1000000");
+    expect(exact.body.data.map((t: { title: string }) => t.title)).toEqual(["ระบบสารบรรณ A"]);
+
+    const inverted = await request(app).get("/api/tors?budgetMin=2000000&budgetMax=1000000");
+    expect(inverted.status).toBe(400);
+    expect(inverted.body.message).toMatch(/budgetMin/);
+  });
+
+  it("sorts by budget and announcement date, missing values last (FR-2)", async () => {
+    await seed();
+    await Tor.create({ title: "ไม่มีงบ", pipelineStatus: "enriched" });
+    const titles = async (qs: string) =>
+      (await request(app).get(`/api/tors?${qs}`)).body.data.map((t: { title: string }) => t.title);
+
+    expect(await titles("sort=budget")).toEqual(["ระบบสารบรรณ B", "ระบบสารบรรณ A", "เว็บไซต์หน่วยงาน", "ไม่มีงบ"]);
+    expect(await titles("sort=budget&order=asc")).toEqual(["เว็บไซต์หน่วยงาน", "ระบบสารบรรณ A", "ระบบสารบรรณ B", "ไม่มีงบ"]);
+    expect(await titles("sort=announcementDate&order=asc")).toEqual([
+      "ระบบสารบรรณ A",
+      "ระบบสารบรรณ B",
+      "เว็บไซต์หน่วยงาน",
+      "ไม่มีงบ",
+    ]);
+  });
+
+  it("deadline sort puts upcoming first (soonest), then passed (most recent), then unknown", async () => {
+    const day = 86_400_000;
+    const now = Date.now();
+    await Tor.create([
+      { title: "ปิดไปนานแล้ว", pipelineStatus: "enriched", submissionDeadline: new Date(now - 400 * day) },
+      { title: "เพิ่งปิด", pipelineStatus: "enriched", submissionDeadline: new Date(now - 2 * day) },
+      { title: "ไม่ทราบวันปิด", pipelineStatus: "enriched" },
+      { title: "ปิดอีก 10 วัน", pipelineStatus: "enriched", submissionDeadline: new Date(now + 10 * day) },
+      { title: "ปิดพรุ่งนี้", pipelineStatus: "enriched", submissionDeadline: new Date(now + day) },
+    ]);
+    const res = await request(app).get("/api/tors?sort=submissionDeadline");
+    expect(res.body.order).toBe("asc");
+    expect(res.body.data.map((t: { title: string }) => t.title)).toEqual([
+      "ปิดพรุ่งนี้",
+      "ปิดอีก 10 วัน",
+      "เพิ่งปิด",
+      "ปิดไปนานแล้ว",
+      "ไม่ทราบวันปิด",
+    ]);
+  });
+
+  it("filters by effective status: a passed deadline counts as closed whatever is stored", async () => {
+    const day = 86_400_000;
+    await Tor.create([
+      { title: "เปิดอยู่", pipelineStatus: "enriched", status: "open", submissionDeadline: new Date(Date.now() + day) },
+      { title: "เลยกำหนดแต่ยัง open", pipelineStatus: "enriched", status: "open", submissionDeadline: new Date(Date.now() - day) },
+      { title: "ใกล้ปิด", pipelineStatus: "enriched", status: "closing_soon" },
+      { title: "ไม่ทราบวันปิด", pipelineStatus: "enriched" },
+    ]);
+    const titles = async (qs: string) =>
+      (await request(app).get(`/api/tors?${qs}`)).body.data.map((t: { title: string }) => t.title).sort();
+
+    expect(await titles("status=closed")).toEqual(["เลยกำหนดแต่ยัง open"]);
+    expect(await titles("status=open")).toEqual(["เปิดอยู่", "ไม่ทราบวันปิด"].sort());
+    expect(await titles("status=closing_soon&status=closed")).toEqual(["ใกล้ปิด", "เลยกำหนดแต่ยัง open"].sort());
+    expect((await request(app).get("/api/tors?status=bogus")).status).toBe(400);
+  });
+
+  it("paginates and reports totals over the whole result set", async () => {
+    await seed();
+    const p1 = await request(app).get("/api/tors?pageSize=2&page=1");
+    const p2 = await request(app).get("/api/tors?pageSize=2&page=2");
+    expect(p1.body).toMatchObject({ page: 1, totalCount: 3, hasNextPage: true, totalBudget: 3_500_000 });
+    expect(p2.body).toMatchObject({ page: 2, totalCount: 3, hasNextPage: false, totalBudget: 3_500_000 });
+    const ids = [...p1.body.data, ...p2.body.data].map((t: { _id: string }) => t._id);
+    expect(new Set(ids).size).toBe(3);
+
+    const empty = await request(app).get("/api/tors?q=" + encodeURIComponent("ไม่มีทางเจอ"));
+    expect(empty.body).toMatchObject({ data: [], totalCount: 0, totalBudget: 0, hasNextPage: false });
+  });
+
+  it("400s on an unknown sort field", async () => {
+    expect((await request(app).get("/api/tors?sort=title")).status).toBe(400);
+  });
+
+  it("filters by announcement and deadline date ranges, inclusive (FR-4)", async () => {
+    await Tor.create([
+      { title: "ประกาศ ก.ค. ปิด ส.ค.", pipelineStatus: "enriched", announcementDate: new Date("2026-07-10"), submissionDeadline: new Date("2026-08-20") },
+      { title: "ประกาศ ส.ค. ปิด ก.ย.", pipelineStatus: "enriched", announcementDate: new Date("2026-08-10"), submissionDeadline: new Date("2026-09-05") },
+      { title: "ไม่ทราบวันปิด", pipelineStatus: "enriched", announcementDate: new Date("2026-08-15") },
+    ]);
+    const titles = async (qs: string) =>
+      (await request(app).get(`/api/tors?${qs}`)).body.data.map((t: { title: string }) => t.title).sort();
+
+    expect(await titles("deadlineFrom=2026-09-01")).toEqual(["ประกาศ ส.ค. ปิด ก.ย."]);
+    expect(await titles("deadlineTo=2026-08-20")).toEqual(["ประกาศ ก.ค. ปิด ส.ค."]);
+    expect(await titles("deadlineFrom=2026-08-01&deadlineTo=2026-09-30")).toEqual(
+      ["ประกาศ ก.ค. ปิด ส.ค.", "ประกาศ ส.ค. ปิด ก.ย."].sort()
+    );
+    expect(await titles("publishedFrom=2026-08-01&deadlineTo=2026-08-31")).toEqual([]);
+    expect(await titles("publishedFrom=2026-08-01")).toEqual(["ประกาศ ส.ค. ปิด ก.ย.", "ไม่ทราบวันปิด"].sort());
+  });
+
+  it("400s on inverted date ranges", async () => {
+    expect((await request(app).get("/api/tors?deadlineFrom=2026-09-01&deadlineTo=2026-08-01")).status).toBe(400);
+    expect((await request(app).get("/api/tors?publishedFrom=2026-09-01&publishedTo=2026-08-01")).status).toBe(400);
+    expect((await request(app).get("/api/tors?deadlineFrom=not-a-date")).status).toBe(400);
+  });
+
   it("400s on a bad pageSize", async () => {
     const res = await request(app).get("/api/tors?pageSize=999");
     expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /api/tors/agencies", () => {
+  it("lists distinct agencies of enriched TORs only, sorted, with the total count", async () => {
+    await seed();
+    await Tor.create([
+      { title: "ไม่มีหน่วยงาน", pipelineStatus: "enriched" },
+      { title: "หน่วยงานที่ยังไม่ enrich", agency: "สำนักงานเขตบางรัก", pipelineStatus: "pending" },
+    ]);
+    const res = await request(app).get("/api/tors/agencies");
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(["สำนักการแพทย์", "สำนักอนามัย"]);
+    expect(res.body.totalCount).toBe(4);
+  });
+});
+
+describe("GET /api/tors/technologies", () => {
+  it("counts tech-stack values of enriched TORs, most used first", async () => {
+    await seed();
+    await Tor.updateOne({ title: "ระบบสารบรรณ A" }, { technologyStack: ["Linux", "PostgreSQL"] });
+    await Tor.updateOne({ title: "ระบบสารบรรณ B" }, { technologyStack: ["Linux"] });
+    await Tor.updateOne({ title: "งานที่ยังไม่ enrich" }, { technologyStack: ["Linux", "COBOL"] });
+    const res = await request(app).get("/api/tors/technologies");
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([
+      { name: "Linux", count: 2 },
+      { name: "PostgreSQL", count: 1 },
+    ]);
   });
 });
 

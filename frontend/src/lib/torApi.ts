@@ -1,5 +1,5 @@
 import { API_BASE } from "@/lib/api";
-import { daysUntil, type AISummary, type Category, type FairnessField, type FairnessFlag, type TOR, type TORStatus } from "@/lib/mockData";
+import { type AISummary, type Category, type FairnessField, type FairnessFlag, type TOR, type TORStatus } from "@/lib/mockData";
 
 /**
  * Real ingested TORs frequently have no submissionDeadline yet (most rows in
@@ -72,7 +72,9 @@ const STATUS_MAP: Record<string, TORStatus> = {
 // recomputed, so a TOR whose deadline has already passed would still read
 // "เปิดรับ". Trust a known deadline over the stored status.
 function mapStatus(raw: string | undefined, deadline: string): TORStatus {
-  if (!isUnknownDeadline(deadline) && daysUntil(deadline) < 0) return "ปิดรับแล้ว";
+  // Real clock, not the mock TODAY_ISO, so this agrees with the backend's
+  // `status` filter (torController statusClause).
+  if (!isUnknownDeadline(deadline) && Date.parse(deadline) < Date.now()) return "ปิดรับแล้ว";
   return (raw && STATUS_MAP[raw]) || "เปิดรับ";
 }
 
@@ -209,7 +211,11 @@ export async function fetchTorList(): Promise<TOR[]> {
 
 export interface TorSearchResult {
   tors: TOR[];
+  page: number;
   totalCount: number;
+  /** Sum of budgets over every matching TOR, not just this page. */
+  totalBudget: number;
+  hasNextPage: boolean;
 }
 
 /**
@@ -219,8 +225,54 @@ export interface TorSearchResult {
 export async function searchTors(query: URLSearchParams, signal?: AbortSignal): Promise<TorSearchResult> {
   const res = await fetch(`${API_BASE}/api/tors?${query.toString()}`, { signal });
   if (!res.ok) throw new Error(`TOR search failed: HTTP ${res.status}`);
-  const body = (await res.json()) as { data: ApiTor[]; totalCount: number };
-  return { tors: body.data.map(mapApiTor), totalCount: body.totalCount };
+  const body = (await res.json()) as {
+    data: ApiTor[];
+    page: number;
+    totalCount: number;
+    totalBudget: number;
+    hasNextPage: boolean;
+  };
+  return {
+    tors: body.data.map(mapApiTor),
+    page: body.page,
+    totalCount: body.totalCount,
+    totalBudget: body.totalBudget,
+    hasNextPage: body.hasNextPage,
+  };
+}
+
+export interface AgencyOptions {
+  agencies: string[];
+  /** Every public TOR, regardless of filters. */
+  totalCount: number;
+}
+
+/** GET /api/tors/agencies — agency filter options across the whole collection (FR-5). */
+export async function fetchAgencies(): Promise<AgencyOptions> {
+  try {
+    const res = await fetch(`${API_BASE}/api/tors/agencies`);
+    if (!res.ok) return { agencies: [], totalCount: 0 };
+    const body = (await res.json()) as { data: string[]; totalCount: number };
+    return { agencies: body.data, totalCount: body.totalCount };
+  } catch {
+    return { agencies: [], totalCount: 0 };
+  }
+}
+
+export interface TechOption {
+  name: string;
+  count: number;
+}
+
+/** GET /api/tors/technologies — tech-stack suggestions, most used first (FR-6). */
+export async function fetchTechnologies(): Promise<TechOption[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/tors/technologies`);
+    if (!res.ok) return [];
+    return ((await res.json()) as { data: TechOption[] }).data;
+  } catch {
+    return [];
+  }
 }
 
 /** GET /api/tors/:id — fetches one TOR, or null if missing/not enriched. */

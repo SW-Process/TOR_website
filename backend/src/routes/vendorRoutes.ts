@@ -8,6 +8,12 @@ import {
   deleteSavedSearch,
 } from "../controllers/vendorProfileController";
 import { listMatches } from "../controllers/matchController";
+import {
+  listBookmarks,
+  putBookmark,
+  updateBookmark,
+  deleteBookmark,
+} from "../controllers/bookmarkController";
 import { requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
@@ -23,5 +29,10 @@ router.patch("/profile/saved-searches/:searchId", updateSavedSearch);
 router.delete("/profile/saved-searches/:searchId", deleteSavedSearch);
 
 router.get("/matches", listMatches);
+
+router.get("/bookmarks", listBookmarks);
+router.put("/bookmarks/:torId", putBookmark);
+router.patch("/bookmarks/:torId", updateBookmark);
+router.delete("/bookmarks/:torId", deleteBookmark);
 
 export default router;

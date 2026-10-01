@@ -8,7 +8,6 @@ import TrackingBoard from "@/components/TrackingBoard";
 import DeadlineCalendar from "@/components/DeadlineCalendar";
 import RequireAuth from "@/components/RequireAuth";
 import { useBookmarks } from "@/lib/useBookmarks";
-import { torList } from "@/lib/mockData";
 
 const views = [
   { key: "list", label: "รายการที่บันทึก", icon: Bookmark },
@@ -19,9 +18,9 @@ const views = [
 type ViewKey = (typeof views)[number]["key"];
 
 export default function BookmarksPage() {
-  const { ids, ready } = useBookmarks();
+  const { items, ready, error, setStatus } = useBookmarks();
   const [view, setView] = useState<ViewKey>("list");
-  const saved = torList.filter((t) => ids.includes(t.id));
+  const saved = items.map((i) => i.tor);
 
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
@@ -35,7 +34,7 @@ export default function BookmarksPage() {
         TOR ที่บันทึกไว้
       </h1>
       <p className="text-sm text-[var(--color-text-muted)] mt-1.5">
-        รายการ TOR ที่คุณบันทึกไว้ พร้อมติดตามสถานะและวันปิดรับ ข้อมูลจัดเก็บไว้ในเบราว์เซอร์นี้เท่านั้น
+        รายการ TOR ที่คุณบันทึกไว้ พร้อมติดตามสถานะและวันปิดรับ ข้อมูลบันทึกไว้กับบัญชีของคุณ
       </p>
 
       <div className="mt-5 flex flex-wrap gap-2">
@@ -59,7 +58,17 @@ export default function BookmarksPage() {
         })}
       </div>
 
-      {!ready ? null : saved.length === 0 ? (
+      {error && (
+        <p role="alert" className="mt-4 text-sm text-[var(--color-danger)]">
+          {error} กรุณาลองใหม่อีกครั้ง
+        </p>
+      )}
+
+      {!ready ? (
+        <div className="mt-8 card p-10 text-center text-sm text-[var(--color-text-muted)]">
+          กำลังโหลดรายการที่บันทึก...
+        </div>
+      ) : saved.length === 0 ? (
         <div className="mt-8 card p-12 flex flex-col items-center text-center gap-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-rose-light)] text-[var(--color-rose-dark)]">
             <Bookmark size={22} />
@@ -82,7 +91,7 @@ export default function BookmarksPage() {
               ))}
             </div>
           )}
-          {view === "tracking" && <TrackingBoard saved={saved} />}
+          {view === "tracking" && <TrackingBoard items={items} onStatusChange={setStatus} />}
           {view === "calendar" && <DeadlineCalendar saved={saved} />}
         </div>
       )}
