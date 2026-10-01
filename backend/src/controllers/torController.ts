@@ -36,11 +36,20 @@ const LIST_PROJECTION =
 function buildFilter(q: ListQuery): QueryFilter<ITor> {
   const filter: QueryFilter<ITor> = { pipelineStatus: "enriched" };
   // RULING: q is a case-insensitive regex match, not MongoDB $text — the default
-  // text index tokenizes on whitespace and Thai has no word spaces. It covers
-  // title, agency and projectCode: the fields the search box promises (FR-7).
+  // text index tokenizes on whitespace and Thai has no word spaces. FR-1 asks for
+  // title + description + extracted content: we have no stored OCR text, so the
+  // AI summary, key points and tech stack stand in for the latter two, alongside
+  // agency and projectCode which the search box also promises.
   if (q.q) {
     const re = { $regex: escapeRegExp(q.q), $options: "i" };
-    filter.$or = [{ title: re }, { agency: re }, { projectCode: re }];
+    filter.$or = [
+      { title: re },
+      { agency: re },
+      { projectCode: re },
+      { "aiSummary.summary": re },
+      { "aiSummary.keyPoints": re },
+      { technologyStack: re },
+    ];
   }
   if (q.agency?.length) filter.agency = { $in: q.agency };
   if (q.category?.length) filter.category = { $in: q.category };
