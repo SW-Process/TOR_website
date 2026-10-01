@@ -1,12 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import TORCard from "./TORCard";
 import { categories, daysUntil, formatBudget, type TOR } from "@/lib/mockData";
-import { fetchAgencies, searchTors, type AgencyOptions } from "@/lib/torApi";
+import {
+  fetchAgencies,
+  fetchTechnologies,
+  searchTors,
+  type AgencyOptions,
+  type TechOption,
+} from "@/lib/torApi";
 import {
   activeFilterCount as countActive,
+  dedupeCaseInsensitive,
+  MAX_TECH_FILTERS,
+  PROJECT_TYPE_LABELS,
+  PROJECT_TYPES,
   STATUSES,
   toApiParams,
   toUrlParams,
@@ -17,12 +27,17 @@ import {
 const EMPTY_FILTERS: Omit<TorFilters, "q" | "sort"> = {
   categories: [],
   agencies: [],
+  tech: [],
+  projectTypes: [],
   statuses: [],
   budgetMin: "",
   budgetMax: "",
   publishedFrom: "",
   publishedTo: "",
 };
+
+/** How many of the most-used tech values to offer as one-click chips. */
+const TECH_QUICK_PICKS = 8;
 
 /** Wait this long after the last keystroke before re-querying the backend. */
 const SEARCH_DEBOUNCE_MS = 300;
@@ -46,6 +61,27 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
       ),
     [agencyOptions.agencies, filters.agencies]
   );
+
+  // Tech stack is free text with hundreds of values, so it's a type-ahead with
+  // the most used values as one-click chips rather than a checkbox list.
+  const [techOptions, setTechOptions] = useState<TechOption[]>([]);
+  useEffect(() => {
+    fetchTechnologies().then(setTechOptions);
+  }, []);
+  const [techDraft, setTechDraft] = useState("");
+  const selectedTech = new Set(filters.tech.map((t) => t.toLowerCase()));
+  const techSuggestions = techOptions.filter((o) => !selectedTech.has(o.name.toLowerCase()));
+
+  function addTech(value: string) {
+    const v = value.trim();
+    if (!v) return;
+    setFilters((f) => ({ ...f, tech: dedupeCaseInsensitive([...f.tech, v]).slice(0, MAX_TECH_FILTERS) }));
+    setTechDraft("");
+  }
+
+  function removeTech(value: string) {
+    setFilters((f) => ({ ...f, tech: f.tech.filter((t) => t !== value) }));
+  }
 
   // Keep the URL in sync without a navigation/re-render, so refresh, share and
   // back restore the same search.
@@ -86,7 +122,7 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
 
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  function toggle<K extends "categories" | "agencies" | "statuses">(key: K, value: TorFilters[K][number]) {
+  function toggle<K extends "categories" | "agencies" | "projectTypes" | "statuses">(key: K, value: TorFilters[K][number]) {
     setFilters((f) => {
       const list = f[key] as string[];
       const next = list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -168,6 +204,84 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
             </label>
           ))}
         </div>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-[var(--color-text)] mb-2.5">ประเภทโครงการ</p>
+        <div className="flex flex-col gap-2">
+          {PROJECT_TYPES.map((t) => (
+            <label key={t} className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
+              <input
+                type="checkbox"
+                checked={filters.projectTypes.includes(t)}
+                onChange={() => toggle("projectTypes", t)}
+                className="rounded border-[var(--color-border)] accent-[var(--color-rose-dark)]"
+              />
+              {PROJECT_TYPE_LABELS[t]}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-[var(--color-text)] mb-2.5">เทคโนโลยี</p>
+        {filters.tech.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {filters.tech.map((t) => (
+              <span
+                key={t}
+                className="badge inline-flex items-center gap-1 bg-[var(--color-rose-light)] text-[var(--color-rose-dark)]"
+              >
+                {t}
+                <button onClick={() => removeTech(t)} aria-label={`ลบ ${t}`}>
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            addTech(techDraft);
+          }}
+          className="flex items-center gap-2"
+        >
+          <input
+            list="tech-options"
+            value={techDraft}
+            onChange={(e) => setTechDraft(e.target.value)}
+            placeholder="เช่น Linux, Oracle Database"
+            disabled={filters.tech.length >= MAX_TECH_FILTERS}
+            className="w-full rounded-full border border-[var(--color-border)] px-3.5 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
+          />
+          <button
+            type="submit"
+            aria-label="เพิ่มเทคโนโลยี"
+            disabled={!techDraft.trim()}
+            className="shrink-0 rounded-full border border-[var(--color-border)] p-2 text-[var(--color-text)] disabled:opacity-40"
+          >
+            <Plus size={14} />
+          </button>
+          <datalist id="tech-options">
+            {techSuggestions.map((o) => (
+              <option key={o.name} value={o.name} />
+            ))}
+          </datalist>
+        </form>
+        {techSuggestions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {techSuggestions.slice(0, TECH_QUICK_PICKS).map((o) => (
+              <button
+                key={o.name}
+                onClick={() => addTech(o.name)}
+                className="rounded-full border border-[var(--color-border)] px-2.5 py-1 text-xs text-[var(--color-text-muted)] hover:border-[var(--color-ink)] hover:text-[var(--color-text)]"
+              >
+                {o.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>

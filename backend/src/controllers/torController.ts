@@ -5,6 +5,7 @@ import type { QueryFilter } from "mongoose";
 import { Tor } from "../models";
 import type { ITor } from "../models";
 import { httpError } from "../utils/httpError";
+import { PROJECT_TYPES } from "../config/projectTypes";
 
 /** Escape a user string so it is a literal inside a RegExp. */
 function escapeRegExp(input: string): string {
@@ -20,6 +21,8 @@ const listQuerySchema = z.object({
   q: z.string().trim().min(1).max(200).optional(),
   agency: z.preprocess(asArray, z.array(z.string()).optional()),
   category: z.preprocess(asArray, z.array(z.string()).optional()),
+  tech: z.preprocess(asArray, z.array(z.string().trim().min(1).max(100)).max(20).optional()),
+  projectType: z.preprocess(asArray, z.array(z.enum(PROJECT_TYPES)).optional()),
   budgetMin: z.coerce.number().min(0).optional(),
   budgetMax: z.coerce.number().min(0).optional(),
   publishedFrom: z.coerce.date().optional(),
@@ -31,7 +34,7 @@ const listQuerySchema = z.object({
 type ListQuery = z.infer<typeof listQuerySchema>;
 
 const LIST_PROJECTION =
-  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode sourceListingUrl";
+  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl";
 
 function buildFilter(q: ListQuery): QueryFilter<ITor> {
   const filter: QueryFilter<ITor> = { pipelineStatus: "enriched" };
@@ -53,6 +56,12 @@ function buildFilter(q: ListQuery): QueryFilter<ITor> {
   }
   if (q.agency?.length) filter.agency = { $in: q.agency };
   if (q.category?.length) filter.category = { $in: q.category };
+  // technologyStack is free text from the model ("Linux", "linux", …), so match
+  // each requested tech case-insensitively but as a whole value, not a substring.
+  if (q.tech?.length) {
+    filter.technologyStack = { $in: q.tech.map((t) => new RegExp(`^${escapeRegExp(t)}$`, "i")) };
+  }
+  if (q.projectType?.length) filter.projectType = { $in: q.projectType };
   if (q.budgetMin !== undefined || q.budgetMax !== undefined) {
     const range: Record<string, number> = {};
     if (q.budgetMin !== undefined) range.$gte = q.budgetMin;
@@ -109,6 +118,20 @@ export async function listAgencies(_req: Request, res: Response): Promise<void> 
   ]);
   const data = (agencies as string[]).sort((a, b) => a.localeCompare(b, "th"));
   res.status(200).json({ data, totalCount });
+}
+
+/**
+ * GET /api/tors/technologies — tech-stack values across public TORs, most used
+ * first, as suggestions for the search page's tech filter (FR-6).
+ */
+export async function listTechnologies(_req: Request, res: Response): Promise<void> {
+  const rows = await Tor.aggregate<{ _id: string; count: number }>([
+    { $match: { pipelineStatus: "enriched" } },
+    { $unwind: "$technologyStack" },
+    { $group: { _id: "$technologyStack", count: { $sum: 1 } } },
+    { $sort: { count: -1, _id: 1 } },
+  ]);
+  res.status(200).json({ data: rows.map((r) => ({ name: r._id, count: r.count })) });
 }
 
 /** GET /api/tors/:id */

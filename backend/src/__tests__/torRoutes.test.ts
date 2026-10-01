@@ -95,6 +95,24 @@ describe("GET /api/tors", () => {
     expect(none.body.totalCount).toBe(0);
   });
 
+  it("filters by tech stack (whole value, case-insensitive) and project type (FR-6)", async () => {
+    await seed();
+    await Tor.updateOne({ title: "ระบบสารบรรณ A" }, { technologyStack: ["Linux", "PostgreSQL"], projectType: "maintenance" });
+    await Tor.updateOne({ title: "ระบบสารบรรณ B" }, { technologyStack: ["Oracle Linux"], projectType: "new-development" });
+    const titles = async (qs: string) =>
+      (await request(app).get(`/api/tors?${qs}`)).body.data.map((t: { title: string }) => t.title);
+
+    expect(await titles("tech=linux")).toEqual(["ระบบสารบรรณ A"]);
+    expect(await titles("tech=linux&tech=oracle%20linux")).toEqual(["ระบบสารบรรณ B", "ระบบสารบรรณ A"]);
+    expect(await titles("projectType=new-development")).toEqual(["ระบบสารบรรณ B"]);
+    expect(await titles("tech=linux&projectType=new-development")).toEqual([]);
+  });
+
+  it("400s on an unknown projectType", async () => {
+    const res = await request(app).get("/api/tors?projectType=bogus");
+    expect(res.status).toBe(400);
+  });
+
   it("400s on a bad pageSize", async () => {
     const res = await request(app).get("/api/tors?pageSize=999");
     expect(res.status).toBe(400);
@@ -112,6 +130,21 @@ describe("GET /api/tors/agencies", () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual(["สำนักการแพทย์", "สำนักอนามัย"]);
     expect(res.body.totalCount).toBe(4);
+  });
+});
+
+describe("GET /api/tors/technologies", () => {
+  it("counts tech-stack values of enriched TORs, most used first", async () => {
+    await seed();
+    await Tor.updateOne({ title: "ระบบสารบรรณ A" }, { technologyStack: ["Linux", "PostgreSQL"] });
+    await Tor.updateOne({ title: "ระบบสารบรรณ B" }, { technologyStack: ["Linux"] });
+    await Tor.updateOne({ title: "งานที่ยังไม่ enrich" }, { technologyStack: ["Linux", "COBOL"] });
+    const res = await request(app).get("/api/tors/technologies");
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([
+      { name: "Linux", count: 2 },
+      { name: "PostgreSQL", count: 1 },
+    ]);
   });
 });
 

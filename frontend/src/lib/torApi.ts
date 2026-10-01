@@ -241,6 +241,22 @@ export async function fetchAgencies(): Promise<AgencyOptions> {
   }
 }
 
+export interface TechOption {
+  name: string;
+  count: number;
+}
+
+/** GET /api/tors/technologies — tech-stack suggestions, most used first (FR-6). */
+export async function fetchTechnologies(): Promise<TechOption[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/tors/technologies`);
+    if (!res.ok) return [];
+    return ((await res.json()) as { data: TechOption[] }).data;
+  } catch {
+    return [];
+  }
+}
+
 /** GET /api/tors/:id — fetches one TOR, or null if missing/not enriched. */
 export async function fetchTorById(id: string): Promise<TOR | null> {
   try {
