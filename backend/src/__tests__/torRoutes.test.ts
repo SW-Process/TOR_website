@@ -194,6 +194,30 @@ describe("GET /api/tors", () => {
     expect((await request(app).get("/api/tors?sort=title")).status).toBe(400);
   });
 
+  it("filters by announcement and deadline date ranges, inclusive (FR-4)", async () => {
+    await Tor.create([
+      { title: "ประกาศ ก.ค. ปิด ส.ค.", pipelineStatus: "enriched", announcementDate: new Date("2026-07-10"), submissionDeadline: new Date("2026-08-20") },
+      { title: "ประกาศ ส.ค. ปิด ก.ย.", pipelineStatus: "enriched", announcementDate: new Date("2026-08-10"), submissionDeadline: new Date("2026-09-05") },
+      { title: "ไม่ทราบวันปิด", pipelineStatus: "enriched", announcementDate: new Date("2026-08-15") },
+    ]);
+    const titles = async (qs: string) =>
+      (await request(app).get(`/api/tors?${qs}`)).body.data.map((t: { title: string }) => t.title).sort();
+
+    expect(await titles("deadlineFrom=2026-09-01")).toEqual(["ประกาศ ส.ค. ปิด ก.ย."]);
+    expect(await titles("deadlineTo=2026-08-20")).toEqual(["ประกาศ ก.ค. ปิด ส.ค."]);
+    expect(await titles("deadlineFrom=2026-08-01&deadlineTo=2026-09-30")).toEqual(
+      ["ประกาศ ก.ค. ปิด ส.ค.", "ประกาศ ส.ค. ปิด ก.ย."].sort()
+    );
+    expect(await titles("publishedFrom=2026-08-01&deadlineTo=2026-08-31")).toEqual([]);
+    expect(await titles("publishedFrom=2026-08-01")).toEqual(["ประกาศ ส.ค. ปิด ก.ย.", "ไม่ทราบวันปิด"].sort());
+  });
+
+  it("400s on inverted date ranges", async () => {
+    expect((await request(app).get("/api/tors?deadlineFrom=2026-09-01&deadlineTo=2026-08-01")).status).toBe(400);
+    expect((await request(app).get("/api/tors?publishedFrom=2026-09-01&publishedTo=2026-08-01")).status).toBe(400);
+    expect((await request(app).get("/api/tors?deadlineFrom=not-a-date")).status).toBe(400);
+  });
+
   it("400s on a bad pageSize", async () => {
     const res = await request(app).get("/api/tors?pageSize=999");
     expect(res.status).toBe(400);

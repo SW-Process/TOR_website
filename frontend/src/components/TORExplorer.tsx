@@ -16,6 +16,7 @@ import {
   activeFilterCount as countActive,
   dedupeCaseInsensitive,
   isBudgetRangeInverted,
+  isDateRangeInverted,
   MAX_TECH_FILTERS,
   PAGE_SIZE,
   PROJECT_TYPE_LABELS,
@@ -37,7 +38,65 @@ const EMPTY_FILTERS: Omit<TorFilters, "q" | "sort" | "page"> = {
   budgetMax: "",
   publishedFrom: "",
   publishedTo: "",
+  deadlineFrom: "",
+  deadlineTo: "",
 };
+
+/** A from/to pair of `YYYY-MM-DD` inputs (FR-4); flags an inverted range. */
+function DateRangeFilter({
+  label,
+  from,
+  to,
+  onChange,
+  note,
+}: {
+  label: string;
+  from: string;
+  to: string;
+  onChange: (from: string, to: string) => void;
+  note?: string;
+}) {
+  const inverted = isDateRangeInverted(from, to);
+  const inputClass = `w-full rounded-full border px-3.5 py-2 text-sm focus:outline-none ${
+    inverted ? "border-[var(--color-danger)]" : "border-[var(--color-border)] focus:border-[var(--color-ink)]"
+  }`;
+  return (
+    <div>
+      <p className="text-sm font-medium text-[var(--color-text)] mb-2.5">{label}</p>
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+          <span className="w-8 shrink-0">ตั้งแต่</span>
+          <input
+            type="date"
+            value={from}
+            max={to || undefined}
+            aria-invalid={inverted}
+            onChange={(e) => onChange(e.target.value, to)}
+            className={inputClass}
+          />
+        </label>
+        <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+          <span className="w-8 shrink-0">ถึง</span>
+          <input
+            type="date"
+            value={to}
+            min={from || undefined}
+            aria-invalid={inverted}
+            onChange={(e) => onChange(from, e.target.value)}
+            className={inputClass}
+          />
+        </label>
+      </div>
+      {inverted ? (
+        <p role="alert" className="mt-1.5 text-xs text-[var(--color-danger)]">
+          วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด — ยังไม่ได้กรองตามช่วงวันนี้
+        </p>
+      ) : (
+        note && (from || to) && <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">{note}</p>
+      )}
+    </div>
+  );
+}
 
 /** How many of the most-used tech values to offer as one-click chips. */
 const TECH_QUICK_PICKS = 8;
@@ -345,31 +404,20 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
         )}
       </div>
 
-      <div>
-        <p className="text-sm font-medium text-[var(--color-text)] mb-2.5">วันที่ประกาศ</p>
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-            <span className="w-8 shrink-0">ตั้งแต่</span>
-            <input
-              type="date"
-              value={filters.publishedFrom}
-              max={filters.publishedTo || undefined}
-              onChange={(e) => update({ publishedFrom: e.target.value })}
-              className="w-full rounded-full border border-[var(--color-border)] px-3.5 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-            <span className="w-8 shrink-0">ถึง</span>
-            <input
-              type="date"
-              value={filters.publishedTo}
-              min={filters.publishedFrom || undefined}
-              onChange={(e) => update({ publishedTo: e.target.value })}
-              className="w-full rounded-full border border-[var(--color-border)] px-3.5 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
-            />
-          </label>
-        </div>
-      </div>
+      <DateRangeFilter
+        label="วันที่ประกาศ"
+        from={filters.publishedFrom}
+        to={filters.publishedTo}
+        onChange={(publishedFrom, publishedTo) => update({ publishedFrom, publishedTo })}
+      />
+
+      <DateRangeFilter
+        label="วันปิดรับข้อเสนอ"
+        from={filters.deadlineFrom}
+        to={filters.deadlineTo}
+        onChange={(deadlineFrom, deadlineTo) => update({ deadlineFrom, deadlineTo })}
+        note="TOR ที่ไม่ระบุวันปิดรับจะไม่แสดงเมื่อใช้ตัวกรองนี้"
+      />
     </div>
   );
 

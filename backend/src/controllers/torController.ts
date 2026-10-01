@@ -38,6 +38,8 @@ const listQuerySchema = z.object({
   budgetMax: z.coerce.number().min(0).optional(),
   publishedFrom: z.coerce.date().optional(),
   publishedTo: z.coerce.date().optional(),
+  deadlineFrom: z.coerce.date().optional(),
+  deadlineTo: z.coerce.date().optional(),
   status: z.preprocess(asArray, z.array(z.enum(TOR_STATUSES)).optional()),
   sort: z.enum(SORT_FIELDS).default("announcementDate"),
   order: z.enum(["asc", "desc"]).optional(),
@@ -46,6 +48,12 @@ const listQuerySchema = z.object({
 })
   .refine((q) => q.budgetMin === undefined || q.budgetMax === undefined || q.budgetMin <= q.budgetMax, {
     message: "budgetMin must not exceed budgetMax",
+  })
+  .refine((q) => !q.publishedFrom || !q.publishedTo || q.publishedFrom <= q.publishedTo, {
+    message: "publishedFrom must not be after publishedTo",
+  })
+  .refine((q) => !q.deadlineFrom || !q.deadlineTo || q.deadlineFrom <= q.deadlineTo, {
+    message: "deadlineFrom must not be after deadlineTo",
   });
 
 type ListQuery = z.infer<typeof listQuerySchema>;
@@ -109,6 +117,13 @@ function buildFilter(q: ListQuery): QueryFilter<ITor> {
     if (q.publishedFrom) range.$gte = q.publishedFrom;
     if (q.publishedTo) range.$lte = q.publishedTo;
     filter.announcementDate = range;
+  }
+  // FR-4: TORs with an unknown deadline never match a deadline range.
+  if (q.deadlineFrom || q.deadlineTo) {
+    const range: Record<string, Date> = {};
+    if (q.deadlineFrom) range.$gte = q.deadlineFrom;
+    if (q.deadlineTo) range.$lte = q.deadlineTo;
+    filter.submissionDeadline = range;
   }
   if (q.status?.length) {
     const now = new Date();

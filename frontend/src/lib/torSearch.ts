@@ -61,6 +61,9 @@ export interface TorFilters {
   /** Announcement date range, `YYYY-MM-DD`; "" = no bound. */
   publishedFrom: string;
   publishedTo: string;
+  /** Submission-deadline range, `YYYY-MM-DD`; "" = no bound. */
+  deadlineFrom: string;
+  deadlineTo: string;
   sort: SortKey;
   /** 1-based results page. Any other filter change resets it to 1. */
   page: number;
@@ -119,6 +122,8 @@ export function parseTorFilters(params: RawSearchParams): TorFilters {
     budgetMax: budget(params.budgetMax),
     publishedFrom: day(params.publishedFrom),
     publishedTo: day(params.publishedTo),
+    deadlineFrom: day(params.deadlineFrom),
+    deadlineTo: day(params.deadlineTo),
     sort: SORT_KEYS.includes(sort) ? sort : "newest",
     page: pageNumber(params.page),
   };
@@ -137,6 +142,8 @@ export function toUrlParams(f: TorFilters): URLSearchParams {
   if (f.budgetMax) p.set("budgetMax", f.budgetMax);
   if (f.publishedFrom) p.set("publishedFrom", f.publishedFrom);
   if (f.publishedTo) p.set("publishedTo", f.publishedTo);
+  if (f.deadlineFrom) p.set("deadlineFrom", f.deadlineFrom);
+  if (f.deadlineTo) p.set("deadlineTo", f.deadlineTo);
   if (f.sort !== "newest") p.set("sort", f.sort);
   if (f.page > 1) p.set("page", String(f.page));
   return p;
@@ -146,6 +153,14 @@ export function toUrlParams(f: TorFilters): URLSearchParams {
 export function isBudgetRangeInverted(f: Pick<TorFilters, "budgetMin" | "budgetMax">): boolean {
   return f.budgetMin !== "" && f.budgetMax !== "" && Number(f.budgetMin) > Number(f.budgetMax);
 }
+
+/** True when both `YYYY-MM-DD` bounds are set and from > to. */
+export function isDateRangeInverted(from: string, to: string): boolean {
+  return from !== "" && to !== "" && from > to;
+}
+
+const startOfDay = (d: string) => `${d}T00:00:00+07:00`;
+const endOfDay = (d: string) => `${d}T23:59:59.999+07:00`;
 
 /** Filters → one server-filtered, server-sorted, server-paginated `/api/tors` query. */
 export function toApiParams(f: TorFilters): URLSearchParams {
@@ -167,8 +182,15 @@ export function toApiParams(f: TorFilters): URLSearchParams {
     if (f.budgetMax) p.set("budgetMax", f.budgetMax);
   }
   // Dates are Bangkok calendar days; make "to" inclusive of that whole day.
-  if (f.publishedFrom) p.set("publishedFrom", `${f.publishedFrom}T00:00:00+07:00`);
-  if (f.publishedTo) p.set("publishedTo", `${f.publishedTo}T23:59:59.999+07:00`);
+  // Inverted ranges are flagged in the UI and not sent (the backend would 400).
+  if (!isDateRangeInverted(f.publishedFrom, f.publishedTo)) {
+    if (f.publishedFrom) p.set("publishedFrom", startOfDay(f.publishedFrom));
+    if (f.publishedTo) p.set("publishedTo", endOfDay(f.publishedTo));
+  }
+  if (!isDateRangeInverted(f.deadlineFrom, f.deadlineTo)) {
+    if (f.deadlineFrom) p.set("deadlineFrom", startOfDay(f.deadlineFrom));
+    if (f.deadlineTo) p.set("deadlineTo", endOfDay(f.deadlineTo));
+  }
   return p;
 }
 
@@ -182,6 +204,8 @@ export function activeFilterCount(f: TorFilters): number {
     (f.budgetMin ? 1 : 0) +
     (f.budgetMax ? 1 : 0) +
     (f.publishedFrom ? 1 : 0) +
-    (f.publishedTo ? 1 : 0)
+    (f.publishedTo ? 1 : 0) +
+    (f.deadlineFrom ? 1 : 0) +
+    (f.deadlineTo ? 1 : 0)
   );
 }
