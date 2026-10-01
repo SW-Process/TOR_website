@@ -31,13 +31,17 @@ const listQuerySchema = z.object({
 type ListQuery = z.infer<typeof listQuerySchema>;
 
 const LIST_PROJECTION =
-  "title agency category budget referencePrice announcementDate submissionDeadline status sourceListingUrl";
+  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode sourceListingUrl";
 
 function buildFilter(q: ListQuery): QueryFilter<ITor> {
   const filter: QueryFilter<ITor> = { pipelineStatus: "enriched" };
-  // RULING: q is a case-insensitive regex match on `title`, not MongoDB $text —
-  // the default text index tokenizes on whitespace and Thai has no word spaces.
-  if (q.q) filter.title = { $regex: escapeRegExp(q.q), $options: "i" };
+  // RULING: q is a case-insensitive regex match, not MongoDB $text — the default
+  // text index tokenizes on whitespace and Thai has no word spaces. It covers
+  // title, agency and projectCode: the fields the search box promises (FR-7).
+  if (q.q) {
+    const re = { $regex: escapeRegExp(q.q), $options: "i" };
+    filter.$or = [{ title: re }, { agency: re }, { projectCode: re }];
+  }
   if (q.agency?.length) filter.agency = { $in: q.agency };
   if (q.category?.length) filter.category = { $in: q.category };
   if (q.budgetMin !== undefined || q.budgetMax !== undefined) {

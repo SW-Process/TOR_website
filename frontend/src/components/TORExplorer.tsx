@@ -3,94 +3,104 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import TORCard from "./TORCard";
+import { categories, daysUntil, formatBudget, type TOR } from "@/lib/mockData";
+import { fetchTorList, searchTors } from "@/lib/torApi";
 import {
-  categories,
-  Category,
-  daysUntil,
-  formatBudget,
-  type TOR,
-  TORStatus,
-} from "@/lib/mockData";
-import { fetchTorList } from "@/lib/torApi";
+  activeFilterCount as countActive,
+  STATUSES,
+  toApiParams,
+  toUrlParams,
+  type SortKey,
+  type TorFilters,
+} from "@/lib/torSearch";
 
-type SortKey = "newest" | "deadline" | "budgetDesc" | "budgetAsc";
+const EMPTY_FILTERS: Omit<TorFilters, "q" | "sort"> = {
+  categories: [],
+  agencies: [],
+  statuses: [],
+  budgetMin: "",
+  budgetMax: "",
+  publishedFrom: "",
+  publishedTo: "",
+};
 
-const statuses: TORStatus[] = ["เปิดรับ", "ใกล้ปิดรับ", "ปิดรับแล้ว"];
+/** Wait this long after the last keystroke before re-querying the backend. */
+const SEARCH_DEBOUNCE_MS = 300;
 
-export default function TORExplorer({
-  initialQuery = "",
-  initialCategory = "",
-  initialSort = "newest",
-}: {
-  initialQuery?: string;
-  initialCategory?: string;
-  initialSort?: string;
-}) {
-  const [torList, setTorList] = useState<TOR[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function TORExplorer({ initialFilters }: { initialFilters: TorFilters }) {
+  const [filters, setFilters] = useState<TorFilters>(initialFilters);
+  const update = (patch: Partial<TorFilters>) => setFilters((f) => ({ ...f, ...patch }));
+
+  // Unfiltered list: only feeds the total count and the agency checkbox options,
+  // so picking one agency doesn't make the others disappear from the panel.
+  const [allTors, setAllTors] = useState<TOR[]>([]);
   useEffect(() => {
-    fetchTorList().then((list) => {
-      setTorList(list);
-      setLoading(false);
-    });
+    fetchTorList().then(setAllTors);
   }, []);
 
   const agencies = useMemo(
-    () => [...new Set(torList.map((t) => t.agency))].sort((a, b) => a.localeCompare(b, "th")),
-    [torList]
+    () =>
+      [...new Set([...allTors.map((t) => t.agency), ...filters.agencies])].sort((a, b) =>
+        a.localeCompare(b, "th")
+      ),
+    [allTors, filters.agencies]
   );
 
-  const [query, setQuery] = useState(initialQuery);
-  const [selectedCategories, setSelectedCategories] = useState<Category[]>(
-    initialCategory && categories.includes(initialCategory as Category)
-      ? [initialCategory as Category]
-      : []
-  );
-  const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<TORStatus[]>([]);
-  const [minBudget, setMinBudget] = useState("");
-  const [maxBudget, setMaxBudget] = useState("");
-  const [sort, setSort] = useState<SortKey>(
-    initialSort === "deadline" ? "deadline" : "newest"
-  );
+  // Keep the URL in sync without a navigation/re-render, so refresh, share and
+  // back restore the same search.
+  const urlQuery = toUrlParams(filters).toString();
+  useEffect(() => {
+    const next = urlQuery ? `?${urlQuery}` : window.location.pathname;
+    window.history.replaceState(null, "", next);
+  }, [urlQuery]);
+
+  // One combined backend query for keyword + category + agency + budget + dates.
+  const apiQuery = toApiParams(filters).toString();
+  const [matched, setMatched] = useState<TOR[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setLoading(true);
+      searchTors(new URLSearchParams(apiQuery), controller.signal)
+        .then(({ tors, totalCount }) => {
+          setMatched(tors);
+          setTotalCount(totalCount);
+          setError(false);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setError(true);
+          setLoading(false);
+        });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [apiQuery]);
+
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  function toggle<T>(list: T[], value: T, setter: (v: T[]) => void) {
-    setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  function toggle<K extends "categories" | "agencies" | "statuses">(key: K, value: TorFilters[K][number]) {
+    setFilters((f) => {
+      const list = f[key] as string[];
+      const next = list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+      return { ...f, [key]: next };
+    });
   }
 
+  // Status is derived from the deadline client-side, and the backend only sorts
+  // by announcement date, so these two are applied to the returned rows.
   const results = useMemo(() => {
-    let list = torList.filter((tor) => {
-      const matchesQuery =
-        !query.trim() ||
-        tor.title.toLowerCase().includes(query.toLowerCase()) ||
-        tor.agency.toLowerCase().includes(query.toLowerCase()) ||
-        tor.projectCode.toLowerCase().includes(query.toLowerCase());
-
-      const matchesCategory =
-        selectedCategories.length === 0 || selectedCategories.includes(tor.category);
-
-      const matchesAgency =
-        selectedAgencies.length === 0 || selectedAgencies.includes(tor.agency);
-
-      const matchesStatus =
-        selectedStatuses.length === 0 || selectedStatuses.includes(tor.status);
-
-      const matchesMin = !minBudget || tor.budget >= Number(minBudget);
-      const matchesMax = !maxBudget || tor.budget <= Number(maxBudget);
-
-      return (
-        matchesQuery &&
-        matchesCategory &&
-        matchesAgency &&
-        matchesStatus &&
-        matchesMin &&
-        matchesMax
-      );
-    });
-
-    list = [...list].sort((a, b) => {
-      switch (sort) {
+    const list = matched.filter(
+      (tor) => filters.statuses.length === 0 || filters.statuses.includes(tor.status)
+    );
+    return [...list].sort((a, b) => {
+      switch (filters.sort) {
         case "deadline":
           return daysUntil(a.deadline) - daysUntil(b.deadline);
         case "budgetDesc":
@@ -101,23 +111,12 @@ export default function TORExplorer({
           return a.announceDate < b.announceDate ? 1 : -1;
       }
     });
+  }, [matched, filters.statuses, filters.sort]);
 
-    return list;
-  }, [torList, query, selectedCategories, selectedAgencies, selectedStatuses, minBudget, maxBudget, sort]);
-
-  const activeFilterCount =
-    selectedCategories.length +
-    selectedAgencies.length +
-    selectedStatuses.length +
-    (minBudget ? 1 : 0) +
-    (maxBudget ? 1 : 0);
+  const activeFilterCount = countActive(filters);
 
   function clearFilters() {
-    setSelectedCategories([]);
-    setSelectedAgencies([]);
-    setSelectedStatuses([]);
-    setMinBudget("");
-    setMaxBudget("");
+    update(EMPTY_FILTERS);
   }
 
   const filterPanel = (
@@ -139,12 +138,12 @@ export default function TORExplorer({
       <div>
         <p className="text-sm font-medium text-[var(--color-text)] mb-2.5">สถานะ</p>
         <div className="flex flex-col gap-2">
-          {statuses.map((s) => (
+          {STATUSES.map((s) => (
             <label key={s} className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
               <input
                 type="checkbox"
-                checked={selectedStatuses.includes(s)}
-                onChange={() => toggle(selectedStatuses, s, setSelectedStatuses)}
+                checked={filters.statuses.includes(s)}
+                onChange={() => toggle("statuses", s)}
                 className="rounded border-[var(--color-border)] accent-[var(--color-rose-dark)]"
               />
               {s}
@@ -160,8 +159,8 @@ export default function TORExplorer({
             <label key={c} className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
               <input
                 type="checkbox"
-                checked={selectedCategories.includes(c)}
-                onChange={() => toggle(selectedCategories, c, setSelectedCategories)}
+                checked={filters.categories.includes(c)}
+                onChange={() => toggle("categories", c)}
                 className="rounded border-[var(--color-border)] accent-[var(--color-rose-dark)]"
               />
               {c}
@@ -177,8 +176,8 @@ export default function TORExplorer({
             <label key={a} className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
               <input
                 type="checkbox"
-                checked={selectedAgencies.includes(a)}
-                onChange={() => toggle(selectedAgencies, a, setSelectedAgencies)}
+                checked={filters.agencies.includes(a)}
+                onChange={() => toggle("agencies", a)}
                 className="rounded border-[var(--color-border)] accent-[var(--color-rose-dark)]"
               />
               {a}
@@ -193,18 +192,46 @@ export default function TORExplorer({
           <input
             type="number"
             placeholder="ต่ำสุด"
-            value={minBudget}
-            onChange={(e) => setMinBudget(e.target.value)}
+            min={0}
+            value={filters.budgetMin}
+            onChange={(e) => update({ budgetMin: e.target.value.replace(/\D/g, "") })}
             className="w-full rounded-full border border-[var(--color-border)] px-3.5 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
           />
           <span className="text-[var(--color-text-muted)]">–</span>
           <input
             type="number"
             placeholder="สูงสุด"
-            value={maxBudget}
-            onChange={(e) => setMaxBudget(e.target.value)}
+            min={0}
+            value={filters.budgetMax}
+            onChange={(e) => update({ budgetMax: e.target.value.replace(/\D/g, "") })}
             className="w-full rounded-full border border-[var(--color-border)] px-3.5 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
           />
+        </div>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-[var(--color-text)] mb-2.5">วันที่ประกาศ</p>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+            <span className="w-8 shrink-0">ตั้งแต่</span>
+            <input
+              type="date"
+              value={filters.publishedFrom}
+              max={filters.publishedTo || undefined}
+              onChange={(e) => update({ publishedFrom: e.target.value })}
+              className="w-full rounded-full border border-[var(--color-border)] px-3.5 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+            <span className="w-8 shrink-0">ถึง</span>
+            <input
+              type="date"
+              value={filters.publishedTo}
+              min={filters.publishedFrom || undefined}
+              onChange={(e) => update({ publishedTo: e.target.value })}
+              className="w-full rounded-full border border-[var(--color-border)] px-3.5 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
+            />
+          </label>
         </div>
       </div>
     </div>
@@ -217,15 +244,15 @@ export default function TORExplorer({
           ค้นหาประกาศจัดซื้อจัดจ้าง (TOR)
         </h1>
         <p className="text-sm text-[var(--color-text-muted)] mt-1.5">
-          พบทั้งหมด {torList.length} โครงการ จากหน่วยงานในสังกัดกรุงเทพมหานคร
+          พบทั้งหมด {allTors.length} โครงการ จากหน่วยงานในสังกัดกรุงเทพมหานคร
         </p>
       </div>
 
       <div className="flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white px-5 py-1 shadow-[var(--shadow-sm)]">
         <Search size={18} className="text-[var(--color-text-faint)]" />
         <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          value={filters.q}
+          onChange={(e) => update({ q: e.target.value })}
           placeholder="ค้นหาชื่อโครงการ, หน่วยงาน หรือเลขที่โครงการ"
           className="w-full py-3 text-sm focus:outline-none"
         />
@@ -263,8 +290,8 @@ export default function TORExplorer({
               พบ <span className="font-semibold text-[var(--color-text)]">{results.length}</span> รายการ
             </p>
             <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortKey)}
+              value={filters.sort}
+              onChange={(e) => update({ sort: e.target.value as SortKey })}
               className="rounded-full border border-[var(--color-border)] px-4 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
             >
               <option value="newest">ประกาศล่าสุด</option>
@@ -277,6 +304,10 @@ export default function TORExplorer({
           {loading ? (
             <div className="card p-10 text-center text-sm text-[var(--color-text-muted)]">
               กำลังโหลด TOR...
+            </div>
+          ) : error ? (
+            <div className="card p-10 text-center text-sm text-[var(--color-text-muted)]">
+              โหลดผลการค้นหาไม่สำเร็จ กรุณาลองใหม่อีกครั้ง
             </div>
           ) : results.length === 0 ? (
             <div className="card p-10 text-center text-sm text-[var(--color-text-muted)]">
@@ -296,6 +327,12 @@ export default function TORExplorer({
                 <TORCard key={tor.id} tor={tor} />
               ))}
             </div>
+          )}
+
+          {!loading && !error && totalCount > matched.length && (
+            <p className="mt-6 text-xs text-[var(--color-text-muted)]">
+              แสดง {matched.length} จาก {totalCount} รายการที่ตรงเงื่อนไข ลองเพิ่มตัวกรองเพื่อจำกัดผลลัพธ์
+            </p>
           )}
 
           <p className="mt-6 text-xs text-[var(--color-text-muted)]">

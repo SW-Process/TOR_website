@@ -51,6 +51,33 @@ describe("GET /api/tors", () => {
     expect(res.body.data.map((t: { title: string }) => t.title)).toEqual(["เว็บไซต์หน่วยงาน"]);
   });
 
+  it("matches q against agency and projectCode too", async () => {
+    await seed();
+    await Tor.updateOne({ title: "ระบบสารบรรณ B" }, { projectCode: "69049037828" });
+    const byAgency = await request(app).get("/api/tors?q=" + encodeURIComponent("อนามัย"));
+    expect(byAgency.body.data.map((t: { title: string }) => t.title)).toEqual(["ระบบสารบรรณ B"]);
+    const byCode = await request(app).get("/api/tors?q=6904903");
+    expect(byCode.body.data.map((t: { title: string }) => t.title)).toEqual(["ระบบสารบรรณ B"]);
+  });
+
+  it("ANDs every filter into one query (FR-7)", async () => {
+    await seed();
+    const qs = new URLSearchParams({
+      q: "สารบรรณ",
+      agency: "สำนักการแพทย์",
+      category: "information-system",
+      budgetMax: "1500000",
+      publishedFrom: "2026-06-01T00:00:00+07:00",
+      publishedTo: "2026-07-01T23:59:59.999+07:00",
+    });
+    const res = await request(app).get(`/api/tors?${qs}`);
+    expect(res.body.data.map((t: { title: string }) => t.title)).toEqual(["ระบบสารบรรณ A"]);
+
+    qs.set("publishedTo", "2026-06-30T23:59:59.999+07:00");
+    const none = await request(app).get(`/api/tors?${qs}`);
+    expect(none.body.totalCount).toBe(0);
+  });
+
   it("400s on a bad pageSize", async () => {
     const res = await request(app).get("/api/tors?pageSize=999");
     expect(res.status).toBe(400);

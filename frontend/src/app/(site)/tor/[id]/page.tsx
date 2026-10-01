@@ -87,7 +87,7 @@ export default async function TORDetailPage({
             </span>
             <span className="flex items-center gap-1.5">
               <CalendarClock size={15} />
-              ประกาศเมื่อ {formatThaiDate(tor.announceDate)}
+              ประกาศเมื่อ {tor.announceDate ? formatThaiDate(tor.announceDate) : "ไม่ระบุ"}
             </span>
           </div>
 
