@@ -3,29 +3,35 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Building2, GripVertical, Inbox } from "lucide-react";
-import { daysUntil, formatThaiDate, type TOR } from "@/lib/mockData";
-import { useTracking, trackingStatuses, type TrackingStatus } from "@/lib/useTracking";
+import { daysUntil, formatThaiDate } from "@/lib/mockData";
+import { isUnknownDeadline } from "@/lib/torApi";
+import {
+  APPLICATION_STATUSES,
+  APPLICATION_STATUS_LABELS,
+  type ApplicationStatus,
+  type SavedBookmark,
+} from "@/lib/useBookmarks";
 
-const columnTone: Record<TrackingStatus, { border: string; text: string; bg: string; dot: string }> = {
-  สนใจ: {
+const columnTone: Record<ApplicationStatus, { border: string; text: string; bg: string; dot: string }> = {
+  interested: {
     border: "border-t-[var(--color-text-faint)]",
     text: "text-[var(--color-text-muted)]",
     bg: "bg-[var(--color-surface-alt)]",
     dot: "bg-[var(--color-text-faint)]",
   },
-  กำลังเตรียมเอกสาร: {
+  preparing: {
     border: "border-t-[var(--color-warning)]",
     text: "text-[var(--color-warning)]",
     bg: "bg-[var(--color-warning-bg)]",
     dot: "bg-[var(--color-warning)]",
   },
-  ยื่นแล้ว: {
+  submitted: {
     border: "border-t-[var(--color-success)]",
     text: "text-[var(--color-success)]",
     bg: "bg-[var(--color-success-bg)]",
     dot: "bg-[var(--color-success)]",
   },
-  พลาด: {
+  missed: {
     border: "border-t-[var(--color-rose-dark)]",
     text: "text-[var(--color-rose-dark)]",
     bg: "bg-[var(--color-rose-light)]",
@@ -33,17 +39,21 @@ const columnTone: Record<TrackingStatus, { border: string; text: string; bg: str
   },
 };
 
-export default function TrackingBoard({ saved }: { saved: TOR[] }) {
-  const { statusOf, setStatus, ready } = useTracking();
+/** Application-status Kanban (FR-32). Status changes persist via `onStatusChange`. */
+export default function TrackingBoard({
+  items: bookmarks,
+  onStatusChange,
+}: {
+  items: readonly SavedBookmark[];
+  onStatusChange: (torId: string, status: ApplicationStatus) => void;
+}) {
   const [dragId, setDragId] = useState<string | null>(null);
-  const [dragOverStatus, setDragOverStatus] = useState<TrackingStatus | null>(null);
-
-  if (!ready) return null;
+  const [dragOverStatus, setDragOverStatus] = useState<ApplicationStatus | null>(null);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {trackingStatuses.map((status) => {
-        const items = saved.filter((t) => statusOf(t.id) === status);
+      {APPLICATION_STATUSES.map((status) => {
+        const items = bookmarks.filter((b) => b.applicationStatus === status).map((b) => b.tor);
         const tone = columnTone[status];
         const isDragOver = dragOverStatus === status;
         return (
@@ -55,7 +65,7 @@ export default function TrackingBoard({ saved }: { saved: TOR[] }) {
             }}
             onDragLeave={() => setDragOverStatus((s) => (s === status ? null : s))}
             onDrop={() => {
-              if (dragId) setStatus(dragId, status);
+              if (dragId) onStatusChange(dragId, status);
               setDragId(null);
               setDragOverStatus(null);
             }}
@@ -66,7 +76,7 @@ export default function TrackingBoard({ saved }: { saved: TOR[] }) {
             <div className="flex items-center justify-between px-1 pb-3">
               <span className={`flex items-center gap-1.5 text-[13px] font-bold ${tone.text}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
-                {status}
+                {APPLICATION_STATUS_LABELS[status]}
               </span>
               <span
                 className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${tone.bg} ${tone.text}`}
@@ -118,17 +128,21 @@ export default function TrackingBoard({ saved }: { saved: TOR[] }) {
                             : "text-[var(--color-text-faint)]"
                         }`}
                       >
-                        {remaining < 0 ? `ปิดรับเมื่อ ${formatThaiDate(tor.deadline)}` : `เหลือ ${remaining} วัน`}
+                        {isUnknownDeadline(tor.deadline)
+                          ? "ไม่ระบุวันปิดรับ"
+                          : remaining < 0
+                          ? `ปิดรับเมื่อ ${formatThaiDate(tor.deadline)}`
+                          : `เหลือ ${remaining} วัน`}
                       </span>
 
                       <select
                         value={status}
-                        onChange={(e) => setStatus(tor.id, e.target.value as TrackingStatus)}
+                        onChange={(e) => onStatusChange(tor.id, e.target.value as ApplicationStatus)}
                         className="mt-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-alt)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-rose)]/30"
                       >
-                        {trackingStatuses.map((s) => (
+                        {APPLICATION_STATUSES.map((s) => (
                           <option key={s} value={s}>
-                            {s}
+                            {APPLICATION_STATUS_LABELS[s]}
                           </option>
                         ))}
                       </select>

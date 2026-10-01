@@ -14,18 +14,16 @@ import TORCard from "@/components/TORCard";
 import RequireAuth from "@/components/RequireAuth";
 import { useAuth } from "@/lib/useAuth";
 import { useBookmarks } from "@/lib/useBookmarks";
-import { useTracking } from "@/lib/useTracking";
 import { useProfile } from "@/lib/useProfile";
 import { useMatches } from "@/lib/useMatches";
-import { torList as mockTorList, daysUntil, categories, type Category, type TOR } from "@/lib/mockData";
+import { daysUntil, categories, type Category, type TOR } from "@/lib/mockData";
 import { fetchTorList, mapApiTor } from "@/lib/torApi";
 
 const catalogFilters: (Category | "ทั้งหมด")[] = ["ทั้งหมด", ...categories];
 
 function DashboardContent() {
   const { displayName } = useAuth();
-  const { ids, ready: bookmarksReady } = useBookmarks();
-  const { statusOf, ready: trackingReady } = useTracking();
+  const { items: bookmarks, ready: bookmarksReady } = useBookmarks();
   const { ready: profileReady, hasProfile } = useProfile();
   const { matches, loading: matchesLoading } = useMatches(profileReady && hasProfile);
   const [activeCategory, setActiveCategory] = useState<Category | "ทั้งหมด">("ทั้งหมด");
@@ -39,7 +37,7 @@ function DashboardContent() {
     });
   }, []);
 
-  const ready = bookmarksReady && trackingReady && profileReady && torsReady;
+  const ready = bookmarksReady && profileReady && torsReady;
 
   const openTor = useMemo(() => torList.filter((t) => t.status !== "ปิดรับแล้ว"), [torList]);
 
@@ -72,14 +70,14 @@ function DashboardContent() {
 
   if (!ready) return null;
 
-  const saved = mockTorList.filter((t) => ids.includes(t.id));
+  const saved = bookmarks.map((b) => b.tor);
   const upcoming = saved
     .filter((t) => {
       const r = daysUntil(t.deadline);
       return r >= 0 && r <= 3;
     })
     .sort((a, b) => daysUntil(a.deadline) - daysUntil(b.deadline));
-  const submittedCount = saved.filter((t) => statusOf(t.id) === "ยื่นแล้ว").length;
+  const submittedCount = bookmarks.filter((b) => b.applicationStatus === "submitted").length;
 
   return (
     <div className="container-page py-8">
