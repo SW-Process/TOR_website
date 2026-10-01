@@ -223,6 +223,24 @@ export async function searchTors(query: URLSearchParams, signal?: AbortSignal): 
   return { tors: body.data.map(mapApiTor), totalCount: body.totalCount };
 }
 
+export interface AgencyOptions {
+  agencies: string[];
+  /** Every public TOR, regardless of filters. */
+  totalCount: number;
+}
+
+/** GET /api/tors/agencies — agency filter options across the whole collection (FR-5). */
+export async function fetchAgencies(): Promise<AgencyOptions> {
+  try {
+    const res = await fetch(`${API_BASE}/api/tors/agencies`);
+    if (!res.ok) return { agencies: [], totalCount: 0 };
+    const body = (await res.json()) as { data: string[]; totalCount: number };
+    return { agencies: body.data, totalCount: body.totalCount };
+  } catch {
+    return { agencies: [], totalCount: 0 };
+  }
+}
+
 /** GET /api/tors/:id — fetches one TOR, or null if missing/not enriched. */
 export async function fetchTorById(id: string): Promise<TOR | null> {
   try {

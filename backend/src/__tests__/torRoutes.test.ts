@@ -101,6 +101,20 @@ describe("GET /api/tors", () => {
   });
 });
 
+describe("GET /api/tors/agencies", () => {
+  it("lists distinct agencies of enriched TORs only, sorted, with the total count", async () => {
+    await seed();
+    await Tor.create([
+      { title: "ไม่มีหน่วยงาน", pipelineStatus: "enriched" },
+      { title: "หน่วยงานที่ยังไม่ enrich", agency: "สำนักงานเขตบางรัก", pipelineStatus: "pending" },
+    ]);
+    const res = await request(app).get("/api/tors/agencies");
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(["สำนักการแพทย์", "สำนักอนามัย"]);
+    expect(res.body.totalCount).toBe(4);
+  });
+});
+
 describe("GET /api/tors/:id", () => {
   it("returns an enriched TOR, 404 for a non-enriched one, 400 for a bad id", async () => {
     await seed();

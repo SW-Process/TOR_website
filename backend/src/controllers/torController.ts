@@ -96,6 +96,21 @@ export async function listTors(req: Request, res: Response): Promise<void> {
   });
 }
 
+/**
+ * GET /api/tors/agencies — every agency that has at least one public TOR, for
+ * the search page's agency filter options (FR-5). Read from the whole
+ * collection, so options don't depend on which page of results was loaded.
+ */
+export async function listAgencies(_req: Request, res: Response): Promise<void> {
+  const filter: QueryFilter<ITor> = { pipelineStatus: "enriched" };
+  const [agencies, totalCount] = await Promise.all([
+    Tor.distinct("agency", { ...filter, agency: { $nin: [null, ""] } }),
+    Tor.countDocuments(filter),
+  ]);
+  const data = (agencies as string[]).sort((a, b) => a.localeCompare(b, "th"));
+  res.status(200).json({ data, totalCount });
+}
+
 /** GET /api/tors/:id */
 export async function getTor(req: Request, res: Response): Promise<void> {
   const tor = await Tor.findOne({ _id: req.params.id, pipelineStatus: "enriched" })

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import TORCard from "./TORCard";
 import { categories, daysUntil, formatBudget, type TOR } from "@/lib/mockData";
-import { fetchTorList, searchTors } from "@/lib/torApi";
+import { fetchAgencies, searchTors, type AgencyOptions } from "@/lib/torApi";
 import {
   activeFilterCount as countActive,
   STATUSES,
@@ -31,19 +31,20 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
   const [filters, setFilters] = useState<TorFilters>(initialFilters);
   const update = (patch: Partial<TorFilters>) => setFilters((f) => ({ ...f, ...patch }));
 
-  // Unfiltered list: only feeds the total count and the agency checkbox options,
-  // so picking one agency doesn't make the others disappear from the panel.
-  const [allTors, setAllTors] = useState<TOR[]>([]);
+  // Options come from the whole collection, not the current results, so picking
+  // one agency doesn't make the others disappear from the panel.
+  const [agencyOptions, setAgencyOptions] = useState<AgencyOptions>({ agencies: [], totalCount: 0 });
   useEffect(() => {
-    fetchTorList().then(setAllTors);
+    fetchAgencies().then(setAgencyOptions);
   }, []);
 
+  // Keep agencies selected via the URL visible even if they have no TORs (yet).
   const agencies = useMemo(
     () =>
-      [...new Set([...allTors.map((t) => t.agency), ...filters.agencies])].sort((a, b) =>
+      [...new Set([...agencyOptions.agencies, ...filters.agencies])].sort((a, b) =>
         a.localeCompare(b, "th")
       ),
-    [allTors, filters.agencies]
+    [agencyOptions.agencies, filters.agencies]
   );
 
   // Keep the URL in sync without a navigation/re-render, so refresh, share and
@@ -244,7 +245,7 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
           ค้นหาประกาศจัดซื้อจัดจ้าง (TOR)
         </h1>
         <p className="text-sm text-[var(--color-text-muted)] mt-1.5">
-          พบทั้งหมด {allTors.length} โครงการ จากหน่วยงานในสังกัดกรุงเทพมหานคร
+          พบทั้งหมด {agencyOptions.totalCount} โครงการ จากหน่วยงานในสังกัดกรุงเทพมหานคร
         </p>
       </div>
 
