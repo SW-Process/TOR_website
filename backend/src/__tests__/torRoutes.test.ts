@@ -113,6 +113,16 @@ describe("GET /api/tors", () => {
     expect(res.status).toBe(400);
   });
 
+  it("treats the budget range as inclusive and 400s when budgetMin > budgetMax (FR-3)", async () => {
+    await seed();
+    const exact = await request(app).get("/api/tors?budgetMin=1000000&budgetMax=1000000");
+    expect(exact.body.data.map((t: { title: string }) => t.title)).toEqual(["ระบบสารบรรณ A"]);
+
+    const inverted = await request(app).get("/api/tors?budgetMin=2000000&budgetMax=1000000");
+    expect(inverted.status).toBe(400);
+    expect(inverted.body.message).toMatch(/budgetMin/);
+  });
+
   it("400s on a bad pageSize", async () => {
     const res = await request(app).get("/api/tors?pageSize=999");
     expect(res.status).toBe(400);

@@ -121,6 +121,11 @@ export function toUrlParams(f: TorFilters): URLSearchParams {
  * status is derived from the deadline on the client (see mapStatus in torApi),
  * so both are applied to the returned rows instead.
  */
+/** True when both budget bounds are set and min > max (the backend 400s on this). */
+export function isBudgetRangeInverted(f: Pick<TorFilters, "budgetMin" | "budgetMax">): boolean {
+  return f.budgetMin !== "" && f.budgetMax !== "" && Number(f.budgetMin) > Number(f.budgetMax);
+}
+
 export function toApiParams(f: TorFilters): URLSearchParams {
   const p = new URLSearchParams({ pageSize: "100" });
   if (f.q.trim()) p.set("q", f.q.trim());
@@ -128,8 +133,12 @@ export function toApiParams(f: TorFilters): URLSearchParams {
   f.agencies.forEach((a) => p.append("agency", a));
   f.tech.forEach((t) => p.append("tech", t));
   f.projectTypes.forEach((t) => p.append("projectType", t));
-  if (f.budgetMin) p.set("budgetMin", f.budgetMin);
-  if (f.budgetMax) p.set("budgetMax", f.budgetMax);
+  // An inverted range is flagged in the UI instead; don't send it (the backend
+  // would 400) — leave budget unfiltered until the user fixes it.
+  if (!isBudgetRangeInverted(f)) {
+    if (f.budgetMin) p.set("budgetMin", f.budgetMin);
+    if (f.budgetMax) p.set("budgetMax", f.budgetMax);
+  }
   // Dates are Bangkok calendar days; make "to" inclusive of that whole day.
   if (f.publishedFrom) p.set("publishedFrom", `${f.publishedFrom}T00:00:00+07:00`);
   if (f.publishedTo) p.set("publishedTo", `${f.publishedTo}T23:59:59.999+07:00`);

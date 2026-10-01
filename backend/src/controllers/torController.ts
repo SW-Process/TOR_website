@@ -29,7 +29,10 @@ const listQuerySchema = z.object({
   publishedTo: z.coerce.date().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-});
+})
+  .refine((q) => q.budgetMin === undefined || q.budgetMax === undefined || q.budgetMin <= q.budgetMax, {
+    message: "budgetMin must not exceed budgetMax",
+  });
 
 type ListQuery = z.infer<typeof listQuerySchema>;
 

@@ -14,6 +14,7 @@ import {
 import {
   activeFilterCount as countActive,
   dedupeCaseInsensitive,
+  isBudgetRangeInverted,
   MAX_TECH_FILTERS,
   PROJECT_TYPE_LABELS,
   PROJECT_TYPES,
@@ -151,6 +152,12 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
   }, [matched, filters.statuses, filters.sort]);
 
   const activeFilterCount = countActive(filters);
+  const budgetInverted = isBudgetRangeInverted(filters);
+  const budgetInputClass = `w-full rounded-full border px-3.5 py-2 text-sm focus:outline-none ${
+    budgetInverted
+      ? "border-[var(--color-danger)]"
+      : "border-[var(--color-border)] focus:border-[var(--color-ink)]"
+  }`;
 
   function clearFilters() {
     update(EMPTY_FILTERS);
@@ -307,21 +314,37 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
           <input
             type="number"
             placeholder="ต่ำสุด"
+            aria-label="งบประมาณต่ำสุด (บาท)"
+            aria-invalid={budgetInverted}
             min={0}
             value={filters.budgetMin}
             onChange={(e) => update({ budgetMin: e.target.value.replace(/\D/g, "") })}
-            className="w-full rounded-full border border-[var(--color-border)] px-3.5 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
+            className={budgetInputClass}
           />
           <span className="text-[var(--color-text-muted)]">–</span>
           <input
             type="number"
             placeholder="สูงสุด"
+            aria-label="งบประมาณสูงสุด (บาท)"
+            aria-invalid={budgetInverted}
             min={0}
             value={filters.budgetMax}
             onChange={(e) => update({ budgetMax: e.target.value.replace(/\D/g, "") })}
-            className="w-full rounded-full border border-[var(--color-border)] px-3.5 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
+            className={budgetInputClass}
           />
         </div>
+        {budgetInverted ? (
+          <p role="alert" className="mt-1.5 text-xs text-[var(--color-danger)]">
+            งบต่ำสุดต้องไม่เกินงบสูงสุด — ยังไม่ได้กรองตามงบประมาณ
+          </p>
+        ) : (
+          (filters.budgetMin || filters.budgetMax) && (
+            <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">
+              {filters.budgetMin ? formatBudget(Number(filters.budgetMin)) : "ไม่จำกัด"} –{" "}
+              {filters.budgetMax ? formatBudget(Number(filters.budgetMax)) : "ไม่จำกัด"}
+            </p>
+          )
+        )}
       </div>
 
       <div>
