@@ -60,7 +60,24 @@ describe("GET /api/tors", () => {
     expect(byCode.body.data.map((t: { title: string }) => t.title)).toEqual(["ระบบสารบรรณ B"]);
   });
 
-  it("ANDs every filter into one query (FR-7)", async () => {
+  it("matches q against the AI summary, key points and tech stack (FR-1)", async () => {
+    await seed();
+    await Tor.updateOne(
+      { title: "ระบบสารบรรณ A" },
+      { aiSummary: { summary: "ระบบจัดเก็บหนังสือราชการ", keyPoints: ["รองรับ Single Sign-On"], confidence: "high" } }
+    );
+    await Tor.updateOne({ title: "เว็บไซต์หน่วยงาน" }, { technologyStack: ["PostgreSQL"] });
+
+    const titles = async (q: string) =>
+      (await request(app).get("/api/tors?q=" + encodeURIComponent(q))).body.data.map((t: { title: string }) => t.title);
+    expect(await titles("หนังสือราชการ")).toEqual(["ระบบสารบรรณ A"]);
+    expect(await titles("single sign")).toEqual(["ระบบสารบรรณ A"]);
+    expect(await titles("postgres")).toEqual(["เว็บไซต์หน่วยงาน"]);
+    // Regex metacharacters are matched literally, not interpreted.
+    expect(await titles(".*")).toEqual([]);
+  });
+
+    it("ANDs every filter into one query (FR-7)", async () => {
     await seed();
     const qs = new URLSearchParams({
       q: "สารบรรณ",

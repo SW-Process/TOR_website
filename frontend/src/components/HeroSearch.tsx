@@ -13,7 +13,7 @@ export default function HeroSearch() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const params = new URLSearchParams();
-    if (q) params.set("q", q);
+    if (q.trim()) params.set("q", q.trim());
     if (category) params.set("category", category);
     router.push(`/tor${params.toString() ? `?${params.toString()}` : ""}`);
   }

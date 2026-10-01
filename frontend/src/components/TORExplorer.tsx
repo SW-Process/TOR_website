@@ -253,7 +253,7 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
         <input
           value={filters.q}
           onChange={(e) => update({ q: e.target.value })}
-          placeholder="ค้นหาชื่อโครงการ, หน่วยงาน หรือเลขที่โครงการ"
+          placeholder="ค้นหาชื่อโครงการ, หน่วยงาน, เลขที่โครงการ หรือคำสำคัญ"
           className="w-full py-3 text-sm focus:outline-none"
         />
         <button
@@ -311,7 +311,10 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
             </div>
           ) : results.length === 0 ? (
             <div className="card p-10 text-center text-sm text-[var(--color-text-muted)]">
-              ไม่พบ TOR ที่ตรงกับเงื่อนไขการค้นหา ลองปรับตัวกรองหรือคำค้นหาใหม่
+              {filters.q.trim()
+                ? `ไม่พบ TOR ที่ตรงกับ “${filters.q.trim()}”`
+                : "ไม่พบ TOR ที่ตรงกับเงื่อนไขการค้นหา"}{" "}
+              ลองปรับตัวกรองหรือคำค้นหาใหม่
               {activeFilterCount > 0 && (
                 <button
                   onClick={clearFilters}
