@@ -39,18 +39,27 @@ const CATEGORY_MAP: Record<string, Category> = {
   other: "อื่นๆ",
 };
 
-const CATEGORY_SLUG: Record<string, string> = Object.fromEntries(
-  Object.entries(CATEGORY_MAP).map(([slug, label]) => [label, slug])
-);
+const CATEGORY_SLUG = Object.fromEntries(
+  Object.entries(CATEGORY_MAP).map(([slug, label]) => [label, slug]),
+) as Record<Category, string>;
 
-/** Thai display category → backend taxonomy slug (for `/api/tors?category=`). */
-export function categorySlug(category: Category): string {
-  return CATEGORY_SLUG[category] ?? "other";
+/** Thai display category → backend taxonomy slug (what TORs are stored with). */
+export function categoryToSlug(label: Category): string {
+  return CATEGORY_SLUG[label];
 }
 
 function mapCategory(raw?: string): Category {
   if (!raw) return "อื่นๆ";
   return CATEGORY_MAP[raw] ?? "อื่นๆ";
+}
+
+/**
+ * Backend slug → Thai display category. Profiles saved before slugs were sent
+ * still hold the Thai label itself, so accept that too; drop anything else.
+ */
+export function slugToCategory(raw: string): Category | null {
+  if (raw in CATEGORY_MAP) return CATEGORY_MAP[raw];
+  return raw in CATEGORY_SLUG ? (raw as Category) : null;
 }
 
 const STATUS_MAP: Record<string, TORStatus> = {

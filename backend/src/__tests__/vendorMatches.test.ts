@@ -85,6 +85,25 @@ describe("GET /api/vendor/matches", () => {
     expect(res.body.data[1].matchScore).toBeLessThan(res.body.data[0].matchScore);
   });
 
+  // Regression: PUT-ing without budgetMin/budgetMax (as the frontend does when
+  // the vendor leaves the budget fields empty) must not save an explicit
+  // {min:0,max:0} range — that would apply and penalize every TOR's score.
+  it("does not penalize the match score when the budget fields are left empty", async () => {
+    await seedTors();
+    const agent = await vendorAgent();
+    await agent.put("/api/vendor/profile").send({
+      interestedCategories: ["web-application"],
+      technologyStack: ["React", "Node.js"],
+      // no budgetMin / budgetMax at all
+    });
+
+    const res = await agent.get("/api/vendor/matches");
+    expect(res.status).toBe(200);
+    const top = res.body.data.find((m: { tor: { title: string } }) => m.tor.title === "เว็บแอปพลิเคชันสารบรรณ");
+    expect(top.matchScore).toBe(100);
+    expect(top.matchedCriteria.sort()).toEqual(["category", "technologyStack"]);
+  });
+
   it("gives partial technologyStack credit through the API, case-insensitively", async () => {
     await seedTors();
     const agent = await vendorAgent();

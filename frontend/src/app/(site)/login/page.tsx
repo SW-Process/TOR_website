@@ -37,7 +37,7 @@ export default function LoginPage() {
   if (authReady && isLoggedIn && !signingIn) return null;
 
   return (
-    <div className="relative flex min-h-screen flex-1 items-center overflow-hidden bg-[linear-gradient(135deg,_var(--color-blush-deep)_0%,_var(--color-blush)_45%,_var(--color-blush-soft)_100%)]">
+    <div className="relative flex min-h-[calc(100svh-var(--header-h))] flex-1 items-center overflow-hidden bg-[linear-gradient(135deg,_var(--color-blush-deep)_0%,_var(--color-blush)_45%,_var(--color-blush-soft)_100%)]">
       <div
         className="absolute inset-0 opacity-[0.35] [background-image:radial-gradient(rgba(34,26,24,0.18)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_80%_60%_at_70%_30%,black_10%,transparent_75%)]"
         aria-hidden

@@ -1,5 +1,5 @@
 import { categories, type Category, type TORStatus } from "@/lib/mockData";
-import { categorySlug } from "@/lib/torApi";
+import { categoryToSlug } from "@/lib/torApi";
 
 /**
  * FR-7 (SRS §6.1): every search filter lives in one object, is serialized to
@@ -90,7 +90,7 @@ export function toUrlParams(f: TorFilters): URLSearchParams {
 export function toApiParams(f: TorFilters): URLSearchParams {
   const p = new URLSearchParams({ pageSize: "100" });
   if (f.q.trim()) p.set("q", f.q.trim());
-  f.categories.forEach((c) => p.append("category", categorySlug(c)));
+  f.categories.forEach((c) => p.append("category", categoryToSlug(c)));
   f.agencies.forEach((a) => p.append("agency", a));
   if (f.budgetMin) p.set("budgetMin", f.budgetMin);
   if (f.budgetMax) p.set("budgetMax", f.budgetMax);

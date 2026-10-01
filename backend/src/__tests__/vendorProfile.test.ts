@@ -123,6 +123,38 @@ describe("PUT /api/vendor/profile", () => {
     expect(res.status).toBe(400);
   });
 
+  it("accepts numeric strings for number fields", async () => {
+    const agent = await vendorAgent();
+    const res = await agent
+      .put("/api/vendor/profile")
+      .send({ registeredCapital: "1000000", budgetMin: "100", budgetMax: "200" });
+    expect(res.status).toBe(200);
+    expect(res.body.profile.registeredCapital).toBe(1_000_000);
+    expect(res.body.profile.budgetRange).toEqual({ min: 100, max: 200 });
+  });
+
+  it.each([
+    ["a non-numeric string", "abc"],
+    ["Infinity", "Infinity"],
+    ["a negative numeric string", "-1"],
+  ])("rejects %s as a number with 400", async (_label, value) => {
+    const agent = await vendorAgent();
+    const res = await agent.put("/api/vendor/profile").send({ teamSize: value });
+    expect(res.status).toBe(400);
+  });
+
+  it.each([
+    ["true", true],
+    ["false", false],
+    ["an array holding a number", [5]],
+    ["an empty array", []],
+    ["a hex string", "0x10"],
+  ])("rejects %s for a number field with 400", async (_label, value) => {
+    const agent = await vendorAgent();
+    const res = await agent.put("/api/vendor/profile").send({ teamSize: value });
+    expect(res.status).toBe(400);
+  });
+
   it("rejects budgetMin greater than budgetMax with 400", async () => {
     const agent = await vendorAgent();
     const res = await agent.put("/api/vendor/profile").send({ budgetMin: 900, budgetMax: 100 });
@@ -331,21 +363,16 @@ describe("PUT /api/vendor/profile — other fields and edge cases", () => {
     expect(res.status).toBe(400);
   });
 
-  // KNOWN GAP: asNonNegativeNumber() runs Number(raw) on any type, so these
-  // are coerced and saved instead of rejected. `it.failing` passes while the
-  // bug exists and starts failing once validation is fixed — then flip to `it`.
-  describe("known gap: non-numeric types coerced by Number()", () => {
-    it.failing.each([
-      ["true", true],
-      ["false", false],
-      ["an array holding a number", [5]],
-      ["an empty array", []],
-      ["a hex string", "0x10"],
-    ])("should reject %s with 400", async (_label, value) => {
-      const agent = await vendorAgent();
-      const res = await agent.put("/api/vendor/profile").send({ teamSize: value });
-      expect(res.status).toBe(400);
-    });
+  it.each([
+    ["true", true],
+    ["false", false],
+    ["an array holding a number", [5]],
+    ["an empty array", []],
+    ["a hex string", "0x10"],
+  ])("rejects %s with 400", async (_label, value) => {
+    const agent = await vendorAgent();
+    const res = await agent.put("/api/vendor/profile").send({ teamSize: value });
+    expect(res.status).toBe(400);
   });
 
   it("accepts the nested budgetRange shape", async () => {
