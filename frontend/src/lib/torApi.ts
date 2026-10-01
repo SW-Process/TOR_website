@@ -1,5 +1,5 @@
 import { API_BASE } from "@/lib/api";
-import type { AISummary, Category, FairnessField, FairnessFlag, TOR, TORStatus } from "@/lib/mockData";
+import { daysUntil, type AISummary, type Category, type FairnessField, type FairnessFlag, type TOR, type TORStatus } from "@/lib/mockData";
 
 /**
  * Real ingested TORs frequently have no submissionDeadline yet (most rows in
@@ -68,7 +68,11 @@ const STATUS_MAP: Record<string, TORStatus> = {
   closed: "ปิดรับแล้ว",
 };
 
-function mapStatus(raw?: string): TORStatus {
+// The backend's denormalized `status` defaults to "open" and is never
+// recomputed, so a TOR whose deadline has already passed would still read
+// "เปิดรับ". Trust a known deadline over the stored status.
+function mapStatus(raw: string | undefined, deadline: string): TORStatus {
+  if (!isUnknownDeadline(deadline) && daysUntil(deadline) < 0) return "ปิดรับแล้ว";
   return (raw && STATUS_MAP[raw]) || "เปิดรับ";
 }
 
@@ -157,7 +161,11 @@ function mapSummary(raw: ApiAiSummary | null | undefined, fallbackDate: string):
 
 /** Map a raw `/api/tors` (list or detail) row onto the frontend's TOR shape. */
 export function mapApiTor(raw: ApiTor): TOR {
-  const announceDate = raw.announcementDate ?? new Date().toISOString();
+  // Empty string = unknown. Don't substitute today's date: the page would then
+  // claim the TOR was announced today.
+  const announceDate = raw.announcementDate ?? "";
+  const fallbackDate = announceDate || new Date().toISOString();
+  const deadline = raw.submissionDeadline ?? UNKNOWN_DEADLINE;
   return {
     id: raw._id,
     title: raw.title,
@@ -166,8 +174,8 @@ export function mapApiTor(raw: ApiTor): TOR {
     category: mapCategory(raw.category),
     budget: raw.budget ?? raw.referencePrice ?? 0,
     announceDate,
-    deadline: raw.submissionDeadline ?? UNKNOWN_DEADLINE,
-    status: mapStatus(raw.status),
+    deadline,
+    status: mapStatus(raw.status, deadline),
     projectCode: raw.projectCode ?? raw._id,
     location: raw.location ?? raw.agency ?? "",
     views: raw.viewCount ?? 0,
@@ -182,8 +190,8 @@ export function mapApiTor(raw: ApiTor): TOR {
     // Always the original e-GP announcement page, regardless of whether we have a PDF.
     sourceListingUrl: raw.sourceListingUrl ?? null,
     description: raw.aiSummary?.summary ?? "",
-    summary: mapSummary(raw.aiSummary, announceDate),
-    fairnessFlags: mapFairnessFlags(raw.fairnessFlags, announceDate),
+    summary: mapSummary(raw.aiSummary, fallbackDate),
+    fairnessFlags: mapFairnessFlags(raw.fairnessFlags, fallbackDate),
   };
 }
 
@@ -197,6 +205,22 @@ export async function fetchTorList(): Promise<TOR[]> {
   } catch {
     return [];
   }
+}
+
+export interface TorSearchResult {
+  tors: TOR[];
+  totalCount: number;
+}
+
+/**
+ * GET /api/tors?<query> — one combined, server-side filtered search (FR-7).
+ * Throws on network/HTTP failure so the caller can tell "no matches" from "broken".
+ */
+export async function searchTors(query: URLSearchParams, signal?: AbortSignal): Promise<TorSearchResult> {
+  const res = await fetch(`${API_BASE}/api/tors?${query.toString()}`, { signal });
+  if (!res.ok) throw new Error(`TOR search failed: HTTP ${res.status}`);
+  const body = (await res.json()) as { data: ApiTor[]; totalCount: number };
+  return { tors: body.data.map(mapApiTor), totalCount: body.totalCount };
 }
 
 /** GET /api/tors/:id — fetches one TOR, or null if missing/not enriched. */
