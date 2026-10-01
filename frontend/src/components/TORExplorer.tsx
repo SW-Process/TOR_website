@@ -1,21 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import TORCard from "./TORCard";
-import { categories, daysUntil, formatBudget, type TOR } from "@/lib/mockData";
+import { categories, formatBudget } from "@/lib/mockData";
 import {
   fetchAgencies,
   fetchTechnologies,
   searchTors,
   type AgencyOptions,
   type TechOption,
+  type TorSearchResult,
 } from "@/lib/torApi";
 import {
   activeFilterCount as countActive,
   dedupeCaseInsensitive,
   isBudgetRangeInverted,
   MAX_TECH_FILTERS,
+  PAGE_SIZE,
   PROJECT_TYPE_LABELS,
   PROJECT_TYPES,
   STATUSES,
@@ -25,7 +27,7 @@ import {
   type TorFilters,
 } from "@/lib/torSearch";
 
-const EMPTY_FILTERS: Omit<TorFilters, "q" | "sort"> = {
+const EMPTY_FILTERS: Omit<TorFilters, "q" | "sort" | "page"> = {
   categories: [],
   agencies: [],
   tech: [],
@@ -44,8 +46,17 @@ const TECH_QUICK_PICKS = 8;
 const SEARCH_DEBOUNCE_MS = 300;
 
 export default function TORExplorer({ initialFilters }: { initialFilters: TorFilters }) {
-  const [filters, setFilters] = useState<TorFilters>(initialFilters);
+  const [filters, setFiltersState] = useState<TorFilters>(initialFilters);
+  // Any filter or sort change starts again from page 1; only goToPage keeps it.
+  const setFilters = (next: (f: TorFilters) => TorFilters) =>
+    setFiltersState((f) => ({ ...next(f), page: 1 }));
   const update = (patch: Partial<TorFilters>) => setFilters((f) => ({ ...f, ...patch }));
+
+  const resultsTop = useRef<HTMLDivElement>(null);
+  function goToPage(page: number) {
+    setFiltersState((f) => ({ ...f, page }));
+    resultsTop.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   // Options come from the whole collection, not the current results, so picking
   // one agency doesn't make the others disappear from the panel.
@@ -92,10 +103,15 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
     window.history.replaceState(null, "", next);
   }, [urlQuery]);
 
-  // One combined backend query for keyword + category + agency + budget + dates.
+  // One backend query: every filter + sort + page (FR-2, FR-7).
   const apiQuery = toApiParams(filters).toString();
-  const [matched, setMatched] = useState<TOR[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
+  const [result, setResult] = useState<TorSearchResult>({
+    tors: [],
+    page: 1,
+    totalCount: 0,
+    totalBudget: 0,
+    hasNextPage: false,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -103,9 +119,8 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
     const timer = setTimeout(() => {
       setLoading(true);
       searchTors(new URLSearchParams(apiQuery), controller.signal)
-        .then(({ tors, totalCount }) => {
-          setMatched(tors);
-          setTotalCount(totalCount);
+        .then((r) => {
+          setResult(r);
           setError(false);
           setLoading(false);
         })
@@ -131,25 +146,8 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
     });
   }
 
-  // Status is derived from the deadline client-side, and the backend only sorts
-  // by announcement date, so these two are applied to the returned rows.
-  const results = useMemo(() => {
-    const list = matched.filter(
-      (tor) => filters.statuses.length === 0 || filters.statuses.includes(tor.status)
-    );
-    return [...list].sort((a, b) => {
-      switch (filters.sort) {
-        case "deadline":
-          return daysUntil(a.deadline) - daysUntil(b.deadline);
-        case "budgetDesc":
-          return b.budget - a.budget;
-        case "budgetAsc":
-          return a.budget - b.budget;
-        default:
-          return a.announceDate < b.announceDate ? 1 : -1;
-      }
-    });
-  }, [matched, filters.statuses, filters.sort]);
+  const results = result.tors;
+  const totalPages = Math.max(1, Math.ceil(result.totalCount / PAGE_SIZE));
 
   const activeFilterCount = countActive(filters);
   const budgetInverted = isBudgetRangeInverted(filters);
@@ -423,9 +421,15 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
         )}
 
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div ref={resultsTop} className="flex items-center justify-between mb-4 scroll-mt-24">
             <p className="text-sm text-[var(--color-text-muted)]">
-              พบ <span className="font-semibold text-[var(--color-text)]">{results.length}</span> รายการ
+              พบ <span className="font-semibold text-[var(--color-text)]">{result.totalCount}</span> รายการ
+              {result.totalCount > PAGE_SIZE && (
+                <>
+                  {" "}
+                  · หน้า {filters.page} จาก {totalPages}
+                </>
+              )}
             </p>
             <select
               value={filters.sort}
@@ -446,6 +450,16 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
           ) : error ? (
             <div className="card p-10 text-center text-sm text-[var(--color-text-muted)]">
               โหลดผลการค้นหาไม่สำเร็จ กรุณาลองใหม่อีกครั้ง
+            </div>
+          ) : results.length === 0 && filters.page > 1 ? (
+            <div className="card p-10 text-center text-sm text-[var(--color-text-muted)]">
+              ไม่มีผลลัพธ์ในหน้า {filters.page}
+              <button
+                onClick={() => goToPage(1)}
+                className="block mx-auto mt-3 text-[var(--color-rose-dark)] font-semibold hover:underline"
+              >
+                กลับไปหน้าแรก
+              </button>
             </div>
           ) : results.length === 0 ? (
             <div className="card p-10 text-center text-sm text-[var(--color-text-muted)]">
@@ -470,17 +484,33 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
             </div>
           )}
 
-          {!loading && !error && totalCount > matched.length && (
-            <p className="mt-6 text-xs text-[var(--color-text-muted)]">
-              แสดง {matched.length} จาก {totalCount} รายการที่ตรงเงื่อนไข ลองเพิ่มตัวกรองเพื่อจำกัดผลลัพธ์
-            </p>
+          {!loading && !error && totalPages > 1 && (
+            <nav aria-label="เปลี่ยนหน้าผลการค้นหา" className="mt-6 flex items-center justify-center gap-3">
+              <button
+                onClick={() => goToPage(filters.page - 1)}
+                disabled={filters.page <= 1}
+                className="btn-pill border border-[var(--color-border)] px-3.5 py-2 text-sm font-medium text-[var(--color-text)] disabled:opacity-40"
+              >
+                <ChevronLeft size={15} />
+                ก่อนหน้า
+              </button>
+              <span className="text-sm text-[var(--color-text-muted)]">
+                หน้า {filters.page} / {totalPages}
+              </span>
+              <button
+                onClick={() => goToPage(filters.page + 1)}
+                disabled={!result.hasNextPage}
+                className="btn-pill border border-[var(--color-border)] px-3.5 py-2 text-sm font-medium text-[var(--color-text)] disabled:opacity-40"
+              >
+                ถัดไป
+                <ChevronRight size={15} />
+              </button>
+            </nav>
           )}
 
           <p className="mt-6 text-xs text-[var(--color-text-muted)]">
             งบประมาณรวมของผลการค้นหา:{" "}
-            <span className="font-medium text-[var(--color-text)]">
-              {formatBudget(results.reduce((sum, t) => sum + t.budget, 0))}
-            </span>
+            <span className="font-medium text-[var(--color-text)]">{formatBudget(result.totalBudget)}</span>
           </p>
         </div>
       </div>

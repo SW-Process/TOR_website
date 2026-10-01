@@ -27,6 +27,23 @@ export const PROJECT_TYPE_LABELS = {
 export type ProjectType = keyof typeof PROJECT_TYPE_LABELS;
 export const PROJECT_TYPES = Object.keys(PROJECT_TYPE_LABELS) as ProjectType[];
 
+/** Results per page (a multiple of the 2- and 3-column grid). */
+export const PAGE_SIZE = 24;
+
+/** UI sort option → backend `sort` / `order` (FR-2). */
+const SORT_API: Record<SortKey, { sort: string; order: "asc" | "desc" }> = {
+  newest: { sort: "announcementDate", order: "desc" },
+  deadline: { sort: "submissionDeadline", order: "asc" },
+  budgetDesc: { sort: "budget", order: "desc" },
+  budgetAsc: { sort: "budget", order: "asc" },
+};
+
+const STATUS_API: Record<TORStatus, string> = {
+  เปิดรับ: "open",
+  ใกล้ปิดรับ: "closing_soon",
+  ปิดรับแล้ว: "closed",
+};
+
 /** Backend caps `tech` at 20 values per query. */
 export const MAX_TECH_FILTERS = 20;
 
@@ -45,6 +62,8 @@ export interface TorFilters {
   publishedFrom: string;
   publishedTo: string;
   sort: SortKey;
+  /** 1-based results page. Any other filter change resets it to 1. */
+  page: number;
 }
 
 export type RawSearchParams = Record<string, string | string[] | undefined>;
@@ -81,6 +100,11 @@ export function dedupeCaseInsensitive(values: string[]): string[] {
   });
 }
 
+function pageNumber(v: string | string[] | undefined): number {
+  const s = first(v);
+  return /^\d+$/.test(s) && Number(s) >= 1 ? Number(s) : 1;
+}
+
 /** Parse page search params, silently dropping values that aren't valid. */
 export function parseTorFilters(params: RawSearchParams): TorFilters {
   const sort = first(params.sort) as SortKey;
@@ -96,6 +120,7 @@ export function parseTorFilters(params: RawSearchParams): TorFilters {
     publishedFrom: day(params.publishedFrom),
     publishedTo: day(params.publishedTo),
     sort: SORT_KEYS.includes(sort) ? sort : "newest",
+    page: pageNumber(params.page),
   };
 }
 
@@ -113,21 +138,23 @@ export function toUrlParams(f: TorFilters): URLSearchParams {
   if (f.publishedFrom) p.set("publishedFrom", f.publishedFrom);
   if (f.publishedTo) p.set("publishedTo", f.publishedTo);
   if (f.sort !== "newest") p.set("sort", f.sort);
+  if (f.page > 1) p.set("page", String(f.page));
   return p;
 }
 
-/**
- * Filters → one `/api/tors` query. Status and sort are not backend params:
- * status is derived from the deadline on the client (see mapStatus in torApi),
- * so both are applied to the returned rows instead.
- */
 /** True when both budget bounds are set and min > max (the backend 400s on this). */
 export function isBudgetRangeInverted(f: Pick<TorFilters, "budgetMin" | "budgetMax">): boolean {
   return f.budgetMin !== "" && f.budgetMax !== "" && Number(f.budgetMin) > Number(f.budgetMax);
 }
 
+/** Filters → one server-filtered, server-sorted, server-paginated `/api/tors` query. */
 export function toApiParams(f: TorFilters): URLSearchParams {
-  const p = new URLSearchParams({ pageSize: "100" });
+  const p = new URLSearchParams({
+    page: String(f.page),
+    pageSize: String(PAGE_SIZE),
+    ...SORT_API[f.sort],
+  });
+  f.statuses.forEach((s) => p.append("status", STATUS_API[s]));
   if (f.q.trim()) p.set("q", f.q.trim());
   f.categories.forEach((c) => p.append("category", categoryToSlug(c)));
   f.agencies.forEach((a) => p.append("agency", a));

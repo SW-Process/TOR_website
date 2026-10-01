@@ -123,6 +123,77 @@ describe("GET /api/tors", () => {
     expect(inverted.body.message).toMatch(/budgetMin/);
   });
 
+  it("sorts by budget and announcement date, missing values last (FR-2)", async () => {
+    await seed();
+    await Tor.create({ title: "ไม่มีงบ", pipelineStatus: "enriched" });
+    const titles = async (qs: string) =>
+      (await request(app).get(`/api/tors?${qs}`)).body.data.map((t: { title: string }) => t.title);
+
+    expect(await titles("sort=budget")).toEqual(["ระบบสารบรรณ B", "ระบบสารบรรณ A", "เว็บไซต์หน่วยงาน", "ไม่มีงบ"]);
+    expect(await titles("sort=budget&order=asc")).toEqual(["เว็บไซต์หน่วยงาน", "ระบบสารบรรณ A", "ระบบสารบรรณ B", "ไม่มีงบ"]);
+    expect(await titles("sort=announcementDate&order=asc")).toEqual([
+      "ระบบสารบรรณ A",
+      "ระบบสารบรรณ B",
+      "เว็บไซต์หน่วยงาน",
+      "ไม่มีงบ",
+    ]);
+  });
+
+  it("deadline sort puts upcoming first (soonest), then passed (most recent), then unknown", async () => {
+    const day = 86_400_000;
+    const now = Date.now();
+    await Tor.create([
+      { title: "ปิดไปนานแล้ว", pipelineStatus: "enriched", submissionDeadline: new Date(now - 400 * day) },
+      { title: "เพิ่งปิด", pipelineStatus: "enriched", submissionDeadline: new Date(now - 2 * day) },
+      { title: "ไม่ทราบวันปิด", pipelineStatus: "enriched" },
+      { title: "ปิดอีก 10 วัน", pipelineStatus: "enriched", submissionDeadline: new Date(now + 10 * day) },
+      { title: "ปิดพรุ่งนี้", pipelineStatus: "enriched", submissionDeadline: new Date(now + day) },
+    ]);
+    const res = await request(app).get("/api/tors?sort=submissionDeadline");
+    expect(res.body.order).toBe("asc");
+    expect(res.body.data.map((t: { title: string }) => t.title)).toEqual([
+      "ปิดพรุ่งนี้",
+      "ปิดอีก 10 วัน",
+      "เพิ่งปิด",
+      "ปิดไปนานแล้ว",
+      "ไม่ทราบวันปิด",
+    ]);
+  });
+
+  it("filters by effective status: a passed deadline counts as closed whatever is stored", async () => {
+    const day = 86_400_000;
+    await Tor.create([
+      { title: "เปิดอยู่", pipelineStatus: "enriched", status: "open", submissionDeadline: new Date(Date.now() + day) },
+      { title: "เลยกำหนดแต่ยัง open", pipelineStatus: "enriched", status: "open", submissionDeadline: new Date(Date.now() - day) },
+      { title: "ใกล้ปิด", pipelineStatus: "enriched", status: "closing_soon" },
+      { title: "ไม่ทราบวันปิด", pipelineStatus: "enriched" },
+    ]);
+    const titles = async (qs: string) =>
+      (await request(app).get(`/api/tors?${qs}`)).body.data.map((t: { title: string }) => t.title).sort();
+
+    expect(await titles("status=closed")).toEqual(["เลยกำหนดแต่ยัง open"]);
+    expect(await titles("status=open")).toEqual(["เปิดอยู่", "ไม่ทราบวันปิด"].sort());
+    expect(await titles("status=closing_soon&status=closed")).toEqual(["ใกล้ปิด", "เลยกำหนดแต่ยัง open"].sort());
+    expect((await request(app).get("/api/tors?status=bogus")).status).toBe(400);
+  });
+
+  it("paginates and reports totals over the whole result set", async () => {
+    await seed();
+    const p1 = await request(app).get("/api/tors?pageSize=2&page=1");
+    const p2 = await request(app).get("/api/tors?pageSize=2&page=2");
+    expect(p1.body).toMatchObject({ page: 1, totalCount: 3, hasNextPage: true, totalBudget: 3_500_000 });
+    expect(p2.body).toMatchObject({ page: 2, totalCount: 3, hasNextPage: false, totalBudget: 3_500_000 });
+    const ids = [...p1.body.data, ...p2.body.data].map((t: { _id: string }) => t._id);
+    expect(new Set(ids).size).toBe(3);
+
+    const empty = await request(app).get("/api/tors?q=" + encodeURIComponent("ไม่มีทางเจอ"));
+    expect(empty.body).toMatchObject({ data: [], totalCount: 0, totalBudget: 0, hasNextPage: false });
+  });
+
+  it("400s on an unknown sort field", async () => {
+    expect((await request(app).get("/api/tors?sort=title")).status).toBe(400);
+  });
+
   it("400s on a bad pageSize", async () => {
     const res = await request(app).get("/api/tors?pageSize=999");
     expect(res.status).toBe(400);

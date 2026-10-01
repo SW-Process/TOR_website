@@ -1,5 +1,5 @@
 import { API_BASE } from "@/lib/api";
-import { daysUntil, type AISummary, type Category, type FairnessField, type FairnessFlag, type TOR, type TORStatus } from "@/lib/mockData";
+import { type AISummary, type Category, type FairnessField, type FairnessFlag, type TOR, type TORStatus } from "@/lib/mockData";
 
 /**
  * Real ingested TORs frequently have no submissionDeadline yet (most rows in
@@ -72,7 +72,9 @@ const STATUS_MAP: Record<string, TORStatus> = {
 // recomputed, so a TOR whose deadline has already passed would still read
 // "เปิดรับ". Trust a known deadline over the stored status.
 function mapStatus(raw: string | undefined, deadline: string): TORStatus {
-  if (!isUnknownDeadline(deadline) && daysUntil(deadline) < 0) return "ปิดรับแล้ว";
+  // Real clock, not the mock TODAY_ISO, so this agrees with the backend's
+  // `status` filter (torController statusClause).
+  if (!isUnknownDeadline(deadline) && Date.parse(deadline) < Date.now()) return "ปิดรับแล้ว";
   return (raw && STATUS_MAP[raw]) || "เปิดรับ";
 }
 
@@ -209,7 +211,11 @@ export async function fetchTorList(): Promise<TOR[]> {
 
 export interface TorSearchResult {
   tors: TOR[];
+  page: number;
   totalCount: number;
+  /** Sum of budgets over every matching TOR, not just this page. */
+  totalBudget: number;
+  hasNextPage: boolean;
 }
 
 /**
@@ -219,8 +225,20 @@ export interface TorSearchResult {
 export async function searchTors(query: URLSearchParams, signal?: AbortSignal): Promise<TorSearchResult> {
   const res = await fetch(`${API_BASE}/api/tors?${query.toString()}`, { signal });
   if (!res.ok) throw new Error(`TOR search failed: HTTP ${res.status}`);
-  const body = (await res.json()) as { data: ApiTor[]; totalCount: number };
-  return { tors: body.data.map(mapApiTor), totalCount: body.totalCount };
+  const body = (await res.json()) as {
+    data: ApiTor[];
+    page: number;
+    totalCount: number;
+    totalBudget: number;
+    hasNextPage: boolean;
+  };
+  return {
+    tors: body.data.map(mapApiTor),
+    page: body.page,
+    totalCount: body.totalCount,
+    totalBudget: body.totalBudget,
+    hasNextPage: body.hasNextPage,
+  };
 }
 
 export interface AgencyOptions {
