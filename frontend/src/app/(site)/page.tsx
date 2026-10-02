@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -17,6 +18,7 @@ import TORCard from "@/components/TORCard";
 import AlertSignup from "@/components/AlertSignup";
 import CategoryGrid from "@/components/CategoryGrid";
 import StatusBadge from "@/components/StatusBadge";
+import mascotPeek from "@/components/picture/bottom.png";
 import { formatBudget } from "@/lib/mockData";
 import { fetchTorList } from "@/lib/torApi";
 
@@ -136,9 +138,24 @@ export default async function Home() {
                 <div className="animate-card-bob absolute top-10 left-6 w-[300px]">
                   <Link
                     href={`/tor/${featured.id}`}
-                    className="group block rotate-[-4deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
+                    className="group relative block rotate-[-4deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
                     style={{ boxShadow: "0 24px 48px -16px rgba(224,87,119,0.35), 0 10px 24px rgba(34,26,24,0.06)" }}
                   >
+                    {/* Mascot peeking over the card's top-right edge; its paws sit on the edge. */}
+                    <Image
+                      src={mascotPeek}
+                      alt=""
+                      width={150}
+                      priority
+                      className="pointer-events-none absolute z-10 select-none"
+                      style={{
+                        top: -76,
+                        right: -16,
+                        width: 150,
+                        height: "auto",
+                        filter: "drop-shadow(0 8px 12px rgba(224,87,119,0.18))",
+                      }}
+                    />
                     <StatusBadge status={featured.status} />
                     <p className="mt-3 line-clamp-2 font-[family-name:var(--font-heading)] font-bold text-[var(--color-text)] leading-snug">
                       {featured.title}
