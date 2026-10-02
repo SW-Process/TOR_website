@@ -77,20 +77,20 @@ export function slugToCategory(raw: string): Category | null {
   return raw in CATEGORY_SLUG ? (raw as Category) : null;
 }
 
-const STATUS_MAP: Record<string, TORStatus> = {
-  open: "เปิดรับ",
-  closing_soon: "ใกล้ปิดรับ",
-  closed: "ปิดรับแล้ว",
-};
+/** A TOR whose submission deadline is at most this many days away is "ใกล้ปิดรับ". */
+export const CLOSING_SOON_DAYS = 7;
 
 // The backend's denormalized `status` defaults to "open" and is never
-// recomputed, so a TOR whose deadline has already passed would still read
-// "เปิดรับ". Trust a known deadline over the stored status.
+// recomputed, so derive the status from the deadline instead — only an
+// admin-stored "closed" is honored. Mirrors statusClause in the backend's
+// torController.
 function mapStatus(raw: string | undefined, deadline: string): TORStatus {
-  // Real clock, not the mock TODAY_ISO, so this agrees with the backend's
-  // `status` filter (torController statusClause).
-  if (!isUnknownDeadline(deadline) && Date.parse(deadline) < Date.now()) return "ปิดรับแล้ว";
-  return (raw && STATUS_MAP[raw]) || "เปิดรับ";
+  // Real clock, not the mock TODAY_ISO, so this agrees with the backend filter.
+  if (raw === "closed") return "ปิดรับแล้ว";
+  if (isUnknownDeadline(deadline)) return "เปิดรับ";
+  const msLeft = Date.parse(deadline) - Date.now();
+  if (msLeft < 0) return "ปิดรับแล้ว";
+  return msLeft <= CLOSING_SOON_DAYS * 86_400_000 ? "ใกล้ปิดรับ" : "เปิดรับ";
 }
 
 const CONFIDENCE_MAP: Record<string, AISummary["confidence"]> = {

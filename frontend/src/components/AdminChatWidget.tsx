@@ -137,7 +137,12 @@ export default function AdminChatWidget() {
   const awaitingReply = last?.from === "visitor";
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
+    // Pinned with inline styles so the corner placement never depends on a
+    // (possibly stale, during dev HMR) stylesheet having the utility classes.
+    <div
+      className="flex flex-col items-end gap-3"
+      style={{ position: "fixed", right: "clamp(16px, 2vw, 24px)", bottom: "clamp(16px, 2vw, 24px)", zIndex: 40 }}
+    >
       {open && (
         <section
           aria-label="แชทกับแอดมิน"
