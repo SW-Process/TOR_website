@@ -16,8 +16,15 @@ import HeroSearch from "@/components/HeroSearch";
 import TORCard from "@/components/TORCard";
 import AlertSignup from "@/components/AlertSignup";
 import CategoryGrid from "@/components/CategoryGrid";
+import StatusBadge from "@/components/StatusBadge";
 import { formatBudget } from "@/lib/mockData";
 import { fetchTorList } from "@/lib/torApi";
+
+/** "฿8.5M"-style budget for the compact hero card. */
+function formatCompactBaht(amount: number): string {
+  if (!amount) return "ไม่ระบุงบ";
+  return `฿${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(amount)}`;
+}
 
 export default async function Home() {
   const torList = await fetchTorList();
@@ -27,6 +34,8 @@ export default async function Home() {
   const latest = [...torList]
     .sort((a, b) => (a.announceDate < b.announceDate ? 1 : -1))
     .slice(0, 6);
+  // Hero showcase: the newest TOR still taking bids.
+  const featured = latest.find((t) => t.status !== "ปิดรับแล้ว") ?? latest[0];
 
   const trust = [
     { icon: ShieldCheck, title: "ข้อมูลจาก e-GP", sub: "กรมบัญชีกลาง" },
@@ -121,27 +130,32 @@ export default async function Home() {
               style={{ animationDelay: "-2s" }}
             />
 
-            <div className="absolute top-[210px] left-16 h-8 w-[240px] rotate-[-4deg] rounded-full bg-black/15 blur-xl" />
-            <div className="animate-card-bob absolute top-10 left-6 w-[300px]">
-              <div
-                className="rotate-[-4deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
-                style={{ boxShadow: "0 24px 48px -16px rgba(224,87,119,0.35), 0 10px 24px rgba(34,26,24,0.06)" }}
-              >
-                <span className="badge bg-[var(--color-success-bg)] text-[var(--color-success)]">เปิดรับ</span>
-                <p className="mt-3 font-[family-name:var(--font-heading)] font-bold text-[var(--color-text)] leading-snug">
-                  จ้างพัฒนาระบบแพลตฟอร์มสืบค้นประกาศจัดซื้อจัดจ้างกลาง
-                </p>
-                <p className="mt-2 text-xs text-[var(--color-text-muted)]">สำนักยุทธศาสตร์และประเมินผล</p>
-                <div className="mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-3">
-                  <span className="font-[family-name:var(--font-heading)] font-extrabold text-[var(--color-rose-dark)]">
-                    ฿8.5M
-                  </span>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ink)] text-white">
-                    <ArrowUpRight size={15} />
-                  </span>
+            {featured && (
+              <>
+                <div className="absolute top-[210px] left-16 h-8 w-[240px] rotate-[-4deg] rounded-full bg-black/15 blur-xl" />
+                <div className="animate-card-bob absolute top-10 left-6 w-[300px]">
+                  <Link
+                    href={`/tor/${featured.id}`}
+                    className="group block rotate-[-4deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
+                    style={{ boxShadow: "0 24px 48px -16px rgba(224,87,119,0.35), 0 10px 24px rgba(34,26,24,0.06)" }}
+                  >
+                    <StatusBadge status={featured.status} />
+                    <p className="mt-3 line-clamp-2 font-[family-name:var(--font-heading)] font-bold text-[var(--color-text)] leading-snug">
+                      {featured.title}
+                    </p>
+                    <p className="mt-2 truncate text-xs text-[var(--color-text-muted)]">{featured.agency}</p>
+                    <div className="mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-3">
+                      <span className="font-[family-name:var(--font-heading)] font-extrabold text-[var(--color-rose-dark)]">
+                        {formatCompactBaht(featured.budget)}
+                      </span>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ink)] text-white transition-transform group-hover:scale-110">
+                        <ArrowUpRight size={15} />
+                      </span>
+                    </div>
+                  </Link>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
 
             <div className="absolute bottom-2 right-8 h-7 w-44 rotate-[3deg] rounded-full bg-black/15 blur-xl" />
             <div className="animate-card-bob absolute bottom-10 right-4 w-56" style={{ animationDelay: "-2.5s" }}>
@@ -153,7 +167,10 @@ export default async function Home() {
                   <Sparkles size={16} />
                 </span>
                 <p className="mt-3 text-sm font-bold text-[var(--color-text)]">สรุปด้วย AI แล้ว</p>
-                <p className="text-xs text-[var(--color-text-muted)]">ทุกประกาศ 100%</p>
+                {/* /api/tors only serves enriched TORs, so every one listed has a summary. */}
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {torList.length.toLocaleString("th-TH")} ประกาศ
+                </p>
               </div>
             </div>
 
