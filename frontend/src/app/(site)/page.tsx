@@ -19,6 +19,7 @@ import AlertSignup from "@/components/AlertSignup";
 import CategoryGrid from "@/components/CategoryGrid";
 import StatusBadge from "@/components/StatusBadge";
 import mascotPeek from "@/components/picture/bottom.png";
+import mascotSign from "@/components/picture/circle.png";
 import { formatBudget } from "@/lib/mockData";
 import { fetchTorList } from "@/lib/torApi";
 
@@ -191,14 +192,19 @@ export default async function Home() {
               </div>
             </div>
 
-            <div className="absolute top-[calc(50%+58px)] right-14 h-6 w-20 -translate-x-1/2 rounded-full bg-black/20 blur-lg" />
-            <div
-              className="animate-card-bob absolute top-1/2 right-16 -translate-y-1/2"
-              style={{ animationDelay: "-4s" }}
-            >
+            {/* Mascot holding the open-TOR count up like a sign: the stick's tip
+                (≈79%, 8% of circle.png) tucks behind the bottom of the circle. */}
+            <div className="animate-card-bob absolute" style={{ top: 96, right: 28, width: 182, height: 201, animationDelay: "-4s" }}>
+              <Image
+                src={mascotSign}
+                alt=""
+                width={170}
+                className="pointer-events-none absolute select-none"
+                style={{ left: 0, top: 62, width: 170, height: "auto", filter: "drop-shadow(0 12px 16px rgba(224,87,119,0.22))" }}
+              />
               <div
-                className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-[var(--color-ink)] text-center text-white"
-                style={{ boxShadow: "0 20px 40px -12px rgba(34,26,24,0.45)" }}
+                className="absolute z-10 flex h-24 w-24 flex-col items-center justify-center rounded-full bg-[var(--color-ink)] text-center text-white"
+                style={{ left: 86, top: 0, boxShadow: "0 20px 40px -12px rgba(34,26,24,0.45)" }}
               >
                 <span className="font-[family-name:var(--font-heading)] text-base font-extrabold">
                   {openTOR.length}
