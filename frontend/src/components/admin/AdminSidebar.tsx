@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LogOut,
   MessageSquareWarning,
+  MessagesSquare,
   Terminal,
 } from "lucide-react";
 import RunStatusBadge from "./RunStatusBadge";
@@ -35,6 +36,7 @@ export const adminNavItems = [
   { href: "/admin/scraper", label: "สถานะสแครปเปอร์", icon: Activity },
   { href: "/admin/records", label: "ตรวจสอบ TOR", icon: Database },
   { href: "/admin/reports", label: "รายงานจากผู้ใช้", icon: MessageSquareWarning },
+  { href: "/admin/chats", label: "แชทจากผู้ใช้", icon: MessagesSquare },
   { href: "/admin/logs", label: "System Logs", icon: Terminal },
 ];
 
