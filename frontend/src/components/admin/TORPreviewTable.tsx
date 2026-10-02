@@ -1,30 +1,61 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FileText, Search } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
-import { categories, daysUntil, torList, Category, TORStatus } from "@/lib/mockData";
+import { categories, type Category, type TOR, type TORStatus } from "@/lib/mockData";
+import { categoryToSlug, daysLeft, isUnknownDeadline, searchTors } from "@/lib/torApi";
+import { STATUS_API, STATUSES as statuses } from "@/lib/torSearch";
 
-const statuses: TORStatus[] = ["เปิดรับ", "ใกล้ปิดรับ", "ปิดรับแล้ว"];
+const PREVIEW_SIZE = 5;
+const SEARCH_DEBOUNCE_MS = 300;
 
+function deadlineLabel(tor: TOR): string {
+  if (isUnknownDeadline(tor.deadline)) return "ไม่ระบุวันปิดรับ";
+  const days = daysLeft(tor.deadline);
+  return days >= 0 ? `ปิดรับใน ${days} วัน` : "ปิดรับแล้ว";
+}
+
+/** Latest public TORs from GET /api/tors, newest announcement first. */
 export default function TORPreviewTable() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<TORStatus | "ทุกสถานะ">("ทุกสถานะ");
   const [category, setCategory] = useState<Category | "ทุกหมวดหมู่">("ทุกหมวดหมู่");
+  const [rows, setRows] = useState<TOR[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const filtered = useMemo(() => {
-    return torList
-      .filter((t) => {
-        const matchesQuery =
-          !query.trim() ||
-          t.title.toLowerCase().includes(query.toLowerCase()) ||
-          t.agency.toLowerCase().includes(query.toLowerCase());
-        const matchesStatus = status === "ทุกสถานะ" || t.status === status;
-        const matchesCategory = category === "ทุกหมวดหมู่" || t.category === category;
-        return matchesQuery && matchesStatus && matchesCategory;
-      })
-      .slice(0, 5);
+  useEffect(() => {
+    const params = new URLSearchParams({
+      page: "1",
+      pageSize: String(PREVIEW_SIZE),
+      sort: "announcementDate",
+      order: "desc",
+    });
+    if (query.trim()) params.set("q", query.trim());
+    if (status !== "ทุกสถานะ") params.set("status", STATUS_API[status]);
+    if (category !== "ทุกหมวดหมู่") params.set("category", categoryToSlug(category));
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setLoading(true);
+      searchTors(params, controller.signal)
+        .then(({ tors }) => {
+          setRows(tors);
+          setError(false);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setError(true);
+          setLoading(false);
+        });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [query, status, category]);
 
   return (
@@ -72,13 +103,18 @@ export default function TORPreviewTable() {
       </div>
 
       <div className="mt-2 flex flex-col">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <p className="py-8 text-center text-xs text-[var(--color-text-muted)]">กำลังโหลด TOR...</p>
+        ) : error ? (
+          <p className="py-8 text-center text-xs text-[var(--color-text-muted)]">
+            โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง
+          </p>
+        ) : rows.length === 0 ? (
           <p className="py-8 text-center text-xs text-[var(--color-text-muted)]">
             ไม่พบ TOR ที่ตรงกับเงื่อนไข
           </p>
         ) : (
-          filtered.map((tor) => {
-            const days = daysUntil(tor.deadline);
+          rows.map((tor) => {
             return (
               <Link
                 key={tor.id}
@@ -95,7 +131,7 @@ export default function TORPreviewTable() {
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   <StatusBadge status={tor.status} />
                   <span className="text-[11px] text-[var(--color-text-muted)] whitespace-nowrap">
-                    {days >= 0 ? `ปิดรับใน ${days} วัน` : "ปิดรับแล้ว"}
+                    {deadlineLabel(tor)}
                   </span>
                 </div>
               </Link>
