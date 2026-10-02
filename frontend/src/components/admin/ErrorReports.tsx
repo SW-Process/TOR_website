@@ -188,11 +188,15 @@ function ReportCard({ report, onChanged }: { report: Report; onChanged: () => vo
       </header>
 
       {/* Message */}
-      <blockquote className="relative mt-4 rounded-2xl bg-[var(--color-surface-alt)] px-4 py-3.5 pl-9 text-sm leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words">
-        <span aria-hidden className="absolute left-3.5 top-2 font-serif text-3xl leading-none text-[var(--color-rose-dark)]/40">
+      {/* Opening/closing marks are inline so they hug the first and last words. */}
+      <blockquote className="mt-4 rounded-2xl bg-[var(--color-surface-alt)] px-4 py-3.5 text-sm leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words">
+        <span aria-hidden className="mr-1 font-serif text-lg font-bold leading-none text-[var(--color-rose-dark)]/60">
           “
         </span>
-        {report.description}
+        {report.description.trim()}
+        <span aria-hidden className="ml-1 font-serif text-lg font-bold leading-none text-[var(--color-rose-dark)]/60">
+          ”
+        </span>
       </blockquote>
 
       {/* TOR */}
