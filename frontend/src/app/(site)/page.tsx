@@ -20,6 +20,7 @@ import CategoryGrid from "@/components/CategoryGrid";
 import StatusBadge from "@/components/StatusBadge";
 import mascotPeek from "@/components/picture/bottom.png";
 import mascotSign from "@/components/picture/circle.png";
+import mascotPoint from "@/components/picture/good.png";
 import { formatBudget } from "@/lib/mockData";
 import { fetchTorList } from "@/lib/torApi";
 
@@ -178,9 +179,17 @@ export default async function Home() {
             <div className="absolute bottom-2 right-8 h-7 w-44 rotate-[3deg] rounded-full bg-black/15 blur-xl" />
             <div className="animate-card-bob absolute bottom-10 right-4 w-56" style={{ animationDelay: "-2.5s" }}>
               <div
-                className="rotate-[3deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
+                className="relative rotate-[3deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
                 style={{ boxShadow: "0 24px 48px -16px rgba(224,87,119,0.3), 0 10px 24px rgba(34,26,24,0.06)" }}
               >
+                {/* Mascot on the bottom-right corner, pointing back at the label. */}
+                <Image
+                  src={mascotPoint}
+                  alt=""
+                  width={120}
+                  className="pointer-events-none absolute z-10 select-none"
+                  style={{ right: -30, bottom: -36, width: 120, height: "auto", filter: "drop-shadow(0 10px 14px rgba(224,87,119,0.22))" }}
+                />
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-rose-light)] text-[var(--color-rose-dark)]">
                   <Sparkles size={16} />
                 </span>
