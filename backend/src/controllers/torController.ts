@@ -63,20 +63,30 @@ export const LIST_PROJECTION =
 
 const LIST_PROJECT_STAGE = Object.fromEntries(LIST_PROJECTION.split(" ").map((f) => [f, 1]));
 
+/** A TOR whose submission deadline is at most this many days away is "closing soon". */
+export const CLOSING_SOON_DAYS = 7;
+const DAY_MS = 86_400_000;
+
 /**
- * Effective lifecycle status. The stored `status` defaults to "open" and is
- * never recomputed, so a passed submissionDeadline always means closed —
- * mirrors mapStatus in frontend/src/lib/torApi.ts.
+ * Effective lifecycle status, derived from submissionDeadline rather than the
+ * stored `status` (which defaults to "open" and is never recomputed):
+ *   closed       — deadline passed, or an admin stored "closed"
+ *   closing_soon — deadline within CLOSING_SOON_DAYS from now
+ *   open         — deadline further out, or unknown
+ * Mirrors mapStatus in frontend/src/lib/torApi.ts.
  */
 function statusClause(status: (typeof TOR_STATUSES)[number], now: Date): QueryFilter<ITor> {
-  const notPast = { $or: [{ submissionDeadline: { $gte: now } }, { submissionDeadline: null }] };
+  const soon = new Date(now.getTime() + CLOSING_SOON_DAYS * DAY_MS);
+  const notStoredClosed = { status: { $ne: "closed" as const } };
   switch (status) {
     case "closed":
       return { $or: [{ submissionDeadline: { $lt: now } }, { status: "closed" }] };
     case "closing_soon":
-      return { $and: [{ status: "closing_soon" }, notPast] };
+      return { $and: [notStoredClosed, { submissionDeadline: { $gte: now, $lte: soon } }] };
     case "open":
-      return { $and: [{ status: { $nin: ["closing_soon", "closed"] } }, notPast] };
+      return {
+        $and: [notStoredClosed, { $or: [{ submissionDeadline: { $gt: soon } }, { submissionDeadline: null }] }],
+      };
   }
 }
 
