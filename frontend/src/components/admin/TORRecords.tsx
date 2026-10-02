@@ -1,28 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  EyeOff,
   Pencil,
   Save,
-  Trash2,
   X,
 } from "lucide-react";
 import AdminPageHeader from "./AdminPageHeader";
 import StatusBadge from "@/components/StatusBadge";
-import {
-  agencies,
-  categories,
-  formatBudget,
-  formatThaiDate,
-  torList as initialTorList,
-  TOR,
-  TORStatus,
-} from "@/lib/mockData";
-import { torFlags, FlaggedField } from "@/lib/adminMockData";
+import { categories, formatBudget, formatThaiDate, type TOR, type TORStatus } from "@/lib/mockData";
+import { apiFetch } from "@/lib/api";
+import { categoryToSlug, fetchAgencies, isUnknownDeadline, mapApiTor, type ApiTor } from "@/lib/torApi";
+import { STATUS_API } from "@/lib/torSearch";
 
-const statusTabs: { label: string; value: TORStatus | "ทั้งหมด" | "ต้องตรวจสอบ" }[] = [
+type TabValue = TORStatus | "ทั้งหมด" | "ต้องตรวจสอบ";
+
+const statusTabs: { label: string; value: TabValue }[] = [
   { label: "ทั้งหมด", value: "ทั้งหมด" },
   { label: "ต้องตรวจสอบ", value: "ต้องตรวจสอบ" },
   { label: "เปิดรับ", value: "เปิดรับ" },
@@ -30,60 +28,187 @@ const statusTabs: { label: string; value: TORStatus | "ทั้งหมด" | 
   { label: "ปิดรับแล้ว", value: "ปิดรับแล้ว" },
 ];
 
-const fieldLabels: Record<FlaggedField, string> = {
+type FlagField = "budget" | "deadline" | "category" | "agency" | "title" | "qualificationRequirements" | "other";
+
+const fieldLabels: Record<FlagField, string> = {
   budget: "งบประมาณ",
   deadline: "วันปิดรับ",
   category: "หมวดหมู่",
   agency: "หน่วยงาน",
   title: "ชื่อโครงการ",
+  qualificationRequirements: "คุณสมบัติผู้เสนอราคา",
+  other: "อื่นๆ",
 };
 
+const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
+
+interface ApiAdminTor extends ApiTor {
+  fairnessFlags?: { field: FlagField; message: string; status: "open" | "acknowledged" | "dismissed" }[];
+}
+
+/** A public TOR plus the AI fairness signals still waiting for review. */
+interface AdminTor extends TOR {
+  openFlags: { field: FlagField; message: string }[];
+}
+
+interface Draft {
+  id: string;
+  projectCode: string;
+  title: string;
+  agency: string;
+  category: TOR["category"];
+  /** Whole baht as typed; "" = unknown. */
+  budget: string;
+  /** `YYYY-MM-DD`; "" = unknown. */
+  deadline: string;
+  status: TORStatus;
+  openFlags: AdminTor["openFlags"];
+}
+
+function toAdminTor(raw: ApiAdminTor): AdminTor {
+  return {
+    ...mapApiTor(raw),
+    openFlags: (raw.fairnessFlags ?? []).filter((f) => f.status === "open"),
+  };
+}
+
+function toDraft(tor: AdminTor): Draft {
+  return {
+    id: tor.id,
+    projectCode: tor.projectCode,
+    title: tor.title,
+    agency: tor.agency,
+    category: tor.category,
+    budget: tor.budget ? String(tor.budget) : "",
+    deadline: isUnknownDeadline(tor.deadline) ? "" : tor.deadline.slice(0, 10),
+    status: tor.status,
+    openFlags: tor.openFlags,
+  };
+}
+
+/** Admin review of public TORs (UC-5), backed by /api/admin/tors. */
 export default function TORRecords({ initialQuery = "" }: { initialQuery?: string }) {
-  const [torItems, setTorItems] = useState<TOR[]>(initialTorList);
-  const [resolvedIds, setResolvedIds] = useState<string[]>([]);
   const [query, setQuery] = useState(initialQuery);
-  const [filter, setFilter] = useState<TORStatus | "ทั้งหมด" | "ต้องตรวจสอบ">("ทั้งหมด");
-  const [draft, setDraft] = useState<TOR | null>(null);
+  const [filter, setFilter] = useState<TabValue>("ทั้งหมด");
+  const [page, setPage] = useState(1);
+  const [rows, setRows] = useState<AdminTor[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalFlagged, setTotalFlagged] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  // Bumped after a save/hide so the current page reloads.
+  const [reloadKey, setReloadKey] = useState(0);
 
-  function flagsFor(id: string) {
-    if (resolvedIds.includes(id)) return [];
-    return torFlags[id] ?? [];
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
+
+  const [agencyOptions, setAgencyOptions] = useState<string[]>([]);
+  useEffect(() => {
+    fetchAgencies().then((a) => setAgencyOptions(a.agencies));
+  }, []);
+
+  const apiQuery = useMemo(() => {
+    const p = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
+    if (query.trim()) p.set("q", query.trim());
+    if (filter === "ต้องตรวจสอบ") p.set("flagged", "true");
+    else if (filter !== "ทั้งหมด") p.set("status", STATUS_API[filter]);
+    return p.toString();
+  }, [query, filter, page]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setLoading(true);
+      apiFetch(`/api/admin/tors?${apiQuery}`)
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const body = (await res.json()) as {
+            data: ApiAdminTor[];
+            totalCount: number;
+            flaggedCount: number;
+            hasNextPage: boolean;
+          };
+          if (cancelled) return;
+          setRows(body.data.map(toAdminTor));
+          setTotalCount(body.totalCount);
+          setTotalFlagged(body.flaggedCount);
+          setHasNextPage(body.hasNextPage);
+          setLoadError(false);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setLoadError(true);
+          setLoading(false);
+        });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [apiQuery, reloadKey]);
+
+  function changeQuery(q: string) {
+    setQuery(q);
+    setPage(1);
   }
 
-  const filtered = useMemo(() => {
-    return torItems.filter((t) => {
-      const matchesQuery =
-        !query.trim() ||
-        t.title.toLowerCase().includes(query.toLowerCase()) ||
-        t.agency.toLowerCase().includes(query.toLowerCase()) ||
-        t.projectCode.toLowerCase().includes(query.toLowerCase());
-      const matchesFilter =
-        filter === "ทั้งหมด"
-          ? true
-          : filter === "ต้องตรวจสอบ"
-            ? flagsFor(t.id).length > 0
-            : t.status === filter;
-      return matchesQuery && matchesFilter;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [torItems, query, filter, resolvedIds]);
-
-  function handleDelete(id: string) {
-    setTorItems((items) => items.filter((t) => t.id !== id));
+  function changeFilter(f: TabValue) {
+    setFilter(f);
+    setPage(1);
   }
 
-  function openEdit(tor: TOR) {
-    setDraft({ ...tor });
+  async function handleHide(tor: AdminTor) {
+    if (!window.confirm(`ซ่อน “${tor.title}” จากหน้าเว็บสาธารณะ?\nข้อมูลยังเก็บไว้ในฐานข้อมูล`)) return;
+    setActionError(null);
+    const res = await apiFetch(`/api/admin/tors/${tor.id}`, { method: "DELETE" }).catch(() => null);
+    if (!res?.ok) {
+      setActionError("ซ่อน TOR ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+      return;
+    }
+    setReloadKey((k) => k + 1);
   }
 
-  function saveDraft() {
+  function openEdit(tor: AdminTor) {
+    setActionError(null);
+    setSavedId(null);
+    setDraft(toDraft(tor));
+  }
+
+  async function saveDraft() {
     if (!draft) return;
-    setTorItems((items) => items.map((t) => (t.id === draft.id ? draft : t)));
-    setResolvedIds((ids) => (ids.includes(draft.id) ? ids : [...ids, draft.id]));
+    setSaving(true);
+    setActionError(null);
+    const res = await apiFetch(`/api/admin/tors/${draft.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: draft.title,
+        agency: draft.agency,
+        category: categoryToSlug(draft.category),
+        budget: draft.budget === "" ? null : Number(draft.budget),
+        submissionDeadline: draft.deadline || null,
+        status: STATUS_API[draft.status],
+        resolveFlags: true,
+      }),
+    }).catch(() => null);
+    setSaving(false);
+    if (!res?.ok) {
+      const body = res ? ((await res.json().catch(() => ({}))) as { message?: string }) : {};
+      setActionError(`บันทึกไม่สำเร็จ${body.message ? `: ${body.message}` : ""}`);
+      return;
+    }
+    setSavedId(draft.id);
     setDraft(null);
+    setReloadKey((k) => k + 1);
   }
 
-  const totalFlagged = torItems.filter((t) => flagsFor(t.id).length > 0).length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const draftAgencies = draft ? [...new Set([draft.agency, ...agencyOptions])] : agencyOptions;
 
   return (
     <div className="pb-12 relative">
@@ -97,7 +222,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
         <div className="flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white px-5 py-1 shadow-[var(--shadow-sm)] sm:max-w-sm">
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => changeQuery(e.target.value)}
             placeholder="ค้นหาชื่อโครงการ, หน่วยงาน หรือเลขที่โครงการ"
             className="w-full py-2.5 text-sm focus:outline-none"
           />
@@ -108,7 +233,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
             <button
               key={tab.value}
               type="button"
-              onClick={() => setFilter(tab.value)}
+              onClick={() => changeFilter(tab.value)}
               className={`btn-pill px-4 py-2 text-xs font-semibold transition-colors ${
                 filter === tab.value
                   ? "btn-pill-primary"
@@ -135,14 +260,20 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
             <span className="text-right">จัดการ</span>
           </div>
 
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="p-10 text-center text-sm text-[var(--color-text-muted)]">กำลังโหลด TOR...</div>
+          ) : loadError ? (
+            <div className="p-10 text-center text-sm text-[var(--color-text-muted)]">
+              โหลดข้อมูลไม่สำเร็จ — ต้องเข้าสู่ระบบด้วยบัญชีผู้ดูแลระบบ
+            </div>
+          ) : rows.length === 0 ? (
             <div className="p-10 text-center text-sm text-[var(--color-text-muted)]">
               ไม่พบประกาศที่ตรงกับเงื่อนไข
             </div>
           ) : (
             <div className="divide-y divide-[var(--color-border)]">
-              {filtered.map((tor) => {
-                const flags = flagsFor(tor.id);
+              {rows.map((tor) => {
+                const flags = tor.openFlags;
                 const flaggedFields = flags.map((f) => f.field);
                 return (
                   <div
@@ -164,7 +295,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                       <p className="mt-1 text-xs text-[var(--color-text-faint)]">{tor.projectCode}</p>
                       {flags.length > 0 && (
                         <p className="mt-1 text-[11px] text-[var(--color-danger)] leading-relaxed">
-                          {flags.map((f) => fieldLabels[f.field]).join(", ")}: {flags[0].reason}
+                          {[...new Set(flags.map((f) => fieldLabels[f.field]))].join(", ")}: {flags[0].message}
                         </p>
                       )}
                     </div>
@@ -185,10 +316,16 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                           : "text-[var(--color-text-muted)]"
                       }`}
                     >
-                      {formatThaiDate(tor.deadline)}
+                      {isUnknownDeadline(tor.deadline) ? "ไม่ระบุ" : formatThaiDate(tor.deadline)}
                     </p>
-                    <div>
+                    <div className="flex flex-col items-start gap-1">
                       <StatusBadge status={tor.status} />
+                      {savedId === tor.id && (
+                        <span className="flex items-center gap-1 text-[11px] text-[var(--color-success)]">
+                          <CheckCircle2 size={11} />
+                          บันทึกแล้ว
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 lg:justify-end">
                       <button
@@ -201,11 +338,12 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                       </button>
                       <button
                         type="button"
-                        aria-label="ลบ"
-                        onClick={() => handleDelete(tor.id)}
+                        aria-label="ซ่อนจากหน้าเว็บ"
+                        title="ซ่อนจากหน้าเว็บ"
+                        onClick={() => void handleHide(tor)}
                         className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
                       >
-                        <Trash2 size={15} />
+                        <EyeOff size={15} />
                       </button>
                     </div>
                   </div>
@@ -214,9 +352,41 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
             </div>
           )}
         </div>
+        {actionError && !draft && (
+          <p role="alert" className="mt-4 text-sm text-[var(--color-danger)]">
+            {actionError}
+          </p>
+        )}
+
+        {!loading && !loadError && totalPages > 1 && (
+          <nav aria-label="เปลี่ยนหน้า" className="mt-4 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page <= 1}
+              className="btn-pill border border-[var(--color-border)] bg-white px-3.5 py-2 text-xs font-semibold text-[var(--color-text)] disabled:opacity-40"
+            >
+              <ChevronLeft size={14} />
+              ก่อนหน้า
+            </button>
+            <span className="text-xs text-[var(--color-text-muted)]">
+              หน้า {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!hasNextPage}
+              className="btn-pill border border-[var(--color-border)] bg-white px-3.5 py-2 text-xs font-semibold text-[var(--color-text)] disabled:opacity-40"
+            >
+              ถัดไป
+              <ChevronRight size={14} />
+            </button>
+          </nav>
+        )}
+
         <p className="mt-4 text-xs text-[var(--color-text-muted)]">
-          แสดง {filtered.length} จาก {torItems.length} รายการ — การแก้ไข/ลบในหน้านี้เป็นการจำลอง (mock)
-          ยังไม่เชื่อมต่อฐานข้อมูลจริง
+          แสดง {rows.length} จาก {totalCount} รายการ — การซ่อนจะไม่ลบข้อมูลออกจากฐานข้อมูล
+          และการแก้ไขอาจถูกเขียนทับหากประกาศต้นฉบับบน e-GP เปลี่ยนแปลงและระบบประมวลผลใหม่
         </p>
       </div>
 
@@ -241,16 +411,16 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
             </div>
             <p className="mt-1 text-xs text-[var(--color-text-faint)]">{draft.projectCode}</p>
 
-            {flagsFor(draft.id).length > 0 && (
+            {draft.openFlags.length > 0 && (
               <div className="mt-4 rounded-2xl bg-[var(--color-danger-bg)] p-4">
                 <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-danger)]">
                   <AlertTriangle size={13} />
-                  ระบบตั้งค่าสถานะให้ตรวจสอบ
+                  สัญญาณที่ควรตรวจสอบ (สร้างโดย AI)
                 </p>
                 <ul className="mt-2 flex flex-col gap-1.5">
-                  {flagsFor(draft.id).map((f, i) => (
+                  {draft.openFlags.map((f, i) => (
                     <li key={i} className="text-xs text-[var(--color-danger)] leading-relaxed">
-                      <span className="font-semibold">{fieldLabels[f.field]}:</span> {f.reason}
+                      <span className="font-semibold">{fieldLabels[f.field]}:</span> {f.message}
                     </li>
                   ))}
                 </ul>
@@ -260,7 +430,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                saveDraft();
+                void saveDraft();
               }}
               className="mt-6 flex flex-col gap-4"
             >
@@ -281,7 +451,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                   onChange={(e) => setDraft({ ...draft, agency: e.target.value })}
                   className="rounded-full border border-[var(--color-border)] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[var(--color-ink)]"
                 >
-                  {agencies.map((a) => (
+                  {draftAgencies.map((a) => (
                     <option key={a} value={a}>
                       {a}
                     </option>
@@ -309,8 +479,10 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                   <span className="text-xs font-semibold text-[var(--color-text)]">งบประมาณ (บาท)</span>
                   <input
                     type="number"
+                    min={0}
                     value={draft.budget}
-                    onChange={(e) => setDraft({ ...draft, budget: Number(e.target.value) })}
+                    placeholder="ไม่ระบุ"
+                    onChange={(e) => setDraft({ ...draft, budget: e.target.value.replace(/\D/g, "") })}
                     className="rounded-full border border-[var(--color-border)] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[var(--color-ink)]"
                   />
                 </label>
@@ -341,10 +513,11 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
               <div className="mt-2 flex items-center gap-3">
                 <button
                   type="submit"
-                  className="btn-pill btn-pill-primary flex-1 py-3 text-sm"
+                  disabled={saving || !draft.title.trim()}
+                  className="btn-pill btn-pill-primary flex-1 py-3 text-sm disabled:opacity-50"
                 >
                   <Save size={15} />
-                  บันทึกและทำเครื่องหมายว่าตรวจสอบแล้ว
+                  {saving ? "กำลังบันทึก..." : "บันทึกและทำเครื่องหมายว่าตรวจสอบแล้ว"}
                 </button>
                 <button
                   type="button"
@@ -355,11 +528,13 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                 </button>
               </div>
 
-              {resolvedIds.includes(draft.id) && (
-                <p className="flex items-center gap-1.5 text-xs text-[var(--color-success)]">
-                  <CheckCircle2 size={13} />
-                  รายการนี้ถูกตรวจสอบแล้ว
+              {actionError && (
+                <p role="alert" className="text-xs text-[var(--color-danger)]">
+                  {actionError}
                 </p>
+              )}
+              {draft.deadline === "" && (
+                <p className="text-xs text-[var(--color-text-muted)]">เว้นวันปิดรับว่างไว้หากประกาศไม่ได้ระบุ</p>
               )}
             </form>
           </div>

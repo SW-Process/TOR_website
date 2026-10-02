@@ -22,7 +22,7 @@ const SORT_FIELDS = ["announcementDate", "submissionDeadline", "budget"] as cons
 type SortField = (typeof SORT_FIELDS)[number];
 
 /** Default direction per sort field: newest / soonest deadline / largest budget first. */
-const DEFAULT_ORDER: Record<SortField, "asc" | "desc"> = {
+export const DEFAULT_ORDER: Record<SortField, "asc" | "desc"> = {
   announcementDate: "desc",
   submissionDeadline: "asc",
   budget: "desc",
@@ -56,9 +56,9 @@ const listQuerySchema = z.object({
     message: "deadlineFrom must not be after deadlineTo",
   });
 
-type ListQuery = z.infer<typeof listQuerySchema>;
+export type ListQuery = z.infer<typeof listQuerySchema>;
 
-const LIST_PROJECTION =
+export const LIST_PROJECTION =
   "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl";
 
 const LIST_PROJECT_STAGE = Object.fromEntries(LIST_PROJECTION.split(" ").map((f) => [f, 1]));
@@ -80,7 +80,7 @@ function statusClause(status: (typeof TOR_STATUSES)[number], now: Date): QueryFi
   }
 }
 
-function buildFilter(q: ListQuery): QueryFilter<ITor> {
+export function buildFilter(q: ListQuery): QueryFilter<ITor> {
   const filter: QueryFilter<ITor> = { pipelineStatus: "enriched" };
   // RULING: q is a case-insensitive regex match, not MongoDB $text — the default
   // text index tokenizes on whitespace and Thai has no word spaces. FR-1 asks for
@@ -138,7 +138,7 @@ function buildFilter(q: ListQuery): QueryFilter<ITor> {
  * then already-passed ones (most recent first), then unknown deadlines —
  * otherwise years-old closed TORs would top the list.
  */
-function sortStages(field: SortField, order: "asc" | "desc"): PipelineStage.FacetPipelineStage[] {
+export function sortStages(field: SortField, order: "asc" | "desc"): PipelineStage.FacetPipelineStage[] {
   const dir = order === "asc" ? 1 : -1;
   const missing = { $cond: [{ $ifNull: [`$${field}`, false] }, 0, 1] };
 
@@ -177,7 +177,7 @@ function sortStages(field: SortField, order: "asc" | "desc"): PipelineStage.Face
   return [{ $addFields: { _missing: missing } }, { $sort: { _missing: 1, [field]: dir, _id: -1 } }];
 }
 
-function parseQuery(req: Request): ListQuery {
+export function parseQuery(req: Request): ListQuery {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) throw httpError(400, parsed.error.issues.map((i) => i.message).join("; "));
   return parsed.data;

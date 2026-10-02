@@ -7,6 +7,7 @@ import authRoutes from "./routes/authRoutes";
 import vendorRoutes from "./routes/vendorRoutes";
 import ingestionRoutes from "./routes/ingestionRoutes";
 import torRoutes from "./routes/torRoutes";
+import adminRoutes from "./routes/adminRoutes";
 import { notFound, errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -25,6 +26,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/vendor", vendorRoutes);
 app.use("/api/ingestion", ingestionRoutes);
 app.use("/api/tors", torRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
