@@ -2,6 +2,21 @@ import { API_BASE } from "@/lib/api";
 import { type AISummary, type Category, type FairnessField, type FairnessFlag, type TOR, type TORStatus } from "@/lib/mockData";
 
 /**
+ * API_BASE (NEXT_PUBLIC_API_BASE_URL) is the browser-facing address — in
+ * Docker it's http://localhost:8000, which only resolves from the host
+ * machine. fetchTorList/fetchTorById also run server-side (the homepage and
+ * TOR detail page are Server Components), where "localhost:8000" is the
+ * Next.js container's own loopback, not the backend container, so the fetch
+ * fails and the detail page 404s. Use INTERNAL_API_BASE_URL (the Docker
+ * service DNS name) there instead; outside Docker, server and browser share
+ * a host, so API_BASE already resolves correctly and this is unset.
+ */
+function resolveApiBase(): string {
+  if (typeof window !== "undefined") return API_BASE;
+  return process.env.INTERNAL_API_BASE_URL || API_BASE;
+}
+
+/**
  * Real ingested TORs frequently have no submissionDeadline yet (most rows in
  * the current e-GP import). Rather than fabricate a plausible-looking date,
  * fall back to this far-future sentinel so downstream "days left" math never
@@ -200,7 +215,7 @@ export function mapApiTor(raw: ApiTor): TOR {
 /** GET /api/tors — fetches the (currently small) enriched TOR set and maps it. */
 export async function fetchTorList(): Promise<TOR[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/tors?pageSize=100`);
+    const res = await fetch(`${resolveApiBase()}/api/tors?pageSize=100`);
     if (!res.ok) return [];
     const body = (await res.json()) as { data: ApiTor[] };
     return body.data.map(mapApiTor);
@@ -278,7 +293,7 @@ export async function fetchTechnologies(): Promise<TechOption[]> {
 /** GET /api/tors/:id — fetches one TOR, or null if missing/not enriched. */
 export async function fetchTorById(id: string): Promise<TOR | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/tors/${id}`);
+    const res = await fetch(`${resolveApiBase()}/api/tors/${id}`);
     if (!res.ok) return null;
     const body = (await res.json()) as { tor: ApiTor };
     return mapApiTor(body.tor);
