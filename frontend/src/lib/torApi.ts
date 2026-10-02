@@ -256,6 +256,25 @@ export async function searchTors(query: URLSearchParams, signal?: AbortSignal): 
   };
 }
 
+/** Whole days until `iso` on the real clock (negative = passed). */
+export function daysLeft(iso: string): number {
+  return Math.ceil((Date.parse(iso) - Date.now()) / 86_400_000);
+}
+
+/**
+ * Count of public TORs per API status (open / closing_soon / closed), from the
+ * same effective-status filter the search page uses. One cheap request each.
+ */
+export async function fetchStatusCounts(statuses: readonly string[]): Promise<Record<string, number>> {
+  const counts = await Promise.all(
+    statuses.map(async (s) => {
+      const { totalCount } = await searchTors(new URLSearchParams({ status: s, pageSize: "1" }));
+      return [s, totalCount] as const;
+    })
+  );
+  return Object.fromEntries(counts);
+}
+
 export interface AgencyOptions {
   agencies: string[];
   /** Every public TOR, regardless of filters. */

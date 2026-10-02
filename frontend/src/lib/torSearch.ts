@@ -38,7 +38,7 @@ const SORT_API: Record<SortKey, { sort: string; order: "asc" | "desc" }> = {
   budgetAsc: { sort: "budget", order: "asc" },
 };
 
-const STATUS_API: Record<TORStatus, string> = {
+export const STATUS_API: Record<TORStatus, string> = {
   เปิดรับ: "open",
   ใกล้ปิดรับ: "closing_soon",
   ปิดรับแล้ว: "closed",

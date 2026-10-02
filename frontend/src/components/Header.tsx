@@ -13,6 +13,7 @@ import {
   FileSearch,
   UserRound,
   LayoutDashboard,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
 
@@ -21,7 +22,8 @@ const publicLinks = [
   { href: "/tor?sort=deadline", label: "ใกล้ปิดรับ" },
 ];
 
-const memberLinks = [
+// Vendor-only pages: their APIs reject admins, so admins get the admin panel link instead.
+const vendorLinks = [
   { href: "/dashboard", label: "แดชบอร์ด" },
   { href: "/bookmarks", label: "รายการที่บันทึก" },
 ];
@@ -33,7 +35,9 @@ export default function Header() {
   const router = useRouter();
 
   const loggedIn = ready && isLoggedIn;
-  const navLinks = [...publicLinks, ...(loggedIn ? memberLinks : [])];
+  const isAdmin = loggedIn && user?.role === "admin";
+  const isVendor = loggedIn && user?.role === "vendor";
+  const navLinks = [...publicLinks, ...(isVendor ? vendorLinks : [])];
 
   async function handleLogout() {
     await logout();
@@ -75,7 +79,17 @@ export default function Header() {
             <Search size={16} />
           </Link>
 
-          {loggedIn && (
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="btn-pill border border-[var(--color-border-strong)] mr-1 px-3.5 py-2 text-[13px] font-medium text-[var(--color-text)] hover:border-[var(--color-ink)] transition-colors"
+            >
+              <ShieldCheck size={14} />
+              หน้าแอดมิน
+            </Link>
+          )}
+
+          {isVendor && (
             <Link
               href="/bookmarks"
               aria-label="รายการที่บันทึก"
@@ -108,22 +122,36 @@ export default function Header() {
                       <p className="text-xs text-[var(--color-text-faint)] truncate">{user?.email}</p>
                     </div>
                     <div className="my-1 h-px bg-[var(--color-border)]" />
-                    <Link
-                      href="/dashboard"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
-                    >
-                      <LayoutDashboard size={15} />
-                      แดชบอร์ด
-                    </Link>
-                    <Link
-                      href="/account/profile"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
-                    >
-                      <UserRound size={15} />
-                      โปรไฟล์ธุรกิจ
-                    </Link>
+                    {isAdmin && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                      >
+                        <ShieldCheck size={15} />
+                        หน้าแอดมิน
+                      </Link>
+                    )}
+                    {isVendor && (
+                      <>
+                        <Link
+                          href="/dashboard"
+                          onClick={() => setMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                        >
+                          <LayoutDashboard size={15} />
+                          แดชบอร์ด
+                        </Link>
+                        <Link
+                          href="/account/profile"
+                          onClick={() => setMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                        >
+                          <UserRound size={15} />
+                          โปรไฟล์ธุรกิจ
+                        </Link>
+                      </>
+                    )}
                     <button
                       onClick={handleLogout}
                       className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-rose-dark)] hover:bg-[var(--color-blush-soft)]"
@@ -167,13 +195,25 @@ export default function Header() {
 
           {loggedIn ? (
             <>
-              <Link
-                href="/account/profile"
-                onClick={() => setOpen(false)}
-                className="rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
-              >
-                โปรไฟล์ธุรกิจ · {displayName}
-              </Link>
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                >
+                  <ShieldCheck size={15} />
+                  หน้าแอดมิน · {displayName}
+                </Link>
+              )}
+              {isVendor && (
+                <Link
+                  href="/account/profile"
+                  onClick={() => setOpen(false)}
+                  className="rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                >
+                  โปรไฟล์ธุรกิจ · {displayName}
+                </Link>
+              )}
               <button
                 onClick={handleLogout}
                 className="btn-pill mt-1 border border-[var(--color-border-strong)] py-2.5 text-sm text-[var(--color-rose-dark)]"
