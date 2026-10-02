@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import AdminPageHeader from "./AdminPageHeader";
 import { apiFetch, API_BASE } from "@/lib/api";
-import { formatThaiDateTime } from "@/lib/adminStats";
+import { formatThaiDateTime, timeAgo } from "@/lib/adminStats";
 
 type ReportStatus = "open" | "resolved";
 type Tab = ReportStatus | "all";
@@ -63,23 +63,6 @@ const ROLE_LABELS: Record<Person["role"], string> = {
   vendor: "ผู้ประกอบการ",
   admin: "ผู้ดูแลระบบ",
 };
-
-const relative = new Intl.RelativeTimeFormat("th", { numeric: "auto" });
-
-function timeAgo(iso: string): string {
-  const seconds = (Date.parse(iso) - Date.now()) / 1000;
-  const units: [Intl.RelativeTimeFormatUnit, number][] = [
-    ["year", 31_536_000],
-    ["month", 2_592_000],
-    ["day", 86_400],
-    ["hour", 3_600],
-    ["minute", 60],
-  ];
-  for (const [unit, size] of units) {
-    if (Math.abs(seconds) >= size) return relative.format(Math.round(seconds / size), unit);
-  }
-  return "เมื่อสักครู่";
-}
 
 function Avatar({ person, size = 44 }: { person: Person | null; size?: number }) {
   const style = { width: size, height: size };

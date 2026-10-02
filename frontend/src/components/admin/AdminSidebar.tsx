@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   Activity,
   ChevronRight,
@@ -13,20 +14,49 @@ import {
   Terminal,
 } from "lucide-react";
 import RunStatusBadge from "./RunStatusBadge";
-import { dataSources } from "@/lib/adminMockData";
+import {
+  fetchAdminStats,
+  overallRunStatus,
+  RUN_STATUS_LABELS,
+  timeAgo,
+  type AdminStats,
+  type RunSummary,
+} from "@/lib/adminStats";
+
+/** Re-check pipeline health this often while the admin panel is open. */
+const STATUS_REFRESH_MS = 60_000;
+
+function runLine(label: string, run: RunSummary | null): string {
+  return run ? `${label}: ${RUN_STATUS_LABELS[run.status]} · ${timeAgo(run.startedAt)}` : `${label}: ยังไม่เคยรัน`;
+}
 
 export const adminNavItems = [
   { href: "/admin", label: "ภาพรวม", icon: LayoutDashboard },
   { href: "/admin/scraper", label: "สถานะสแครปเปอร์", icon: Activity },
-  { href: "/admin/logs", label: "System Logs", icon: Terminal },
   { href: "/admin/records", label: "ตรวจสอบ TOR", icon: Database },
   { href: "/admin/reports", label: "รายงานจากผู้ใช้", icon: MessageSquareWarning },
+  { href: "/admin/logs", label: "System Logs", icon: Terminal },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
-  const failedSources = dataSources.filter((s) => s.status === "failed").length;
-  const overallStatus = failedSources > 0 ? "failed" : dataSources.some((s) => s.status === "running") ? "running" : "success";
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [statsError, setStatsError] = useState(false);
+
+  useEffect(() => {
+    const load = () =>
+      fetchAdminStats()
+        .then((s) => {
+          setStats(s);
+          setStatsError(false);
+        })
+        .catch(() => setStatsError(true));
+    void load();
+    const timer = setInterval(load, STATUS_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  const overallStatus = stats ? overallRunStatus(stats) : null;
 
   return (
     <aside className="hidden lg:flex w-60 shrink-0 flex-col bg-white">
@@ -66,13 +96,21 @@ export default function AdminSidebar() {
           href="/admin/scraper"
           className="rounded-2xl bg-[var(--color-surface-alt)] p-4 hover:bg-[var(--color-blush-soft)] transition-colors"
         >
-          <p className="text-xs font-semibold text-[var(--color-text)]">สถานะระบบวันนี้</p>
+          <p className="text-xs font-semibold text-[var(--color-text)]">สถานะระบบล่าสุด</p>
           <div className="mt-2.5">
-            <RunStatusBadge status={overallStatus} />
+            {overallStatus ? (
+              <RunStatusBadge status={overallStatus} />
+            ) : (
+              <span className="badge bg-white text-[var(--color-text-muted)]">
+                {statsError ? "โหลดสถานะไม่ได้" : stats ? "ยังไม่เคยรัน" : "กำลังตรวจสอบ…"}
+              </span>
+            )}
           </div>
-          <p className="mt-2 text-[11px] text-[var(--color-text-faint)] leading-relaxed">
-            {failedSources > 0 ? `${failedSources} แหล่งข้อมูลล้มเหลว` : "ทุกแหล่งข้อมูลทำงานปกติ"}
-          </p>
+          {stats && (
+            <p className="mt-2 whitespace-pre-line text-[11px] text-[var(--color-text-faint)] leading-relaxed">
+              {`${runLine("ดึงข้อมูล", stats.lastDiscovery)}\n${runLine("ประมวลผล AI", stats.lastEnrichment)}`}
+            </p>
+          )}
         </Link>
 
         <Link
