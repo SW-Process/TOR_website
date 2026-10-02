@@ -1,10 +1,8 @@
 import { apiFetch } from "./api";
 
 /**
- * Client for the site "chat with admin" feature. Visitors use /api/chat (a
- * logged-in visitor is identified by the session cookie, an anonymous one by
- * the guest token the backend hands out on their first message); admins use
- * /api/admin/chats.
+ * Client for the site "chat with admin" feature. Logged-in visitors use
+ * /api/chat (identified by the session cookie); admins use /api/admin/chats.
  */
 
 export type ChatSender = "visitor" | "admin";
@@ -23,46 +21,16 @@ export interface VisitorConversation {
   unread: number;
 }
 
-const GUEST_TOKEN_KEY = "tor-insight:chat-token";
-
 /** How often an open chat window / admin thread checks for new messages. */
 export const CHAT_POLL_ACTIVE_MS = 4_000;
 /** How often a closed widget or the admin inbox list checks for activity. */
 export const CHAT_POLL_IDLE_MS = 30_000;
 
-function readGuestToken(): string | null {
-  try {
-    return window.localStorage.getItem(GUEST_TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function saveGuestToken(token: string) {
-  try {
-    window.localStorage.setItem(GUEST_TOKEN_KEY, token);
-  } catch {
-    // storage unavailable (private mode) — the thread lasts for this page view only
-  }
-}
-
-let memoryToken: string | null = null;
-
-function guestHeaders(): HeadersInit {
-  const token = memoryToken ?? readGuestToken();
-  return token ? { "X-Chat-Token": token } : {};
-}
-
-/** Whether this browser may already have a thread (so polling is worthwhile). */
-export function hasGuestToken(): boolean {
-  return Boolean(memoryToken ?? readGuestToken());
-}
-
 export async function fetchMyConversation(
   after?: string
 ): Promise<{ conversation: VisitorConversation | null; messages: ChatMessage[] }> {
   const qs = after ? `?after=${encodeURIComponent(after)}` : "";
-  const res = await apiFetch(`/api/chat/conversation${qs}`, { headers: guestHeaders() });
+  const res = await apiFetch(`/api/chat/conversation${qs}`);
   if (!res.ok) throw new Error(`chat ${res.status}`);
   return res.json();
 }
@@ -70,20 +38,15 @@ export async function fetchMyConversation(
 export async function sendMyMessage(text: string): Promise<ChatMessage> {
   const res = await apiFetch("/api/chat/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...guestHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
   });
   if (!res.ok) throw new Error(`chat ${res.status}`);
-  const body = (await res.json()) as { message: ChatMessage; guestToken?: string };
-  if (body.guestToken) {
-    memoryToken = body.guestToken;
-    saveGuestToken(body.guestToken);
-  }
-  return body.message;
+  return ((await res.json()) as { message: ChatMessage }).message;
 }
 
 export async function markMyConversationRead(): Promise<void> {
-  await apiFetch("/api/chat/read", { method: "POST", headers: guestHeaders() });
+  await apiFetch("/api/chat/read", { method: "POST" });
 }
 
 /**
@@ -117,7 +80,7 @@ export interface ChatVisitor {
 export interface AdminChatSummary {
   id: string;
   status: ChatStatus;
-  /** null for an anonymous (guest) visitor. */
+  /** null only if the account has since been deleted. */
   visitor: ChatVisitor | null;
   lastMessageAt: string;
   lastMessagePreview: string;

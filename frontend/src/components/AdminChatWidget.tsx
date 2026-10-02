@@ -10,7 +10,6 @@ import {
   CHAT_POLL_IDLE_MS,
   fetchMyConversation,
   formatChatTime,
-  hasGuestToken,
   markMyConversationRead,
   mergeMessages,
   sendMyMessage,
@@ -75,19 +74,18 @@ export default function AdminChatWidget() {
     }
   }, []);
 
-  const isAdmin = user?.role === "admin";
-  const hasConversation = conversation !== null;
+  // Chat is for logged-in vendors only; admins answer from the admin panel.
+  const canChat = ready && user?.role === "vendor";
 
   // Poll for admin replies: often while the window is open, rarely otherwise
-  // (to light the unread badge). Skipped when this visitor has no thread yet.
+  // (to light the unread badge).
   useEffect(() => {
-    if (!ready || isAdmin) return;
-    if (!user && !hasConversation && !hasGuestToken()) return;
+    if (!canChat) return;
     const tick = () => void sync().catch(() => {});
     tick();
     const timer = setInterval(tick, open ? CHAT_POLL_ACTIVE_MS : CHAT_POLL_IDLE_MS);
     return () => clearInterval(timer);
-  }, [ready, isAdmin, user, hasConversation, open, sync]);
+  }, [canChat, open, sync]);
 
   const unread = conversation?.unread ?? 0;
   useEffect(() => {
@@ -133,8 +131,7 @@ export default function AdminChatWidget() {
     setShowHint(false);
   }
 
-  // Admins answer chats from the admin panel, not as a visitor.
-  if (isAdmin) return null;
+  if (!canChat) return null;
 
   const last = messages[messages.length - 1];
   const awaitingReply = last?.from === "visitor";
@@ -202,7 +199,6 @@ export default function AdminChatWidget() {
             {awaitingReply && !sending && (
               <p className="mx-auto max-w-[85%] text-center text-[11px] leading-relaxed text-[var(--color-text-muted)]">
                 ส่งถึงแอดมินแล้ว ✨ ทีมงานจะตอบกลับในแชทนี้
-                {user ? "" : " (ข้อความผูกกับเบราว์เซอร์นี้ กลับมาดูคำตอบได้ภายหลัง)"}
               </p>
             )}
           </div>

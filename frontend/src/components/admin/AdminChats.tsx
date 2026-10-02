@@ -47,7 +47,7 @@ const ROLE_LABELS: Record<ChatVisitor["role"], string> = {
 };
 
 function visitorName(chat: AdminChatSummary) {
-  return chat.visitor ? chat.visitor.displayName : "ผู้เยี่ยมชม (ไม่ได้เข้าสู่ระบบ)";
+  return chat.visitor ? chat.visitor.displayName : "บัญชีที่ถูกลบแล้ว";
 }
 
 function Avatar({ visitor, size = 40 }: { visitor: ChatVisitor | null; size?: number }) {
@@ -230,18 +230,12 @@ function ChatThread({
                   : "bg-[var(--color-surface-alt)] text-[var(--color-text-muted)]"
               }`}
             >
-              {chat.visitor ? ROLE_LABELS[chat.visitor.role] : "Guest"}
+              {chat.visitor ? ROLE_LABELS[chat.visitor.role] : "ไม่พบบัญชี"}
             </span>
           </div>
           <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-[var(--color-text-muted)]">
-            {chat.visitor ? (
-              <>
-                <Mail size={12} className="shrink-0" />
-                {chat.visitor.email}
-              </>
-            ) : (
-              "ตอบกลับได้เฉพาะในแชทนี้ — ผู้เยี่ยมชมจะเห็นเมื่อกลับมาที่เว็บด้วยเบราว์เซอร์เดิม"
-            )}
+            <Mail size={12} className="shrink-0" />
+            {chat.visitor?.email ?? "—"}
           </p>
         </div>
         <button
