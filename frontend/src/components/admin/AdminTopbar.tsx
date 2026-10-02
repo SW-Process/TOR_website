@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Bell, MessageSquare, Search } from "lucide-react";
+import { useAuth } from "@/lib/useAuth";
 
 export default function AdminTopbar() {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const { user, displayName, avatarSrc } = useAuth();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,8 +55,16 @@ export default function AdminTopbar() {
           <span className="absolute top-2 right-2.5 h-1.5 w-1.5 rounded-full bg-[var(--color-rose-dark)]" />
         </button>
 
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-rose-light)] text-xs font-bold text-[var(--color-rose-dark)] ring-2 ring-[var(--color-rose-dark)]/30">
-          กก
+        <span
+          title={user?.email}
+          className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-rose-light)] text-xs font-bold text-[var(--color-rose-dark)] ring-2 ring-[var(--color-rose-dark)]/30"
+        >
+          {avatarSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
+          ) : (
+            (displayName || "ผ").trim().slice(0, 1).toUpperCase()
+          )}
         </span>
       </div>
     </div>

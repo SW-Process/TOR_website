@@ -1,9 +1,3 @@
-export const adminUser = {
-  name: "ผู้ดูแลระบบ",
-  email: "admin@torchecker.go.th",
-  notifications: 3,
-};
-
 export type RunStatus = "success" | "failed" | "running";
 
 export interface DataSource {
