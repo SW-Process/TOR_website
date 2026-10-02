@@ -10,6 +10,8 @@
  *   errorreports   — public/vendor-submitted TOR error reports
  *   ingestionruns  — sync run history
  *   systemlogs     — diagnostic logs
+ *   chatconversations — site "chat with admin" threads (one per visitor)
+ *   chatmessages   — messages within a chat conversation
  */
 export { User } from "./User";
 export { VendorProfile } from "./VendorProfile";
@@ -20,6 +22,8 @@ export { ErrorReport } from "./ErrorReport";
 export { IngestionRun } from "./IngestionRun";
 export { SystemLog } from "./SystemLog";
 export { EnrichmentJob } from "./EnrichmentJob";
+export { ChatConversation } from "./ChatConversation";
+export { ChatMessage } from "./ChatMessage";
 
 export type { IUser, UserRole, UserDocument } from "./User";
 export type { IVendorProfile, ISavedSearch } from "./VendorProfile";
@@ -30,3 +34,5 @@ export type { IErrorReport } from "./ErrorReport";
 export type { IIngestionRun, IngestionPhase } from "./IngestionRun";
 export type { ISystemLog } from "./SystemLog";
 export type { IEnrichmentJob, EnrichmentJobStatus } from "./EnrichmentJob";
+export type { IChatConversation, ChatConversationStatus, ChatSender } from "./ChatConversation";
+export type { IChatMessage } from "./ChatMessage";
