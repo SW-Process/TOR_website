@@ -1,28 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { fetchAdminStats } from "@/lib/adminStats";
 
-const ALL_MONTHS = [
-  { month: "ม.ค.", scraped: 41 },
-  { month: "ก.พ.", scraped: 47 },
-  { month: "มี.ค.", scraped: 52 },
-  { month: "เม.ย.", scraped: 58 },
-  { month: "พ.ค.", scraped: 63 },
-  { month: "มิ.ย.", scraped: 69 },
-  { month: "ก.ค.", scraped: 75 },
-  { month: "ส.ค.", scraped: 82 },
-];
+const TICK_COUNT = 5;
 
-const Y_MAX = 100;
-const TICKS = [0, 20, 40, 60, 80, 100];
+/** Smallest "nice" axis max (1/2/5 × 10^n, at least 5) that fits `value`. */
+function niceMax(value: number): number {
+  if (value <= 5) return 5;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const step = [1, 2, 5, 10].find((m) => m * magnitude >= value)!;
+  return step * magnitude;
+}
 
+function monthLabel(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y!, m! - 1, 1).toLocaleDateString("th-TH", { month: "short" });
+}
+
+/** TORs ingested per month (by when the system first stored them), from GET /api/admin/stats. */
 export default function TORStatsChart() {
   const [range, setRange] = useState<"5" | "8">("5");
   const [hovered, setHovered] = useState<number | null>(null);
+  const [data, setData] = useState<{ month: string; label: string; scraped: number }[] | null>(null);
+  const [error, setError] = useState(false);
 
-  const data = ALL_MONTHS.slice(range === "5" ? -5 : -8);
-  const total = data.reduce((sum, m) => sum + m.scraped, 0);
+  useEffect(() => {
+    let cancelled = false;
+    fetchAdminStats(range === "8" ? 8 : 5)
+      .then((s) => {
+        if (cancelled) return;
+        setData(s.monthly.map((m) => ({ month: m.month, label: monthLabel(m.month), scraped: m.count })));
+        setError(false);
+      })
+      .catch(() => !cancelled && setError(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [range]);
+
+  const rows = data ?? [];
+  const total = rows.reduce((sum, m) => sum + m.scraped, 0);
+  const Y_MAX = niceMax(Math.max(0, ...rows.map((m) => m.scraped)));
+  const TICKS = Array.from({ length: TICK_COUNT + 1 }, (_, i) => Math.round((Y_MAX / TICK_COUNT) * i));
 
   return (
     <div className="card p-5 sm:p-6 h-full flex flex-col">
@@ -32,7 +53,16 @@ export default function TORStatsChart() {
             TOR ที่ดึงมารายเดือน
           </h2>
           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            รวม <span className="font-semibold text-[var(--color-text)]">{total.toLocaleString()}</span> รายการในช่วงนี้
+            {error ? (
+              "โหลดข้อมูลไม่สำเร็จ"
+            ) : data === null ? (
+              "กำลังโหลด..."
+            ) : (
+              <>
+                รวม <span className="font-semibold text-[var(--color-text)]">{total.toLocaleString()}</span>{" "}
+                รายการในช่วงนี้ · นับตามวันที่ระบบดึงเข้ามา
+              </>
+            )}
           </p>
         </div>
         <div className="relative">
@@ -67,8 +97,8 @@ export default function TORStatsChart() {
             </div>
 
             <div className="relative flex h-full items-end justify-between gap-4">
-              {data.map((m, i) => {
-                const pct = Math.max((m.scraped / Y_MAX) * 100, 2);
+              {rows.map((m, i) => {
+                const pct = m.scraped === 0 ? 0 : Math.max((m.scraped / Y_MAX) * 100, 2);
                 return (
                   <div key={m.month} className="relative flex h-full flex-1 items-end justify-center">
                     {hovered === i && (
@@ -81,7 +111,7 @@ export default function TORStatsChart() {
                     )}
                     <div
                       role="img"
-                      aria-label={`${m.month}: ${m.scraped} รายการ`}
+                      aria-label={`${m.label}: ${m.scraped} รายการ`}
                       onMouseEnter={() => setHovered(i)}
                       onMouseLeave={() => setHovered(null)}
                       className="w-full max-w-8 rounded-t-[3px] bg-[var(--color-rose-dark)] transition-opacity hover:opacity-75"
@@ -94,9 +124,9 @@ export default function TORStatsChart() {
           </div>
 
           <div className="flex h-6 items-start justify-between gap-4 pt-2">
-            {data.map((m) => (
+            {rows.map((m) => (
               <span key={m.month} className="flex-1 text-center text-[10px] text-[var(--color-text-faint)]">
-                {m.month}
+                {m.label}
               </span>
             ))}
           </div>
