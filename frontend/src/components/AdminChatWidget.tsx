@@ -58,7 +58,6 @@ export default function AdminChatWidget() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showHint, setShowHint] = useState(false);
   const lastIdRef = useRef<string | undefined>(undefined);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -96,11 +95,6 @@ export default function AdminChatWidget() {
   }, [open, unread]);
 
   useEffect(() => {
-    const t = setTimeout(() => setShowHint(true), 1500);
-    return () => clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
 
@@ -128,7 +122,6 @@ export default function AdminChatWidget() {
 
   function toggle() {
     setOpen((o) => !o);
-    setShowHint(false);
   }
 
   if (!canChat) return null;
@@ -246,13 +239,23 @@ export default function AdminChatWidget() {
         </section>
       )}
 
-      <div className="flex items-end gap-2">
-        {(showHint || unread > 0) && !open && (
+      {/* Small label above the button (not beside it), so it never covers page content. */}
+      <div className="flex flex-col items-center" style={{ gap: 6 }}>
+        {!open && (
           <button
             onClick={toggle}
-            className="animate-chat-pop mb-3 origin-bottom-right rounded-2xl rounded-br-md bg-white px-3.5 py-2 text-sm font-medium text-[var(--color-text)] shadow-[var(--shadow-md)]"
+            tabIndex={-1}
+            aria-hidden
+            className="whitespace-nowrap rounded-full font-semibold shadow-[var(--shadow-sm)]"
+            style={{
+              padding: "3px 10px",
+              fontSize: 11,
+              lineHeight: "16px",
+              background: unread > 0 ? "var(--color-rose)" : "var(--color-ink)",
+              color: "#fff",
+            }}
           >
-            {unread > 0 ? "แอดมินตอบกลับแล้ว 💬" : "มีอะไรให้ช่วยไหมคะ? 💬"}
+            {unread > 0 ? "ข้อความใหม่" : "ติดต่อเรา"}
           </button>
         )}
         <button
