@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { getMyConversation, markMyConversationRead, sendMyMessage } from "../controllers/chatController";
-import { optionalAuth } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
-// Usable logged in (thread keyed by account) or anonymous (X-Chat-Token).
-router.use(optionalAuth);
+// Login required — one thread per account.
+router.use(requireAuth);
 
 router.get("/conversation", getMyConversation);
 router.post("/messages", sendMyMessage);

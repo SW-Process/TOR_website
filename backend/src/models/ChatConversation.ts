@@ -4,8 +4,7 @@ export type ChatConversationStatus = "open" | "closed";
 export type ChatSender = "visitor" | "admin";
 
 export interface IChatConversation {
-  user: Types.ObjectId | null;
-  guestTokenHash: string | null;
+  user: Types.ObjectId;
   status: ChatConversationStatus;
   lastMessageAt: Date;
   lastMessagePreview: string;
@@ -17,15 +16,12 @@ export interface IChatConversation {
 }
 
 /**
- * chatconversations — one "chat with admin" thread per visitor (site chat
- * widget). Owned either by a logged-in account (`user`) or, for anonymous
- * visitors, by a random guest token whose SHA-256 is stored here — the raw
- * token only ever lives in the visitor's browser.
+ * chatconversations — one "chat with admin" thread per account (site chat
+ * widget; login required).
  */
 const chatConversationSchema = new Schema<IChatConversation>(
   {
-    user: { type: Schema.Types.ObjectId, ref: "User", default: null },
-    guestTokenHash: { type: String, default: null },
+    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
     status: { type: String, enum: ["open", "closed"], default: "open", index: true },
     // denormalized from the newest ChatMessage so the admin inbox is one query
     lastMessageAt: { type: Date, default: () => new Date() },
@@ -37,15 +33,8 @@ const chatConversationSchema = new Schema<IChatConversation>(
   { timestamps: true }
 );
 
-// One thread per owner.
-chatConversationSchema.index(
-  { user: 1 },
-  { unique: true, partialFilterExpression: { user: { $type: "objectId" } } }
-);
-chatConversationSchema.index(
-  { guestTokenHash: 1 },
-  { unique: true, partialFilterExpression: { guestTokenHash: { $type: "string" } } }
-);
+// One thread per account.
+chatConversationSchema.index({ user: 1 }, { unique: true });
 chatConversationSchema.index({ lastMessageAt: -1 });
 
 export const ChatConversation = model<IChatConversation>("ChatConversation", chatConversationSchema);

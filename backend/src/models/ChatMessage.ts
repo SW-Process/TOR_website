@@ -4,9 +4,8 @@ import type { ChatSender } from "./ChatConversation";
 export interface IChatMessage {
   conversation: Types.ObjectId;
   from: ChatSender;
-  // the account that wrote it: the admin for replies, the visitor's account
-  // when logged in, null for an anonymous visitor
-  sender: Types.ObjectId | null;
+  // the account that wrote it: the visitor, or the admin for replies
+  sender: Types.ObjectId;
   text: string;
   createdAt: Date;
   updatedAt: Date;
@@ -20,7 +19,7 @@ const chatMessageSchema = new Schema<IChatMessage>(
   {
     conversation: { type: Schema.Types.ObjectId, ref: "ChatConversation", required: true },
     from: { type: String, enum: ["visitor", "admin"], required: true },
-    sender: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    sender: { type: Schema.Types.ObjectId, ref: "User", required: true },
     text: { type: String, required: true },
   },
   { timestamps: true }

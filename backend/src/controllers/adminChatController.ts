@@ -56,8 +56,8 @@ export async function listChats(req: Request, res: Response): Promise<void> {
   const data = chats.map((c) => ({
     id: key(c._id),
     status: c.status,
-    // null for an anonymous (guest) visitor
-    visitor: c.user ? person(userById.get(key(c.user)), companyByUser.get(key(c.user))) : null,
+    // null only if the account has since been deleted
+    visitor: person(userById.get(key(c.user)), companyByUser.get(key(c.user))),
     lastMessageAt: c.lastMessageAt,
     lastMessagePreview: c.lastMessagePreview,
     lastMessageFrom: c.lastMessageFrom,

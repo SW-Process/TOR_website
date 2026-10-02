@@ -39,56 +39,44 @@ async function agentWithRole(email: string, role: "admin" | "vendor") {
 }
 
 describe("/api/chat (visitor)", () => {
+  it("requires login", async () => {
+    expect((await request(app).get("/api/chat/conversation")).status).toBe(401);
+    expect((await request(app).post("/api/chat/messages").send({ text: "สวัสดี" })).status).toBe(401);
+  });
+
   it("returns no conversation before the first message", async () => {
-    const res = await request(app).get("/api/chat/conversation");
+    const vendor = await agentWithRole("vendor@test.com", "vendor");
+    const res = await vendor.get("/api/chat/conversation");
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ conversation: null, messages: [] });
   });
 
-  it("gives an anonymous visitor a guest token that unlocks only their thread", async () => {
-    const first = await request(app).post("/api/chat/messages").send({ text: "สวัสดีครับ" });
-    expect(first.status).toBe(201);
-    const token = first.body.guestToken as string;
-    expect(token).toEqual(expect.any(String));
-
-    // The raw token is never stored.
-    const stored = await ChatConversation.findById(first.body.conversation.id).lean();
-    expect(stored?.guestTokenHash).not.toBe(token);
-
-    const again = await request(app).post("/api/chat/messages").set("X-Chat-Token", token).send({ text: "ขอสอบถาม" });
-    expect(again.status).toBe(201);
-    expect(again.body.guestToken).toBeUndefined();
-    expect(again.body.conversation.id).toBe(first.body.conversation.id);
-
-    const mine = await request(app).get("/api/chat/conversation").set("X-Chat-Token", token);
-    expect(mine.body.messages.map((m: { text: string }) => m.text)).toEqual(["สวัสดีครับ", "ขอสอบถาม"]);
-
-    const stranger = await request(app).get("/api/chat/conversation").set("X-Chat-Token", "not-the-token");
-    expect(stranger.body.conversation).toBeNull();
-  });
-
-  it("keys a logged-in visitor's thread by account", async () => {
+  it("keys the thread by account and keeps it private", async () => {
     const vendor = await agentWithRole("vendor@test.com", "vendor");
     const a = await vendor.post("/api/chat/messages").send({ text: "ข้อความแรก" });
     const b = await vendor.post("/api/chat/messages").send({ text: "ข้อความสอง" });
-    expect(a.body.guestToken).toBeUndefined();
+    expect(a.status).toBe(201);
     expect(b.body.conversation.id).toBe(a.body.conversation.id);
     expect(await ChatConversation.countDocuments()).toBe(1);
+
+    const mine = await vendor.get("/api/chat/conversation");
+    expect(mine.body.messages.map((m: { text: string }) => m.text)).toEqual(["ข้อความแรก", "ข้อความสอง"]);
+
+    const other = await agentWithRole("other@test.com", "vendor");
+    expect((await other.get("/api/chat/conversation")).body.conversation).toBeNull();
   });
 
   it("rejects empty messages", async () => {
-    const res = await request(app).post("/api/chat/messages").send({ text: "   " });
-    expect(res.status).toBe(400);
+    const vendor = await agentWithRole("vendor@test.com", "vendor");
+    expect((await vendor.post("/api/chat/messages").send({ text: "   " })).status).toBe(400);
   });
 
   it("polls only messages after the cursor", async () => {
-    const first = await request(app).post("/api/chat/messages").send({ text: "หนึ่ง" });
-    const token = first.body.guestToken as string;
-    await request(app).post("/api/chat/messages").set("X-Chat-Token", token).send({ text: "สอง" });
+    const vendor = await agentWithRole("vendor@test.com", "vendor");
+    const first = await vendor.post("/api/chat/messages").send({ text: "หนึ่ง" });
+    await vendor.post("/api/chat/messages").send({ text: "สอง" });
 
-    const res = await request(app)
-      .get(`/api/chat/conversation?after=${first.body.message.id}`)
-      .set("X-Chat-Token", token);
+    const res = await vendor.get(`/api/chat/conversation?after=${first.body.message.id}`);
     expect(res.body.messages.map((m: { text: string }) => m.text)).toEqual(["สอง"]);
   });
 });
@@ -104,48 +92,49 @@ describe("/api/admin/chats", () => {
     const vendor = await agentWithRole("vendor@test.com", "vendor");
     await vendor.put("/api/vendor/profile").send({ companyName: "บริษัท ตัวอย่าง จำกัด" });
     await vendor.post("/api/chat/messages").send({ text: "เข้าสู่ระบบไม่ได้" });
-    const guest = await request(app).post("/api/chat/messages").send({ text: "ข้อมูล TOR ผิด" });
-    const token = guest.body.guestToken as string;
+    const other = await agentWithRole("other@test.com", "vendor");
+    await other.post("/api/chat/messages").send({ text: "ข้อมูล TOR ผิด" });
 
     const admin = await agentWithRole("admin@test.com", "admin");
     const list = await admin.get("/api/admin/chats");
     expect(list.status).toBe(200);
     expect(list.body.counts).toEqual({ open: 2, closed: 0, unread: 2 });
-    const [guestChat, vendorChat] = list.body.data;
-    expect(guestChat).toMatchObject({ visitor: null, lastMessagePreview: "ข้อมูล TOR ผิด", unread: 1 });
+    const [otherChat, vendorChat] = list.body.data;
+    expect(otherChat).toMatchObject({ lastMessagePreview: "ข้อมูล TOR ผิด", unread: 1 });
+    expect(otherChat.visitor).toMatchObject({ email: "other@test.com" });
     expect(vendorChat.visitor).toMatchObject({ email: "vendor@test.com", displayName: "บริษัท ตัวอย่าง จำกัด" });
 
-    // Admin reads and replies to the guest.
-    expect((await admin.post(`/api/admin/chats/${guestChat.id}/read`)).status).toBe(204);
-    const reply = await admin.post(`/api/admin/chats/${guestChat.id}/messages`).send({ text: "รับทราบครับ" });
+    // Admin reads and replies.
+    expect((await admin.post(`/api/admin/chats/${otherChat.id}/read`)).status).toBe(204);
+    const reply = await admin.post(`/api/admin/chats/${otherChat.id}/messages`).send({ text: "รับทราบครับ" });
     expect(reply.status).toBe(201);
     expect(reply.body.message).toMatchObject({ from: "admin", text: "รับทราบครับ" });
 
-    const thread = await admin.get(`/api/admin/chats/${guestChat.id}/messages`);
+    const thread = await admin.get(`/api/admin/chats/${otherChat.id}/messages`);
     expect(thread.body.messages.map((m: { from: string }) => m.from)).toEqual(["visitor", "admin"]);
 
-    // The guest sees the reply as unread until they mark it read.
-    const seen = await request(app).get("/api/chat/conversation").set("X-Chat-Token", token);
+    // The visitor sees the reply as unread until they mark it read.
+    const seen = await other.get("/api/chat/conversation");
     expect(seen.body.conversation.unread).toBe(1);
     expect(seen.body.messages.at(-1)).toMatchObject({ from: "admin", text: "รับทราบครับ" });
-    await request(app).post("/api/chat/read").set("X-Chat-Token", token);
-    const after = await request(app).get("/api/chat/conversation").set("X-Chat-Token", token);
-    expect(after.body.conversation.unread).toBe(0);
+    await other.post("/api/chat/read");
+    expect((await other.get("/api/chat/conversation")).body.conversation.unread).toBe(0);
 
     const relisted = await admin.get("/api/admin/chats?status=all");
     expect(relisted.body.counts.unread).toBe(1);
   });
 
   it("closes a thread and reopens it when the visitor writes again", async () => {
-    const guest = await request(app).post("/api/chat/messages").send({ text: "ขอบคุณครับ" });
-    const id = guest.body.conversation.id as string;
+    const vendor = await agentWithRole("vendor@test.com", "vendor");
+    const sent = await vendor.post("/api/chat/messages").send({ text: "ขอบคุณครับ" });
+    const id = sent.body.conversation.id as string;
     const admin = await agentWithRole("admin@test.com", "admin");
 
     const closed = await admin.patch(`/api/admin/chats/${id}`).send({ status: "closed" });
     expect(closed.body.chat.status).toBe("closed");
     expect((await admin.get("/api/admin/chats")).body.data).toHaveLength(0);
 
-    await request(app).post("/api/chat/messages").set("X-Chat-Token", guest.body.guestToken).send({ text: "อีกเรื่องครับ" });
+    await vendor.post("/api/chat/messages").send({ text: "อีกเรื่องครับ" });
     expect((await ChatConversation.findById(id).lean())?.status).toBe("open");
   });
 

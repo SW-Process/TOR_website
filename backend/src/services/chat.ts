@@ -1,4 +1,3 @@
-import { createHash, randomBytes } from "node:crypto";
 import { isValidObjectId, type Types } from "mongoose";
 import { z } from "zod";
 import { ChatConversation, ChatMessage } from "../models";
@@ -25,16 +24,6 @@ export const afterQuerySchema = z.object({
     .refine((v) => isValidObjectId(v), "Invalid cursor")
     .optional(),
 });
-
-/** New random guest token (kept by the browser) and the hash we store. */
-export function newGuestToken(): { token: string; hash: string } {
-  const token = randomBytes(24).toString("base64url");
-  return { token, hash: hashGuestToken(token) };
-}
-
-export function hashGuestToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
 
 type MessageLike = Pick<IChatMessage, "from" | "text" | "createdAt"> & { _id: Types.ObjectId };
 
@@ -69,7 +58,7 @@ export async function readMessages(conversationId: Types.ObjectId | string, afte
 export async function appendMessage(
   conversationId: Types.ObjectId | string,
   from: ChatSender,
-  sender: string | null,
+  sender: string,
   text: string
 ) {
   const message = await ChatMessage.create({ conversation: conversationId, from, sender, text });
