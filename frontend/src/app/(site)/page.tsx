@@ -253,9 +253,9 @@ export default async function Home() {
               <div>
                 <Sparkles size={18} className="text-[var(--color-rose-dark)]" />
                 <p className="mt-2 font-[family-name:var(--font-heading)] text-xl sm:text-2xl font-extrabold text-[var(--color-text)]">
-                  100%
+                  {torList.length.toLocaleString("th-TH")} ประกาศ
                 </p>
-                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">สรุปด้วย AI</p>
+                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">สรุปด้วย AI แล้ว</p>
               </div>
               <div>
                 <Building2 size={18} className="text-[var(--color-rose-dark)]" />
