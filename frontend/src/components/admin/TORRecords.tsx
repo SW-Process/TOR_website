@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import AdminPageHeader from "./AdminPageHeader";
+import HideTorDialog from "./HideTorDialog";
 import StatusBadge from "@/components/StatusBadge";
 import { categories, formatBudget, formatThaiDate, type TOR, type TORStatus } from "@/lib/mockData";
 import { apiFetch } from "@/lib/api";
@@ -106,6 +107,14 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
   const [actionError, setActionError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
 
+  const [hideTarget, setHideTarget] = useState<AdminTor | null>(null);
+  const [hiding, setHiding] = useState(false);
+  const [hideError, setHideError] = useState<string | null>(null);
+  const closeHideDialog = useCallback(() => {
+    setHideTarget(null);
+    setHideError(null);
+  }, []);
+
   const [agencyOptions, setAgencyOptions] = useState<string[]>([]);
   useEffect(() => {
     fetchAgencies().then((a) => setAgencyOptions(a.agencies));
@@ -162,14 +171,17 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
     setPage(1);
   }
 
-  async function handleHide(tor: AdminTor) {
-    if (!window.confirm(`ซ่อน “${tor.title}” จากหน้าเว็บสาธารณะ?\nข้อมูลยังเก็บไว้ในฐานข้อมูล`)) return;
-    setActionError(null);
-    const res = await apiFetch(`/api/admin/tors/${tor.id}`, { method: "DELETE" }).catch(() => null);
+  async function confirmHide() {
+    if (!hideTarget) return;
+    setHiding(true);
+    setHideError(null);
+    const res = await apiFetch(`/api/admin/tors/${hideTarget.id}`, { method: "DELETE" }).catch(() => null);
+    setHiding(false);
     if (!res?.ok) {
-      setActionError("ซ่อน TOR ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+      setHideError("ซ่อน TOR ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
       return;
     }
+    setHideTarget(null);
     setReloadKey((k) => k + 1);
   }
 
@@ -340,7 +352,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                         type="button"
                         aria-label="ซ่อนจากหน้าเว็บ"
                         title="ซ่อนจากหน้าเว็บ"
-                        onClick={() => void handleHide(tor)}
+                        onClick={() => setHideTarget(tor)}
                         className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
                       >
                         <EyeOff size={15} />
@@ -389,6 +401,18 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
           และการแก้ไขอาจถูกเขียนทับหากประกาศต้นฉบับบน e-GP เปลี่ยนแปลงและระบบประมวลผลใหม่
         </p>
       </div>
+
+      {hideTarget && (
+        <HideTorDialog
+          title={hideTarget.title}
+          agency={hideTarget.agency}
+          projectCode={hideTarget.projectCode}
+          busy={hiding}
+          error={hideError}
+          onCancel={closeHideDialog}
+          onConfirm={() => void confirmHide()}
+        />
+      )}
 
       {draft && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={() => setDraft(null)}>
