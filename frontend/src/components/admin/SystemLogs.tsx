@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import AdminPageHeader from "./AdminPageHeader";
 import { apiFetch } from "@/lib/api";
@@ -56,6 +56,68 @@ function formatLogTime(iso: string): string {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** Expanded row: full message, the run it belongs to, and its context fields. */
+function LogDetail({ log }: { log: LogEntry }) {
+  const ctx = log.context;
+  // Long text fields (stack traces, raw responses) get their own block; the rest are chips.
+  const fields = isRecord(ctx) ? Object.entries(ctx) : [];
+  const isLong = (v: unknown) => typeof v === "string" && (v.length > 80 || v.includes("\n"));
+  const short = fields.filter(([, v]) => !isLong(v) && !isRecord(v) && !Array.isArray(v));
+  const shortKeys = new Set(short.map(([k]) => k));
+  const long = fields.filter(([k]) => !shortKeys.has(k));
+
+  return (
+    <div className="flex flex-col gap-3 px-6 pb-5 pt-1 lg:pl-[calc(1.5rem+9rem+1rem)]">
+      <div>
+        <p className="text-[11px] font-semibold text-[var(--color-text-muted)]">ข้อความเต็ม</p>
+        <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words">
+          {log.message}
+        </p>
+      </div>
+
+      {(log.ingestionRunId || short.length > 0) && (
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full border border-[var(--color-border)] bg-white px-3 py-1 text-[11px] text-[var(--color-text-muted)]">
+            แหล่ง: <span className="font-medium text-[var(--color-text)]">{SOURCE_LABELS[log.source]}</span>
+          </span>
+          {log.ingestionRunId && (
+            <span className="rounded-full border border-[var(--color-border)] bg-white px-3 py-1 text-[11px] text-[var(--color-text-muted)]">
+              รอบดึงข้อมูล: <span className="font-mono text-[var(--color-text)]">{log.ingestionRunId}</span>
+            </span>
+          )}
+          {short.map(([k, v]) => (
+            <span
+              key={k}
+              className="rounded-full border border-[var(--color-border)] bg-white px-3 py-1 text-[11px] text-[var(--color-text-muted)]"
+            >
+              {k}: <span className="font-mono text-[var(--color-text)]">{String(v)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {long.map(([k, v]) => (
+        <div key={k}>
+          <p className="text-[11px] font-semibold text-[var(--color-text-muted)]">{k}</p>
+          <pre className="mt-1 max-h-64 overflow-auto rounded-xl border border-[var(--color-border)] bg-white p-3 font-mono text-[11px] leading-relaxed text-[var(--color-ink-soft)] whitespace-pre-wrap break-words">
+            {typeof v === "string" ? v : JSON.stringify(v, null, 2)}
+          </pre>
+        </div>
+      ))}
+
+      {ctx !== undefined && !isRecord(ctx) && (
+        <pre className="max-h-64 overflow-auto rounded-xl border border-[var(--color-border)] bg-white p-3 font-mono text-[11px] leading-relaxed text-[var(--color-ink-soft)] whitespace-pre-wrap break-words">
+          {typeof ctx === "string" ? ctx : JSON.stringify(ctx, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
 }
 
 /** Admin view of backend SystemLog rows (FR-37, FR-38), via GET /api/admin/logs. */
@@ -184,12 +246,12 @@ export default function SystemLogs() {
 
       <div className="mt-6 px-5 sm:px-8">
         <div className="card overflow-hidden p-0">
-          <div className="hidden lg:grid grid-cols-[150px_100px_200px_1fr_20px] gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface-alt)] px-6 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-            <span>เวลา</span>
-            <span>ระดับ</span>
-            <span>Source</span>
-            <span>ข้อความ</span>
-            <span />
+          <div className="hidden lg:flex items-center gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface-alt)] px-6 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+            <span className="w-36 shrink-0">เวลา</span>
+            <span className="w-20 shrink-0">ระดับ</span>
+            <span className="w-48 shrink-0">Source</span>
+            <span className="min-w-0 flex-1">ข้อความ</span>
+            <span className="w-4 shrink-0" />
           </div>
 
           {loading && !result ? (
@@ -204,55 +266,40 @@ export default function SystemLogs() {
           ) : rows.length === 0 ? (
             <div className="p-10 text-center text-sm text-[var(--color-text-muted)]">ไม่พบ log ที่ตรงกับเงื่อนไข</div>
           ) : (
-            <div className={`divide-y divide-[var(--color-border)] font-mono transition-opacity ${loading ? "opacity-60" : ""}`}>
+            <div className={`divide-y divide-[var(--color-border)] transition-opacity ${loading ? "opacity-60" : ""}`}>
               {rows.map((log) => {
                 const open = expanded === log._id;
-                const hasDetail = log.context !== undefined || log.ingestionRunId;
                 return (
-                  <Fragment key={log._id}>
+                  <div key={log._id} className={open ? "bg-[var(--color-surface-alt)]/60" : ""}>
+                    {/* One line per log on desktop; message wraps under the meta on small screens. */}
                     <button
                       type="button"
                       onClick={() => setExpanded(open ? null : log._id)}
                       aria-expanded={open}
-                      disabled={!hasDetail}
-                      className={`grid w-full grid-cols-1 lg:grid-cols-[150px_100px_200px_1fr_20px] gap-1.5 lg:gap-4 px-6 py-3.5 text-left items-start lg:items-center transition-colors ${
-                        hasDetail ? "cursor-pointer hover:bg-[var(--color-surface-alt)]/60" : "cursor-default"
-                      } ${open ? "bg-[var(--color-surface-alt)]/60" : ""}`}
+                      className="flex w-full flex-wrap items-center gap-x-4 gap-y-1.5 px-6 py-3 text-left transition-colors hover:bg-[var(--color-surface-alt)]/60 lg:flex-nowrap"
                     >
-                      <span className="text-xs text-[var(--color-text-faint)]">{formatLogTime(log.timestamp)}</span>
-                      <span>
-                        <span className={`badge ${levelStyles[log.severity]} font-sans`}>{log.severity}</span>
+                      <span className="w-36 shrink-0 font-mono text-xs text-[var(--color-text-faint)]">
+                        {formatLogTime(log.timestamp)}
                       </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-xs text-[var(--color-ink-soft)]">{log.component ?? log.source}</span>
-                        <span className="block font-sans text-[10px] text-[var(--color-text-faint)]">
-                          {SOURCE_LABELS[log.source]}
-                        </span>
+                      <span className="w-20 shrink-0">
+                        <span className={`badge ${levelStyles[log.severity]}`}>{log.severity}</span>
                       </span>
                       <span
-                        className={`text-xs text-[var(--color-text)] leading-relaxed font-sans break-words ${open ? "" : "line-clamp-2"}`}
+                        title={SOURCE_LABELS[log.source]}
+                        className="w-48 shrink-0 truncate font-mono text-xs text-[var(--color-ink-soft)]"
                       >
+                        {log.component ?? log.source}
+                      </span>
+                      <span className="order-last basis-full truncate text-[13px] text-[var(--color-text)] lg:order-none lg:basis-auto lg:min-w-0 lg:flex-1">
                         {log.message}
                       </span>
-                      <span className="hidden lg:flex justify-end text-[var(--color-text-faint)]">
-                        {hasDetail && <ChevronDown size={14} className={`transition-transform ${open ? "rotate-180" : ""}`} />}
-                      </span>
+                      <ChevronDown
+                        size={15}
+                        className={`ml-auto shrink-0 text-[var(--color-text-faint)] transition-transform lg:ml-0 ${open ? "rotate-180" : ""}`}
+                      />
                     </button>
-                    {open && (
-                      <div className="bg-[var(--color-surface-alt)]/60 px-6 pb-4">
-                        {log.ingestionRunId && (
-                          <p className="mb-2 font-sans text-[11px] text-[var(--color-text-muted)]">
-                            รอบดึงข้อมูล: <span className="font-mono">{log.ingestionRunId}</span>
-                          </p>
-                        )}
-                        {log.context !== undefined && (
-                          <pre className="max-h-80 overflow-auto rounded-xl bg-[var(--color-ink)] p-4 text-[11px] leading-relaxed text-white/90 whitespace-pre-wrap break-all">
-                            {JSON.stringify(log.context, null, 2)}
-                          </pre>
-                        )}
-                      </div>
-                    )}
-                  </Fragment>
+                    {open && <LogDetail log={log} />}
+                  </div>
                 );
               })}
             </div>
