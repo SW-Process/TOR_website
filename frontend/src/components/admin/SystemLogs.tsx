@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import AdminPageHeader from "./AdminPageHeader";
 import { apiFetch } from "@/lib/api";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
 type LogLevel = "info" | "warning" | "error";
 type LogSource = "ingestion" | "ai-pipeline" | "application";
@@ -130,12 +131,14 @@ export default function SystemLogs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  // Only typing is debounced; tabs, source and paging fetch immediately.
+  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
 
   useEffect(() => {
     const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
     if (level !== "ทั้งหมด") params.set("severity", level);
     if (source) params.set("source", source);
-    if (query.trim()) params.set("q", query.trim());
+    if (debouncedQuery.trim()) params.set("q", debouncedQuery.trim());
 
     let cancelled = false;
     const timer = setTimeout(() => {
@@ -154,12 +157,12 @@ export default function SystemLogs() {
           setError(true);
           setLoading(false);
         });
-    }, SEARCH_DEBOUNCE_MS);
+    }, 0);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, level, source, page]);
+  }, [debouncedQuery, level, source, page]);
 
   const counts = result?.counts;
   const countFor = (v: LogLevel | "ทั้งหมด") =>

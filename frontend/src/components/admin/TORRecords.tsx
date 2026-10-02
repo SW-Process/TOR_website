@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   EyeOff,
+  Loader2,
   Pencil,
   Save,
   X,
@@ -18,6 +19,7 @@ import { categories, formatBudget, formatThaiDate, type TOR, type TORStatus } fr
 import { apiFetch } from "@/lib/api";
 import { categoryToSlug, fetchAgencies, isUnknownDeadline, mapApiTor, type ApiTor } from "@/lib/torApi";
 import { STATUS_API } from "@/lib/torSearch";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
 type TabValue = TORStatus | "ทั้งหมด" | "ต้องตรวจสอบ";
 
@@ -43,6 +45,19 @@ const fieldLabels: Record<FlagField, string> = {
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
+
+interface Snapshot {
+  rows: AdminTor[];
+  totalCount: number;
+  totalFlagged: number;
+  hasNextPage: boolean;
+}
+
+/**
+ * Last result per query, kept for the browser session so coming back to this
+ * page (or a tab already visited) renders instantly while it refreshes.
+ */
+const snapshotCache = new Map<string, Snapshot>();
 
 interface ApiAdminTor extends ApiTor {
   fairnessFlags?: { field: FlagField; message: string; status: "open" | "acknowledged" | "dismissed" }[];
@@ -93,12 +108,10 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
   const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState<TabValue>("ทั้งหมด");
   const [page, setPage] = useState(1);
-  const [rows, setRows] = useState<AdminTor[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalFlagged, setTotalFlagged] = useState(0);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  // Only typing is debounced; tabs, paging and the first load fetch immediately.
+  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
+  // The latest response, tagged with the query (+ reload) it answers.
+  const [result, setResult] = useState<{ key: string; snap?: Snapshot; error?: true } | null>(null);
   // Bumped after a save/hide so the current page reloads.
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -122,44 +135,58 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
 
   const apiQuery = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
-    if (query.trim()) p.set("q", query.trim());
+    if (debouncedQuery.trim()) p.set("q", debouncedQuery.trim());
     if (filter === "ต้องตรวจสอบ") p.set("flagged", "true");
     else if (filter !== "ทั้งหมด") p.set("status", STATUS_API[filter]);
     return p.toString();
-  }, [query, filter, page]);
+  }, [debouncedQuery, filter, page]);
+
+  const requestKey = `${apiQuery}#${reloadKey}`;
 
   useEffect(() => {
     let cancelled = false;
-    const timer = setTimeout(() => {
-      setLoading(true);
-      apiFetch(`/api/admin/tors?${apiQuery}`)
-        .then(async (res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const body = (await res.json()) as {
-            data: ApiAdminTor[];
-            totalCount: number;
-            flaggedCount: number;
-            hasNextPage: boolean;
-          };
-          if (cancelled) return;
-          setRows(body.data.map(toAdminTor));
-          setTotalCount(body.totalCount);
-          setTotalFlagged(body.flaggedCount);
-          setHasNextPage(body.hasNextPage);
-          setLoadError(false);
-          setLoading(false);
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setLoadError(true);
-          setLoading(false);
-        });
-    }, SEARCH_DEBOUNCE_MS);
+    apiFetch(`/api/admin/tors?${apiQuery}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = (await res.json()) as {
+          data: ApiAdminTor[];
+          totalCount: number;
+          flaggedCount: number;
+          hasNextPage: boolean;
+        };
+        const next: Snapshot = {
+          rows: body.data.map(toAdminTor),
+          totalCount: body.totalCount,
+          totalFlagged: body.flaggedCount,
+          hasNextPage: body.hasNextPage,
+        };
+        snapshotCache.set(apiQuery, next);
+        if (!cancelled) setResult({ key: requestKey, snap: next });
+      })
+      .catch(() => {
+        if (!cancelled) setResult({ key: requestKey, error: true });
+      });
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
-  }, [apiQuery, reloadKey]);
+  }, [apiQuery, requestKey]);
+
+  const fresh = result?.key === requestKey ? result : null;
+  const loading = !fresh;
+  const loadError = !!fresh?.error;
+  // While a request is in flight, show this query's cached result (instant when
+  // revisiting), else the previous one dimmed — never a blank "loading" table.
+  const snapshot = fresh?.snap ?? snapshotCache.get(apiQuery) ?? result?.snap ?? null;
+  const rows = snapshot?.rows ?? [];
+  const totalCount = snapshot?.totalCount ?? 0;
+  const totalFlagged = snapshot?.totalFlagged ?? 0;
+  const hasNextPage = snapshot?.hasNextPage ?? false;
+
+  // After a save/hide every cached page may be stale.
+  function reloadAfterChange() {
+    snapshotCache.clear();
+    setReloadKey((k) => k + 1);
+  }
 
   function changeQuery(q: string) {
     setQuery(q);
@@ -182,7 +209,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
       return;
     }
     setHideTarget(null);
-    setReloadKey((k) => k + 1);
+    reloadAfterChange();
   }
 
   function openEdit(tor: AdminTor) {
@@ -216,7 +243,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
     }
     setSavedId(draft.id);
     setDraft(null);
-    setReloadKey((k) => k + 1);
+    reloadAfterChange();
   }
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -272,9 +299,12 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
             <span className="text-right">จัดการ</span>
           </div>
 
-          {loading ? (
-            <div className="p-10 text-center text-sm text-[var(--color-text-muted)]">กำลังโหลด TOR...</div>
-          ) : loadError ? (
+          {!snapshot && loading ? (
+            <div className="p-10 flex items-center justify-center gap-2 text-sm text-[var(--color-text-muted)]">
+              <Loader2 size={16} className="animate-spin" />
+              กำลังโหลด TOR...
+            </div>
+          ) : loadError && !snapshot ? (
             <div className="p-10 text-center text-sm text-[var(--color-text-muted)]">
               โหลดข้อมูลไม่สำเร็จ — ต้องเข้าสู่ระบบด้วยบัญชีผู้ดูแลระบบ
             </div>
@@ -283,7 +313,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
               ไม่พบประกาศที่ตรงกับเงื่อนไข
             </div>
           ) : (
-            <div className="divide-y divide-[var(--color-border)]">
+            <div className={`divide-y divide-[var(--color-border)] transition-opacity ${loading ? "opacity-60" : ""}`}>
               {rows.map((tor) => {
                 const flags = tor.openFlags;
                 const flaggedFields = flags.map((f) => f.field);
@@ -370,7 +400,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
           </p>
         )}
 
-        {!loading && !loadError && totalPages > 1 && (
+        {snapshot && totalPages > 1 && (
           <nav aria-label="เปลี่ยนหน้า" className="mt-4 flex items-center justify-center gap-3">
             <button
               type="button"
