@@ -4,7 +4,7 @@ import type { HydratedDocument, Types } from "mongoose";
 import { Tor, IngestionRun, type IIngestionRun } from "../../models";
 import { getStorage, type BlobStorage } from "../../storage";
 import { logIngestionEvent } from "../log";
-import { claimNext, complete, fail } from "./enrichmentJobRepo";
+import { claimNext, complete, countRunnable, fail, maxCallsPerRun } from "./enrichmentJobRepo";
 import { applyExtractionToTor, type TorExtractor } from "./torExtractor";
 
 /** Runs older than this while still "running" are treated as interrupted. */
@@ -34,8 +34,7 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 
 export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult> {
   const storage = deps.storage ?? getStorage();
-  const envMax = Number(process.env.MAX_AI_CALLS_PER_RUN);
-  const maxCalls = deps.maxCalls ?? (Number.isFinite(envMax) ? envMax : 50);
+  const maxCalls = deps.maxCalls ?? maxCallsPerRun();
   const now = deps.now ?? (() => new Date());
   const workerId = `enrich-${randomUUID()}`;
 
@@ -64,6 +63,7 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
         trigger: "scheduled",
         phase: "enrichment",
         status: "running",
+        stats: { enrichmentPlanned: planned },
       });
     }
     return run;
@@ -74,8 +74,29 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
   let enrichedRejected = 0;
   let enrichedFailed = 0;
 
+  // Progress denominator for the admin UI: what this run will claim at most.
+  const planned = Math.max(0, Math.min(await countRunnable(now()), maxCalls));
+
+  /** Persist running counters so the admin UI can show "X / planned" mid-run. */
+  const flushProgress = async (): Promise<void> => {
+    if (!run) return;
+    await IngestionRun.updateOne(
+      { _id: run._id },
+      {
+        $set: {
+          "stats.torsFound": claimed,
+          "stats.enrichedOk": enrichedOk,
+          "stats.enrichedRejected": enrichedRejected,
+          "stats.enrichedFailed": enrichedFailed,
+        },
+      }
+    );
+  };
+
   try {
     while (claimed < maxCalls) {
+      // Reflect the previous job's outcome before starting the next one.
+      await flushProgress();
       const job = await claimNext(workerId, now());
       if (!job) break;
       const activeRun = await ensureRun();

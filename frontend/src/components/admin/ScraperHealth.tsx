@@ -5,7 +5,12 @@ import { Clock, RotateCw, Sparkles } from "lucide-react";
 import AdminPageHeader from "./AdminPageHeader";
 import RunStatusBadge from "./RunStatusBadge";
 import { formatDateTime, formatRelativeTime } from "@/lib/adminMockData";
-import { useIngestionRuns, type IngestionPhase } from "@/lib/useIngestionRuns";
+import {
+  useIngestionRuns,
+  type EnrichmentQueueInfo,
+  type IngestionPhase,
+  type IngestionRun,
+} from "@/lib/useIngestionRuns";
 
 const PHASE_LABEL: Record<IngestionPhase, string> = {
   discovery: "ดึงข้อมูล (Ingestion)",
@@ -13,6 +18,8 @@ const PHASE_LABEL: Record<IngestionPhase, string> = {
 };
 
 const DAYS_PER_MONTH = 30;
+// Mirrors ENRICHMENT_MAX_CALLS_CEILING in backend ingestionController.
+const ENRICHMENT_MAX_CALLS_CEILING = 200;
 
 const SEARCH_SUGGESTIONS = [
   "ซอฟต์แวร์",
@@ -25,6 +32,71 @@ const SEARCH_SUGGESTIONS = [
   "ระบบเครือข่าย",
 ];
 
+/** Before a run: how many TORs it will analyse. During a run: "X / N" with a progress bar. */
+function EnrichmentStatus({
+  pending,
+  queue,
+  maxCalls,
+  run,
+}: {
+  pending: boolean;
+  queue: EnrichmentQueueInfo | null;
+  maxCalls: number | null;
+  run: IngestionRun | null;
+}) {
+  if (pending) {
+    const planned = run?.stats.enrichmentPlanned ?? 0;
+    // The run row appears with the first claimed job; until then there is nothing to count.
+    if (!run || planned === 0) {
+      return (
+        <p className="mt-4 text-xs text-[var(--color-text-muted)]">กำลังเตรียมคิววิเคราะห์...</p>
+      );
+    }
+    const { torsFound: done, enrichedOk, enrichedRejected, enrichedFailed } = run.stats;
+    const percent = Math.min(100, Math.round((done / planned) * 100));
+    return (
+      <div className="mt-4" aria-live="polite">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-[var(--color-text-faint)]">กำลังวิเคราะห์</span>
+          <span className="font-medium text-[var(--color-text)]">
+            {done} / {planned} รายการ
+          </span>
+        </div>
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={planned}
+          aria-valuenow={done}
+          className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-border)]"
+        >
+          <div
+            className="h-full rounded-full bg-[var(--color-ink)] transition-all"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+        <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
+          สำเร็จ {enrichedOk} · ไม่เกี่ยวกับซอฟต์แวร์ {enrichedRejected} · ล้มเหลว {enrichedFailed}
+        </p>
+      </div>
+    );
+  }
+
+  if (!queue) return null;
+  const willProcess = Math.min(queue.runnable, maxCalls ?? queue.maxCalls);
+  if (queue.runnable === 0) {
+    return (
+      <p className="mt-4 text-xs text-[var(--color-text-faint)]">ไม่มี TOR ที่รอวิเคราะห์</p>
+    );
+  }
+  return (
+    <p className="mt-4 text-xs text-[var(--color-text-muted)]">
+      พร้อมวิเคราะห์ <span className="font-semibold text-[var(--color-text)]">{willProcess}</span>{" "}
+      รายการ
+      {queue.runnable > willProcess && ` (จากที่รอทั้งหมด ${queue.runnable})`}
+    </p>
+  );
+}
+
 export default function ScraperHealth() {
   const {
     runs,
@@ -33,6 +105,7 @@ export default function ScraperHealth() {
     error: runsError,
     ingestionPending,
     enrichmentPending,
+    enrichmentQueue,
     triggerIngestion,
     triggerEnrichment,
     lastRunFor,
@@ -43,6 +116,9 @@ export default function ScraperHealth() {
   const [lookbackMonths, setLookbackMonths] = useState(1);
   const [announceAllTypes, setAnnounceAllTypes] = useState(false);
   const lookbackDays = lookbackMonths * DAYS_PER_MONTH;
+  // null = untouched, follow the backend default (MAX_AI_CALLS_PER_RUN)
+  const [enrichmentMaxCalls, setEnrichmentMaxCalls] = useState<number | null>(null);
+  const effectiveMaxCalls = enrichmentMaxCalls ?? enrichmentQueue?.maxCalls ?? null;
 
   function runIngestion() {
     triggerIngestion({
@@ -80,11 +156,16 @@ export default function ScraperHealth() {
               {
                 phase: "enrichment" as const,
                 pending: enrichmentPending,
-                onTrigger: triggerEnrichment,
+                onTrigger: () =>
+                  triggerEnrichment(
+                    enrichmentMaxCalls === null ? undefined : { maxCalls: enrichmentMaxCalls }
+                  ),
               },
             ]
           ).map(({ phase, pending, onTrigger }) => {
             const last = lastRunFor(phase);
+            const nothingQueued =
+              phase === "enrichment" && !pending && enrichmentQueue?.runnable === 0;
             return (
               <div key={phase} className="card p-5">
                 <div className="flex items-start justify-between gap-2">
@@ -193,10 +274,40 @@ export default function ScraperHealth() {
                   </div>
                 )}
 
+                {phase === "enrichment" && (
+                  <>
+                    {effectiveMaxCalls !== null && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-xs text-[var(--color-text-faint)]">
+                          <span>วิเคราะห์สูงสุดต่อรอบ</span>
+                          <span className="font-medium text-[var(--color-text)]">
+                            {effectiveMaxCalls}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={1}
+                          max={Math.max(ENRICHMENT_MAX_CALLS_CEILING, effectiveMaxCalls)}
+                          value={effectiveMaxCalls}
+                          onChange={(e) => setEnrichmentMaxCalls(Number(e.target.value))}
+                          disabled={pending}
+                          className="mt-1 w-full accent-[var(--color-ink)] disabled:opacity-60"
+                        />
+                      </div>
+                    )}
+                    <EnrichmentStatus
+                      pending={pending}
+                      queue={enrichmentQueue}
+                      maxCalls={effectiveMaxCalls}
+                      run={last?.status === "running" ? last : null}
+                    />
+                  </>
+                )}
+
                 <button
                   type="button"
                   onClick={onTrigger}
-                  disabled={pending || forbidden}
+                  disabled={pending || forbidden || nothingQueued}
                   className="btn-pill mt-4 w-full border border-[var(--color-border)] py-2 text-xs font-semibold text-[var(--color-text)] hover:border-[var(--color-ink)]/30 transition-colors disabled:opacity-60"
                 >
                   {phase === "enrichment" ? (

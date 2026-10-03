@@ -14,6 +14,8 @@ export interface IIngestionRunStats {
   enrichedOk: number;
   enrichedRejected: number;
   enrichedFailed: number;
+  /** Enrichment runs only: how many jobs this run set out to process (progress denominator). */
+  enrichmentPlanned: number;
 }
 
 export interface IIngestionRun {
@@ -71,6 +73,7 @@ const ingestionRunSchema = new Schema<IIngestionRun>(
       enrichedOk: { type: Number, default: 0 },
       enrichedRejected: { type: Number, default: 0 },
       enrichedFailed: { type: Number, default: 0 },
+      enrichmentPlanned: { type: Number, default: 0 },
     },
     outcomeSummary: { type: String },
   },

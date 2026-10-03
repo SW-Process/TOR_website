@@ -16,6 +16,15 @@ export interface IngestionRunStats {
   enrichedOk: number;
   enrichedRejected: number;
   enrichedFailed: number;
+  /** Enrichment runs: jobs this run set out to process (progress denominator). */
+  enrichmentPlanned: number;
+}
+
+/** What the next enrichment run would do (GET /api/ingestion/enrichment/pending). */
+export interface EnrichmentQueueInfo {
+  runnable: number;
+  maxCalls: number;
+  willProcess: number;
 }
 
 export interface IngestionRun {
@@ -30,7 +39,12 @@ export interface IngestionRun {
 }
 
 const POLL_INTERVAL_MS = 4000;
-const POLL_TIMEOUT_MS = 3 * 60_000;
+// Enrichment makes up to MAX_AI_CALLS_PER_RUN Gemini calls, so it needs far longer than
+// discovery. The backend sweeps a run stuck "running" after 35 min, so stop a bit past that.
+const POLL_TIMEOUT_MS: Record<IngestionPhase, number> = {
+  discovery: 3 * 60_000,
+  enrichment: 40 * 60_000,
+};
 
 /** Real admin controls for the ingestion/enrichment pipeline (FR-35, FR-36). */
 export function useIngestionRuns() {
@@ -39,8 +53,9 @@ export function useIngestionRuns() {
   const [forbidden, setForbidden] = useState(false);
   const [ingestionPending, setIngestionPending] = useState(false);
   const [enrichmentPending, setEnrichmentPending] = useState(false);
+  const [enrichmentQueue, setEnrichmentQueue] = useState<EnrichmentQueueInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimers = useRef<Partial<Record<IngestionPhase, ReturnType<typeof setInterval>>>>({});
 
   const refresh = useCallback(async () => {
     const res = await apiFetch("/api/ingestion/runs?limit=20");
@@ -54,6 +69,45 @@ export function useIngestionRuns() {
     return list;
   }, []);
 
+  const refreshEnrichmentQueue = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/ingestion/enrichment/pending");
+      if (!res.ok) return;
+      setEnrichmentQueue((await res.json()) as EnrichmentQueueInfo);
+    } catch {
+      // The count is advisory; the trigger button still works without it.
+    }
+  }, []);
+
+  const pollUntilSettled = useCallback(
+    (phase: IngestionPhase, setPending: (v: boolean) => void) => {
+      const stop = () => {
+        const timer = pollTimers.current[phase];
+        if (timer) clearInterval(timer);
+        delete pollTimers.current[phase];
+      };
+      stop();
+      const startedAt = Date.now();
+      const check = async () => {
+        try {
+          const list = await refresh();
+          const stillRunning = list.some((r) => r.phase === phase && r.status === "running");
+          if (!stillRunning || Date.now() - startedAt > POLL_TIMEOUT_MS[phase]) {
+            setPending(false);
+            stop();
+            if (phase === "enrichment") void refreshEnrichmentQueue();
+          }
+        } catch {
+          setPending(false);
+          stop();
+        }
+      };
+      void check();
+      pollTimers.current[phase] = setInterval(check, POLL_INTERVAL_MS);
+    },
+    [refresh, refreshEnrichmentQueue]
+  );
+
   useEffect(() => {
     apiFetch("/api/ingestion/runs?limit=20")
       .then(async (res) => {
@@ -64,37 +118,29 @@ export function useIngestionRuns() {
         if (!res.ok) throw new Error("failed to load ingestion runs");
         const { runs: list } = (await res.json()) as { runs: IngestionRun[] };
         setRuns(list);
+        // A run started before this page load (or by the scheduler) — pick up its progress.
+        if (list.some((r) => r.phase === "enrichment" && r.status === "running")) {
+          setEnrichmentPending(true);
+          pollUntilSettled("enrichment", setEnrichmentPending);
+        }
+        if (list.some((r) => r.phase === "discovery" && r.status === "running")) {
+          setIngestionPending(true);
+          pollUntilSettled("discovery", setIngestionPending);
+        }
       })
       .catch(() => setError("โหลดประวัติการรันไม่สำเร็จ"))
       .finally(() => setReady(true));
-  }, []);
-
-  const pollUntilSettled = useCallback(
-    (phase: IngestionPhase, setPending: (v: boolean) => void) => {
-      if (pollTimer.current) clearInterval(pollTimer.current);
-      const startedAt = Date.now();
-      const check = async () => {
-        try {
-          const list = await refresh();
-          const stillRunning = list.some((r) => r.phase === phase && r.status === "running");
-          if (!stillRunning || Date.now() - startedAt > POLL_TIMEOUT_MS) {
-            setPending(false);
-            if (pollTimer.current) clearInterval(pollTimer.current);
-          }
-        } catch {
-          setPending(false);
-          if (pollTimer.current) clearInterval(pollTimer.current);
-        }
-      };
-      void check();
-      pollTimer.current = setInterval(check, POLL_INTERVAL_MS);
-    },
-    [refresh]
-  );
+    apiFetch("/api/ingestion/enrichment/pending")
+      .then(async (res) => {
+        if (res.ok) setEnrichmentQueue((await res.json()) as EnrichmentQueueInfo);
+      })
+      .catch(() => undefined); // advisory count only
+  }, [pollUntilSettled]);
 
   useEffect(() => {
+    const timers = pollTimers.current;
     return () => {
-      if (pollTimer.current) clearInterval(pollTimer.current);
+      for (const timer of Object.values(timers)) clearInterval(timer);
     };
   }, []);
 
@@ -126,13 +172,14 @@ export function useIngestionRuns() {
     [pollUntilSettled]
   );
 
-  const triggerEnrichment = useCallback(async () => {
+  const triggerEnrichment = useCallback(async (params?: { maxCalls?: number }) => {
     setError(null);
     setEnrichmentPending(true);
     try {
       const res = await apiFetch("/api/ingestion/enrichment/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params ?? {}),
       });
       if (res.status === 401 || res.status === 403) {
         setForbidden(true);
@@ -161,6 +208,7 @@ export function useIngestionRuns() {
     error,
     ingestionPending,
     enrichmentPending,
+    enrichmentQueue,
     triggerIngestion,
     triggerEnrichment,
     lastRunFor,

@@ -179,6 +179,44 @@ describe("drainEnrichmentQueue", () => {
     expect(queued).toBe(1);
   });
 
+  it("records the planned total on the run: min(runnable, maxCalls)", async () => {
+    setStorageForTest(fakeStorage);
+    await seedTorWithJob();
+    await seedTorWithJob();
+    await seedTorWithJob();
+    const out = await drainEnrichmentQueue({ extractor: extractorReturning(result()), maxCalls: 2 });
+    const run = await IngestionRun.findById(out.runId).lean();
+    expect(run?.stats.enrichmentPlanned).toBe(2);
+    expect(run?.stats.torsFound).toBe(2);
+  });
+
+  it("persists progress counters while the run is still going", async () => {
+    setStorageForTest(fakeStorage);
+    await seedTorWithJob();
+    await seedTorWithJob();
+    const seen: { planned: number; found: number; ok: number }[] = [];
+    let call = 0;
+    const extractor: TorExtractor = {
+      id: "fake",
+      extract: async () => {
+        // On the 2nd call the 1st job has finished — its progress must be in Mongo already,
+    // and the job in flight is not yet counted as processed.
+        if (++call === 2) {
+          const run = await IngestionRun.findOne({ phase: "enrichment" }).lean();
+          seen.push({
+            planned: run!.stats.enrichmentPlanned,
+            found: run!.stats.torsFound,
+            ok: run!.stats.enrichedOk,
+          });
+          expect(run!.status).toBe("running");
+        }
+        return result();
+      },
+    };
+    await drainEnrichmentQueue({ extractor });
+    expect(seen).toEqual([{ planned: 2, found: 1, ok: 1 }]);
+  });
+
   it("completes a job whose TOR vanished", async () => {
     setStorageForTest(fakeStorage);
     const tor = await seedTorWithJob();
