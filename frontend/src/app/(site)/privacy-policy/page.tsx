@@ -118,9 +118,10 @@ export default function PrivacyPolicyPage() {
             <p className="max-w-md text-sm leading-relaxed text-[var(--color-text-muted)]">
               ติดต่อทีมงานเพื่อขอเข้าถึง แก้ไข หรือลบข้อมูลส่วนบุคคลของท่านได้ที่
             </p>
-            <span className="text-sm font-semibold text-[var(--color-rose-dark)]">
-              support@tor-insight.go.th (ตัวอย่าง)
-            </span>
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm font-semibold text-[var(--color-rose-dark)]">
+              <a href="mailto:paranyu.lion@gmail.com" className="hover:underline">paranyu.lion@gmail.com</a>
+              <a href="tel:+66933239415" className="hover:underline">โทร 093-323-9415</a>
+            </div>
           </div>
         </div>
       </div>
