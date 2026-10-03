@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { EgpAnnouncement, EgpProjectDetail, EgpSearchProject } from "../../scraper/egpClient.types";
-import { canonicalDetailHash, legacyDetailHash, mapProject } from "../mapProject";
+import { canonicalDetailHash, legacyDetailHash, mapProject, sameCoreFields } from "../mapProject";
 
 const OPTS = { fileBase: "https://egp.test/api/file", listingBase: "https://egp.test/project-detail" };
 
@@ -155,5 +155,35 @@ describe("mapProject procurement", () => {
       projectAnnouncementPath: "inv.pdf",
     };
     expect(mapProject(project, detail, [torAnn, inv], OPTS).procurement.stage).toBe("inviting");
+  });
+});
+
+describe("sameCoreFields", () => {
+  const set = mapProject(project, detail, [], OPTS).set;
+  const stored = {
+    title: set.title,
+    agency: set.agency,
+    department: set.department,
+    budget: set.budget,
+    referencePrice: set.referencePrice,
+    procurementMethod: set.procurementMethod,
+    procurementType: set.procurementType,
+    goodsCategory: set.goodsCategory,
+  };
+
+  it("is true when all eight fields match", () => {
+    expect(sameCoreFields(stored, set)).toBe(true);
+  });
+
+  it.each(Object.keys(stored))("is false when %s differs", (field) => {
+    const changed = { ...stored, [field]: typeof (stored as Record<string, unknown>)[field] === "number" ? 1 : "x" };
+    expect(sameCoreFields(changed, set)).toBe(false);
+  });
+
+  it("treats null and undefined as the same", () => {
+    expect(sameCoreFields({ ...stored, goodsCategory: undefined }, { ...set, goodsCategory: undefined })).toBe(true);
+    expect(
+      sameCoreFields({ ...stored, goodsCategory: null as unknown as undefined }, { ...set, goodsCategory: undefined })
+    ).toBe(true);
   });
 });

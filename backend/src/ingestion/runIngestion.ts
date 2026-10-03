@@ -4,7 +4,7 @@ import { EgpClient, egpConfigFromEnv, listingUrl } from "../scraper/egpClient";
 import { TOR_TYPE_ID, type EgpClientLike } from "../scraper/egpClient.types";
 import { getStorage } from "../storage";
 import type { BlobStorage } from "../storage/storage.types";
-import { mapProject } from "./mapProject";
+import { mapProject, sameCoreFields } from "./mapProject";
 import { mergeProcurement } from "./procurementStage";
 import { fetchAndStoreTorPdf } from "./fetchAndStoreTorPdf";
 import { logIngestionEvent } from "./log";
@@ -103,12 +103,15 @@ async function processProject(
     created = true;
     stats.torsCreated += 1;
   } else {
-    // A hash stored before procurement stages existed also covered the contract status. When
-    // that is the only difference, adopt the new hash quietly instead of calling it a change
-    // (which would re-download the PDF and re-run AI enrichment).
+    // A hash stored before procurement stages existed also covered the contract status. Adopt
+    // the new hash quietly (no update, PDF fetch or AI enqueue) when either:
+    //  (i) the stored hash equals the legacy hash of the fresh detail (nothing at all changed), or
+    //  (ii) the Tor is legacy-era (never sighted under the new code: no `procurement`) and every
+    //       hashed core field is unchanged, so the only possible difference is contract status.
     if (
-      tor.sourceContentHash === mapped.legacySourceContentHash &&
-      tor.sourceContentHash !== mapped.sourceContentHash
+      tor.sourceContentHash !== mapped.sourceContentHash &&
+      (tor.sourceContentHash === mapped.legacySourceContentHash ||
+        (!tor.procurement && sameCoreFields(tor, mapped.set)))
     ) {
       tor.sourceContentHash = mapped.sourceContentHash;
     }

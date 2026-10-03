@@ -253,6 +253,7 @@ describe("runIngestion", () => {
         storage: fakeStorage(),
         parse,
         enqueueEnrichment: jest.fn(),
+        now: () => new Date("2026-10-03T00:00:00Z"),
       })
     ).done;
 
@@ -260,7 +261,7 @@ describe("runIngestion", () => {
     expect(t?.procurement?.stage).toBe("inviting");
     expect(t?.procurement?.contractStatus).toBe("ระหว่างดำเนินการ");
     expect(t?.procurement?.announcements.map((a) => a.kind)).toEqual(["tor-draft", "invitation"]);
-    expect(t?.procurement?.lastCheckedAt).toBeInstanceOf(Date);
+    expect(t?.procurement?.lastCheckedAt).toEqual(new Date("2026-10-03T00:00:00Z"));
   });
 
   it("a contract-status change refreshes procurement but is not an update and does not re-enqueue", async () => {
@@ -354,6 +355,63 @@ describe("runIngestion", () => {
     expect(t?.procurement?.bidDeadline?.date).toEqual(new Date("2026-10-20T00:00:00Z"));
     expect(t?.procurement?.announcements[0]?.storageKey).toBe("tor-pdfs/69000000001/ann-p-1.pdf");
     expect(t?.procurement?.contractStatus).toBe("ส่งงานครบถ้วน");
+  });
+
+  describe("legacy-era Tor whose contract status moved before its first new-code sighting", () => {
+    async function seedLegacy(enqueue: jest.Mock, deps: object) {
+      await (await runIngestion(baseOpts, { ...deps, client: fakeClient() })).done;
+      expect(enqueue).toHaveBeenCalledTimes(2);
+      for (const p of projects) {
+        await Tor.updateOne(
+          { projectCode: p.projectNumber },
+          {
+            sourceContentHash: legacyDetailHash(detailFor(`โครงการ ${p.projectNumber}`, "ระหว่างดำเนินการ")),
+            $unset: { procurement: 1 },
+          }
+        );
+      }
+      enqueue.mockClear();
+    }
+
+    it("adopts the new hash quietly and stores procurement", async () => {
+      const enqueue = jest.fn();
+      const deps = { storage: fakeStorage(), parse, enqueueEnrichment: enqueue };
+      await seedLegacy(enqueue, deps);
+
+      const { runId, done } = await runIngestion(baseOpts, {
+        ...deps,
+        client: fakeClient({ contractStatus: "ส่งงานครบถ้วน" }),
+      });
+      await done;
+
+      const run = await IngestionRun.findById(runId).lean();
+      expect(run?.stats).toMatchObject({ torsUpdated: 0, torsUnchanged: 2 });
+      expect(enqueue).not.toHaveBeenCalled();
+      for (const p of projects) {
+        const t = await Tor.findOne({ projectCode: p.projectNumber }).lean();
+        expect(t?.sourceContentHash).toBe(canonicalDetailHash(detailFor(`โครงการ ${p.projectNumber}`)));
+        expect(t?.procurement?.contractStatus).toBe("ส่งงานครบถ้วน");
+      }
+    });
+
+    it("still updates and enqueues when the e-GP title also changed", async () => {
+      const enqueue = jest.fn();
+      const deps = { storage: fakeStorage(), parse, enqueueEnrichment: enqueue };
+      await seedLegacy(enqueue, deps);
+
+      const { runId, done } = await runIngestion(baseOpts, {
+        ...deps,
+        client: fakeClient({
+          contractStatus: "ส่งงานครบถ้วน",
+          detailNames: { "p-1": "โครงการ 69000000001 (แก้ไข)" },
+        }),
+      });
+      await done;
+
+      const run = await IngestionRun.findById(runId).lean();
+      expect(run?.stats).toMatchObject({ torsUpdated: 1, torsUnchanged: 1 });
+      expect(enqueue).toHaveBeenCalledTimes(1);
+    });
   });
 });
 

@@ -71,6 +71,34 @@ export function legacyDetailHash(detail: EgpProjectDetail): string {
   return sha256OfFields([...coreDetailFields(detail), detail.masterContractAvailableName]);
 }
 
+type CoreFields = Pick<
+  MappedProjectSet,
+  | "title"
+  | "agency"
+  | "department"
+  | "budget"
+  | "referencePrice"
+  | "procurementMethod"
+  | "procurementType"
+  | "goodsCategory"
+>;
+
+const CORE_KEYS: (keyof CoreFields)[] = [
+  "title",
+  "agency",
+  "department",
+  "budget",
+  "referencePrice",
+  "procurementMethod",
+  "procurementType",
+  "goodsCategory",
+];
+
+/** True when the stored Tor and the freshly mapped set agree on every hashed field (null == undefined). */
+export function sameCoreFields(stored: Partial<CoreFields>, set: MappedProjectSet): boolean {
+  return CORE_KEYS.every((k) => (stored[k] ?? null) === (set[k] ?? null));
+}
+
 function optionalString(value: string | null | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
