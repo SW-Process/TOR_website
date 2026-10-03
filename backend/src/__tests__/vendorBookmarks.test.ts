@@ -69,8 +69,22 @@ describe("/api/vendor/bookmarks", () => {
     expect(list.body.data[0]).toMatchObject({
       torId: a,
       applicationStatus: "preparing",
-      tor: { _id: a, title: "ระบบสารบรรณ", agency: "สำนักการแพทย์" },
+      tor: { _id: a, title: "ระบบสารบรรณ", agency: "สำนักการแพทย์", displayStatus: "draft" },
     });
+  });
+
+  it("returns a bookmarked TOR's real status, e.g. awarded", async () => {
+    const tor = await Tor.create({
+      title: "ได้ผู้ชนะแล้ว",
+      pipelineStatus: "enriched",
+      procurement: { stage: "awarded", announcements: [], lastCheckedAt: new Date() },
+    });
+    const agent = await vendorAgent();
+    await agent.put(`/api/vendor/bookmarks/${tor.id}`);
+    const list = await agent.get("/api/vendor/bookmarks");
+    const row = list.body.data.find((b: { torId: string }) => b.torId === tor.id);
+    expect(row.tor.displayStatus).toBe("awarded");
+    expect(row.tor.procurement.stage).toBe("awarded");
   });
 
   it("persists application status changes (FR-31)", async () => {

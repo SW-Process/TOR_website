@@ -3,13 +3,14 @@ import { isValidObjectId } from "mongoose";
 import { z } from "zod";
 import { Bookmark, Tor } from "../models";
 import { httpError } from "../utils/httpError";
+import { withDisplayStatus } from "../utils/torStatus";
 import { loadOrCreateProfile } from "./vendorProfileController";
 
 const APPLICATION_STATUSES = ["interested", "preparing", "submitted", "missed"] as const;
 
 // Same public fields the TOR list exposes (torController LIST_PROJECTION).
 const TOR_PROJECTION =
-  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl";
+  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt";
 
 const updateSchema = z
   .object({
@@ -69,7 +70,7 @@ export async function listBookmarks(req: Request, res: Response): Promise<void> 
 
   const data = bookmarks.flatMap((b) => {
     const tor = torById.get(String(b.torId));
-    return tor ? [{ ...serialize(b), tor }] : [];
+    return tor ? [{ ...serialize(b), tor: withDisplayStatus(tor) }] : [];
   });
   res.status(200).json({ data });
 }
