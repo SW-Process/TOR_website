@@ -2,7 +2,7 @@ import { Schema, model, type Types } from "mongoose";
 
 export type IngestionTrigger = "scheduled" | "manual";
 export type IngestionStatus = "running" | "success" | "partial" | "failed";
-export type IngestionPhase = "discovery" | "enrichment";
+export type IngestionPhase = "discovery" | "enrichment" | "lifecycle";
 
 export interface IIngestionRunStats {
   torsFound: number;
@@ -45,7 +45,7 @@ const ingestionRunSchema = new Schema<IIngestionRun>(
     },
     phase: {
       type: String,
-      enum: ["discovery", "enrichment"],
+      enum: ["discovery", "enrichment", "lifecycle"],
       default: "discovery",
       index: true,
     },
