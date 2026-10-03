@@ -112,10 +112,17 @@ meaning or retired in favour of `bidDeadline`.
   logged (`SystemLog`, source `ingestion`) and retried on the next run (their
   `lastCheckedAt` does not advance). Stale `running` rows are swept as for
   enrichment (generalise `sweepStaleEnrichmentRuns`).
-- **Hash fix in discovery:** remove `masterContractAvailableName` from
-  `canonicalDetailHash`, with a one-time migration script that recomputes stored
-  hashes **without** enqueueing jobs. Without the migration every existing TOR
-  would be re-enriched on its next sighting.
+- **Hash fix in discovery:** `canonicalDetailHash` no longer includes
+  `masterContractAvailableName`. Instead of a one-time migration script, discovery
+  adopts the new hash lazily when it sees a TOR again, writing it silently and counting
+  the TOR as unchanged (no PDF re-download, no enrichment) in two cases: (i) the stored
+  hash equals `legacyDetailHash` (the old hash, which still includes contract status) of
+  the freshly fetched detail; or (ii) the TOR is legacy-era (has no `procurement` yet)
+  and its stored core fields (title, agency, department, budget, reference price,
+  method, type, goods category) equal the fresh ones, so the only possible difference is
+  the contract status. This is robust to admin edits: an admin-edited legacy TOR simply
+  falls through to the normal update path, as it did before. A script recomputing
+  hashes from stored fields would have mis-hashed such TORs.
 
 ### 3. Real bid deadline from the invitation
 
@@ -159,7 +166,7 @@ Each step is independently shippable and gets its own PR:
 - Refresh job against a fake `EgpClientLike`: updates `procurement`, respects the
   cap and ordering, never touches the hash or enqueues full enrichment, logs
   failures without advancing `lastCheckedAt`.
-- Hash migration: hashes recomputed, no jobs enqueued.
+- Legacy-hash adoption: unchanged detail, or contract-status-only drift on a legacy-era TOR → no update and no enqueue; genuine change → still an update.
 - Deadline extraction with a fake extractor: stored once per invitation id,
   admin value wins, unreadable PDF leaves it empty.
 - API: new fields, status computation at the 7-day boundary, stage filter.

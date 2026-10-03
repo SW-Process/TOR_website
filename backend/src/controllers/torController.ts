@@ -270,7 +270,7 @@ export async function listTechnologies(_req: Request, res: Response): Promise<vo
 export async function getTor(req: Request, res: Response): Promise<void> {
   const tor = await Tor.findOne({ _id: req.params.id, pipelineStatus: "enriched" })
     .select(
-      "-sourceContentHash -classification -ingestionRunId -__v -sourceDocument.storageKey -sourceDocument.sha256"
+      "-sourceContentHash -classification -ingestionRunId -__v -sourceDocument.storageKey -sourceDocument.sha256 -procurement.announcements.storageKey"
     )
     .lean();
   if (!tor) throw httpError(404, "TOR not found");
