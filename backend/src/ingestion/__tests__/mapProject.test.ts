@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import type { EgpAnnouncement, EgpProjectDetail, EgpSearchProject } from "../../scraper/egpClient.types";
-import { canonicalDetailHash, mapProject } from "../mapProject";
+import { canonicalDetailHash, legacyDetailHash, mapProject } from "../mapProject";
 
 const OPTS = { fileBase: "https://egp.test/api/file", listingBase: "https://egp.test/project-detail" };
 
@@ -96,5 +97,63 @@ describe("canonicalDetailHash", () => {
     );
     expect(canonicalDetailHash(reordered)).toBe(a);
     expect(canonicalDetailHash({ ...detail, projectBudget: 1 })).not.toBe(a);
+  });
+});
+
+describe("source content hash and contract status", () => {
+  it("canonicalDetailHash ignores the contract status", () => {
+    expect(canonicalDetailHash({ ...detail, masterContractAvailableName: "ส่งงานครบถ้วน" })).toBe(
+      canonicalDetailHash(detail)
+    );
+    expect(canonicalDetailHash({ ...detail, masterContractAvailableName: null })).toBe(canonicalDetailHash(detail));
+  });
+
+  it("legacyDetailHash is exactly the pre-change hash and does depend on contract status", () => {
+    const oldHash = createHash("sha256")
+      .update(
+        JSON.stringify([
+          detail.projectName,
+          detail.masterOrgGroupName,
+          detail.masterOrgDepartmentName,
+          detail.projectBudget,
+          detail.projectAverageBudget,
+          detail.masterMethodIdName,
+          detail.masterTypeIdName,
+          detail.masterGoodsIdName,
+          detail.masterContractAvailableName,
+        ])
+      )
+      .digest("hex");
+    expect(legacyDetailHash(detail)).toBe(oldHash);
+    expect(legacyDetailHash({ ...detail, masterContractAvailableName: "ส่งงานครบถ้วน" })).not.toBe(oldHash);
+  });
+
+  it("mapProject exposes both hashes", () => {
+    const m = mapProject(project, detail, [torAnn], OPTS);
+    expect(m.sourceContentHash).toBe(canonicalDetailHash(detail));
+    expect(m.legacySourceContentHash).toBe(legacyDetailHash(detail));
+    expect(m.sourceContentHash).not.toBe(m.legacySourceContentHash);
+  });
+});
+
+describe("mapProject procurement", () => {
+  const NOW = new Date("2026-10-03T00:00:00Z");
+
+  it("builds the procurement payload from the announcements and contract status", () => {
+    const m = mapProject(project, detail, [priceAnn, torAnn], { ...OPTS, now: NOW });
+    expect(m.procurement.stage).toBe("draft");
+    expect(m.procurement.contractStatus).toBe("ระหว่างดำเนินการ");
+    expect(m.procurement.lastCheckedAt).toBe(NOW);
+    expect(m.procurement.announcements.map((a) => a.kind)).toEqual(["tor-draft", "reference-price"]);
+  });
+
+  it("reflects an invitation in the stage", () => {
+    const inv: EgpAnnouncement = {
+      id: "ann-inv",
+      masterAnnounceTypeName: "ประกาศเชิญชวน",
+      projectAnnouncementPublishDate: "2026-09-10T00:00:00Z",
+      projectAnnouncementPath: "inv.pdf",
+    };
+    expect(mapProject(project, detail, [torAnn, inv], OPTS).procurement.stage).toBe("inviting");
   });
 });
