@@ -41,7 +41,7 @@ function detailFor(name: string, contractStatus = "ระหว่างดำ�
     projectAverageBudget: 950_000,
     masterMethodIdName: "ประกวดราคา",
     masterTypeIdName: "จ้าง",
-    masterGoodsIdName: "งานจ้างพัฒนาระบบ",
+    masterGoodsIdName: "งานจ้างพัฒนาซอฟต์แวร์",
     masterContractAvailableName: contractStatus,
   };
 }
@@ -267,6 +267,7 @@ describe("runIngestion", () => {
     const enqueue = jest.fn();
     const deps = { storage: fakeStorage(), parse, enqueueEnrichment: enqueue };
     await (await runIngestion(baseOpts, { ...deps, client: fakeClient() })).done;
+    expect(enqueue).toHaveBeenCalledTimes(2);
     enqueue.mockClear();
 
     const { runId, done } = await runIngestion(baseOpts, {
@@ -292,6 +293,7 @@ describe("runIngestion", () => {
         { sourceContentHash: legacyDetailHash(detailFor(`โครงการ ${p.projectNumber}`)) }
       );
     }
+    expect(enqueue).toHaveBeenCalledTimes(2);
     enqueue.mockClear();
 
     const { runId, done } = await runIngestion(baseOpts, deps);
@@ -314,11 +316,12 @@ describe("runIngestion", () => {
       { projectCode: "69000000001" },
       { sourceContentHash: legacyDetailHash(detailFor("โครงการ 69000000001")) }
     );
+    expect(enqueue).toHaveBeenCalledTimes(2);
     enqueue.mockClear();
 
     const { runId, done } = await runIngestion(baseOpts, {
       ...deps,
-      client: fakeClient({ detailNames: { "p-1": "โครงการ 69000000001 ซอฟต์แวร์ (แก้ไข)" } }),
+      client: fakeClient({ detailNames: { "p-1": "โครงการ 69000000001 (แก้ไข)" } }),
     });
     await done;
 
