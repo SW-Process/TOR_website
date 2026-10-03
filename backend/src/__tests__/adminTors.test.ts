@@ -137,4 +137,28 @@ describe("/api/admin/tors", () => {
     expect((await Tor.findById(flagged).lean())!.pipelineStatus).toBe("rejected");
     expect((await admin.delete(`/api/admin/tors/${flagged}`)).status).toBe(404);
   });
+
+  it("labels rows with their real status and filters by it; a manual close wins", async () => {
+    const stage = (s: string) => ({ stage: s, announcements: [], lastCheckedAt: new Date() });
+    const [awarded, manuallyClosed] = await Tor.insertMany([
+      { title: "ได้ผู้ชนะแล้ว", pipelineStatus: "enriched", procurement: stage("awarded") },
+      { title: "ปิดโดยแอดมิน", pipelineStatus: "enriched", status: "closed", procurement: stage("awarded") },
+    ]);
+    const admin = await agentWithRole("admin");
+
+    const all = await admin.get("/api/admin/tors?pageSize=100");
+    const byTitle = Object.fromEntries(
+      all.body.data.map((t: { title: string; displayStatus: string }) => [t.title, t.displayStatus])
+    );
+    expect(byTitle["ได้ผู้ชนะแล้ว"]).toBe("awarded");
+    expect(byTitle["ปิดโดยแอดมิน"]).toBe("closed");
+
+    const onlyAwarded = await admin.get("/api/admin/tors?status=awarded");
+    expect(onlyAwarded.body.data.map((t: { _id: string }) => t._id)).toContain(String(awarded!._id));
+    expect(onlyAwarded.body.data.map((t: { _id: string }) => t._id)).not.toContain(String(manuallyClosed!._id));
+
+    const patched = await admin.patch(`/api/admin/tors/${awarded!._id}`).send({ status: "closed" });
+    expect(patched.status).toBe(200);
+    expect(patched.body.tor.displayStatus).toBe("closed");
+  });
 });

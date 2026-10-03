@@ -6,6 +6,7 @@ import { Tor } from "../models";
 import type { ITor } from "../models";
 import { TAXONOMY } from "../config/taxonomy";
 import { httpError } from "../utils/httpError";
+import { withDisplayStatus, type StatusInput } from "../utils/torStatus";
 import { DEFAULT_ORDER, LIST_PROJECTION, buildFilter, parseQuery, sortStages } from "./torController";
 
 /**
@@ -51,7 +52,7 @@ export async function listAdminTors(req: Request, res: Response): Promise<void> 
   ]);
   const totalCount = result?.meta[0]?.totalCount ?? 0;
   res.status(200).json({
-    data: result?.data ?? [],
+    data: (result?.data ?? []).map((row) => withDisplayStatus(row as StatusInput)),
     page: q.page,
     pageSize: q.pageSize,
     totalCount,
@@ -101,7 +102,7 @@ export async function updateAdminTor(req: Request, res: Response): Promise<void>
   await tor.save();
 
   const saved = await Tor.findById(id).select(ADMIN_PROJECT_STAGE).lean();
-  res.status(200).json({ tor: saved });
+  res.status(200).json({ tor: saved ? withDisplayStatus(saved) : saved });
 }
 
 /**
