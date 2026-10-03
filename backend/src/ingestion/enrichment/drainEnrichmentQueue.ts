@@ -159,6 +159,7 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
         }
         await tor.save().catch(() => undefined);
         await logIngestionEvent({
+          source: "ai-pipeline",
           severity: "error",
           message: `enrichment ${terminal ? "failed" : "errored (will retry)"} for TOR ${
             tor.projectCode ?? tor.id
@@ -187,6 +188,7 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
     activeRun.outcomeSummary = `claimed ${claimed}, ok ${enrichedOk}, rejected ${enrichedRejected}, failed ${enrichedFailed}`;
     await activeRun.save();
     await logIngestionEvent({
+      source: "ai-pipeline",
       severity: "info",
       message: activeRun.outcomeSummary,
       component: "drainEnrichmentQueue",
@@ -201,6 +203,7 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
       activeRun.outcomeSummary = `enrichment aborted: ${(fatal as Error).message}`;
       await activeRun.save();
       await logIngestionEvent({
+        source: "ai-pipeline",
         severity: "error",
         message: activeRun.outcomeSummary,
         component: "drainEnrichmentQueue",

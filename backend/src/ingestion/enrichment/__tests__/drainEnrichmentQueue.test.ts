@@ -2,7 +2,7 @@
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 import { Readable } from "node:stream";
-import { Tor, EnrichmentJob, IngestionRun } from "../../../models";
+import { Tor, EnrichmentJob, IngestionRun, SystemLog } from "../../../models";
 import { enqueue } from "../enrichmentJobRepo";
 import { drainEnrichmentQueue } from "../drainEnrichmentQueue";
 import type { TorExtractor, TorExtractionResult } from "../torExtractor";
@@ -12,7 +12,7 @@ let mongod: MongoMemoryServer;
 beforeAll(async () => { mongod = await MongoMemoryServer.create(); await mongoose.connect(mongod.getUri()); await EnrichmentJob.init(); });
 afterAll(async () => { await mongoose.disconnect(); await mongod.stop(); });
 afterEach(async () => {
-  await Promise.all([Tor.deleteMany({}), EnrichmentJob.deleteMany({}), IngestionRun.deleteMany({})]);
+  await Promise.all([Tor.deleteMany({}), EnrichmentJob.deleteMany({}), IngestionRun.deleteMany({}), SystemLog.deleteMany({})]);
   setStorageForTest(null);
 });
 
@@ -130,6 +130,20 @@ describe("drainEnrichmentQueue", () => {
     const run = await IngestionRun.findById(out.runId).lean();
     expect(run?.status).toBe("success"); // no terminal failures this run
     expect(run?.stats.enrichmentRetried).toBe(1); // but visible as a retry, not silently dropped
+  });
+
+  it("files its logs under source ai-pipeline, not ingestion", async () => {
+    setStorageForTest(fakeStorage);
+    await seedTorWithJob();
+    await seedTorWithJob();
+    // first TOR errors (transient), second succeeds -> a component log + the run summary
+    await drainEnrichmentQueue({ extractor: extractorReturning(new Error("boom"), result()) });
+    const logs = await SystemLog.find({}).lean();
+    expect(logs.length).toBeGreaterThanOrEqual(2);
+    expect(logs.every((l) => l.source === "ai-pipeline")).toBe(true);
+    expect(logs.map((l) => l.component)).toEqual(
+      expect.arrayContaining(["classifier.gemini", "drainEnrichmentQueue"])
+    );
   });
 
   it("writes no IngestionRun row when the queue is empty", async () => {

@@ -76,4 +76,42 @@ describe("GET /api/admin/logs", () => {
 
     expect((await admin.get("/api/admin/logs?severity=debug")).status).toBe(400);
   });
+
+  describe("date range (FR-38)", () => {
+    const at = (min: number) => new Date(Date.UTC(2026, 8, 30, 12, min)).toISOString();
+    const msgs = async (qs: string) =>
+      (await (await adminAgent()).get(`/api/admin/logs?${qs}`)).body.data.map(
+        (l: { message: string }) => l.message
+      );
+
+    it("filters by from/to, inclusive at both ends", async () => {
+      await seed();
+      expect(await msgs(`from=${at(1)}`)).toEqual(["low confidence", "PDF download failed (a+b)"]);
+      expect(await msgs(`to=${at(1)}`)).toEqual(["PDF download failed (a+b)", "run started"]);
+      expect(await msgs(`from=${at(1)}&to=${at(1)}`)).toEqual(["PDF download failed (a+b)"]);
+    });
+
+    it("returns nothing for a range with no logs", async () => {
+      await seed();
+      expect(await msgs("from=2020-01-01T00:00:00Z&to=2020-01-02T00:00:00Z")).toEqual([]);
+    });
+
+    it("applies the range to the severity counts and the total too", async () => {
+      await seed();
+      const res = await (await adminAgent()).get(`/api/admin/logs?from=${at(1)}`);
+      expect(res.body.counts).toEqual({ info: 0, warning: 1, error: 1 });
+      expect(res.body.totalCount).toBe(2);
+    });
+
+    it("composes with the other filters", async () => {
+      await seed();
+      expect(await msgs(`from=${at(1)}&source=ai-pipeline`)).toEqual(["low confidence"]);
+    });
+
+    it("400 for an unparseable date or an inverted range", async () => {
+      const admin = await adminAgent();
+      expect((await admin.get("/api/admin/logs?from=yesterday")).status).toBe(400);
+      expect((await admin.get(`/api/admin/logs?from=${at(2)}&to=${at(0)}`)).status).toBe(400);
+    });
+  });
 });
