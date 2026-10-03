@@ -88,8 +88,8 @@ Mongo lease and runs one Gemini (`@google/genai`, Vertex) multimodal call per TO
 that classifies software-relatedness, writes `aiSummary` + scalar fields, and sets
 `category` from `config/taxonomy.ts`. `Tor.pipelineStatus` gates the public read
 API (`GET /api/tors`, `/:id`, `/price-stats`) to `"enriched"` rows only. Extraction
-is behind the `TorExtractor` seam (`EXTRACTOR` env). Deploy: two Cloud Run Jobs on
-Cloud Scheduler — see `docs/deployment/gcp.md`.
+is behind the `TorExtractor` seam (`EXTRACTOR` env). Deploy: Cloud Run Jobs on
+Cloud Scheduler (discovery, enrichment, lifecycle) — see `docs/deployment/gcp.md`.
 
 ### Lifecycle refresh (`backend/src/ingestion/lifecycle/`)
 `Tor.procurement` (stage `draft|inviting|awarded|cancelled`, announcements, contract

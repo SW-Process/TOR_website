@@ -114,11 +114,11 @@ gcloud run jobs deploy tor-lifecycle \
   --command node --args dist/jobs/lifecycle.js --max-retries 0 --task-timeout 1800s --memory 512Mi
 ```
 
-> Both commands use gcloud's alternate-delimiter form `--set-env-vars "^::^k=v::k=v..."`
+> All the job commands use gcloud's alternate-delimiter form `--set-env-vars "^::^k=v::k=v..."`
 > because `INGEST_AGENCIES` is itself a comma-separated list: with the default separator
 > gcloud would read each agency name after the first as its own `key=value` pair and
 > reject the command. `::` is the separator here (no value contains it); the
-> `tor-enrichment` command uses the same form for consistency even though none of its
+> `tor-enrichment` and `tor-lifecycle` commands use the same form for consistency even though none of their
 > values contain a comma.
 
 ## Schedules (cadence lives here — change with `gcloud scheduler jobs update`, no redeploy)
@@ -140,8 +140,9 @@ gcloud scheduler jobs create http tor-enrichment-cron --location asia-southeast1
   --http-method POST \
   --oauth-service-account-email tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com
 
+# daily at 02:30 Bangkok time (19:30 UTC) — offset from the hourly discovery cron, which fires at minute 0
 gcloud scheduler jobs create http tor-lifecycle-cron --location asia-southeast1 \
-  --schedule "0 19 * * *" \
+  --schedule "30 19 * * *" \
   --uri "https://<REGION>-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/<PROJECT>/jobs/tor-lifecycle:run" \
   --http-method POST \
   --oauth-service-account-email tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com

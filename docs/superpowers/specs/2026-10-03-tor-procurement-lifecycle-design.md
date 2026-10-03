@@ -183,6 +183,32 @@ Each step is independently shippable and gets its own PR:
   sample before finalising `kind` normalisation.
 - Whether the e-GP sample (unfiltered by announce type) matches the TOR-draft
   population the system actually ingests.
-- A TOR that fails every run keeps its old `lastCheckedAt`, so it stays at the front of
-  the queue and takes one slot of the daily cap. Harmless for a few permanent failures;
-  if many accumulate, order by a separate `procurement.lastAttemptAt`.
+- A TOR that fails every run, or is skipped every run because its listing URL has no
+  recoverable e-GP project id, keeps its old `lastCheckedAt`, so it stays at the front of
+  the queue and takes one slot of the daily cap (and, for skips, writes a warning every
+  day). Harmless for a few permanent cases; if many accumulate, order by a separate
+  `procurement.lastAttemptAt`.
+- **Before step 4 (must):** both writers of `procurement` — the lifecycle refresh
+  (targeted `$set` of `procurement.stage|announcements|lastCheckedAt|contractStatus`) and
+  discovery (`runIngestion` saves the whole subdocument via `mergeProcurement`) — work from
+  a read taken before slow e-GP calls, with no precondition on the write. That is harmless
+  today because neither sets `storageKey` or `bidDeadline`, but once step 4 writes
+  `storageKey`/`bidDeadline` a concurrent writer can silently drop them. Step 4 must add an
+  optimistic precondition to both writers (e.g. `{ procurement: null }` /
+  `{ "procurement.lastCheckedAt": <value read> }` on the refresh, and per-path `$set` or the
+  same precondition on discovery's write) and treat `matchedCount === 0` as retry/skip.
+- `refreshLifecycle` records a fatal abort (or a run where every TOR fails) as an
+  `IngestionRun` with `status: "failed"` but returns normally, so the Cloud Run job exits
+  0 and Cloud Run shows success. Either expose the run status in the result and set
+  `process.exitCode = 1` in `jobs/lifecycle.ts`, or alert on a failed lifecycle run.
+- The stale-run sweep thresholds (10 min idle, 35 min total) are not scaled to the lifecycle
+  cap: with the e-GP client's worst-case retries one TOR can take longer than the idle
+  threshold, and a 300-TOR manual run can exceed 35 minutes. A healthy-but-slow run can then be
+  swept as `failed` (and a second manual run started) until it finishes and overwrites the
+  status. Use a lifecycle-specific threshold scaled to the cap, or a heartbeat inside the
+  retry loop.
+- Manual discovery (`POST /api/ingestion/runs`) returns 409 whenever *any* run is `running`
+  (its guard is not scoped to the discovery phase), so a running lifecycle or enrichment run
+  blocks it, and the admin UI clears its pending state without a message. Scope the guard to
+  `phase: "discovery"` or show a message on 409. Related: the UI's first poll can run
+  before the new run row exists and stop showing "pending"; add a short grace period.
