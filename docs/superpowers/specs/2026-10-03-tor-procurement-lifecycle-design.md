@@ -108,7 +108,9 @@ meaning or retired in favour of `bidDeadline`.
   costs two e-GP requests through the existing polite `EgpClient`.
 - Updates `procurement` only. It must **not** modify `sourceContentHash` and must
   **not** enqueue full enrichment.
-- Recorded as an `IngestionRun` with `phase: "lifecycle"`; per-TOR failures are
+- Recorded as an `IngestionRun` with `phase: "lifecycle"` (stats reuse existing fields:
+  `torsFound` = selected, `torsUpdated` = procurement changed, plus `torsUnchanged`,
+  `torsSkipped`, `torsFailed`); per-TOR failures are
   logged (`SystemLog`, source `ingestion`) and retried on the next run (their
   `lastCheckedAt` does not advance). Stale `running` rows are swept as for
   enrichment (generalise `sweepStaleEnrichmentRuns`).
@@ -181,3 +183,6 @@ Each step is independently shippable and gets its own PR:
   sample before finalising `kind` normalisation.
 - Whether the e-GP sample (unfiltered by announce type) matches the TOR-draft
   population the system actually ingests.
+- A TOR that fails every run keeps its old `lastCheckedAt`, so it stays at the front of
+  the queue and takes one slot of the daily cap. Harmless for a few permanent failures;
+  if many accumulate, order by a separate `procurement.lastAttemptAt`.
