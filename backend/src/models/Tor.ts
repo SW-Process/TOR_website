@@ -5,6 +5,20 @@ export type TorStatus = "open" | "closing_soon" | "closed";
 export type SourceTextLayer = "digital" | "scanned" | "unreadable" | "missing";
 export type TorPipelineStatus = "pending" | "processing" | "enriched" | "rejected" | "failed";
 
+export type ProcurementStage = "draft" | "inviting" | "awarded" | "cancelled";
+
+export const ANNOUNCEMENT_KINDS = [
+  "tor-draft",
+  "bidding-draft",
+  "reference-price",
+  "invitation",
+  "cancellation",
+  "winner",
+  "plan",
+  "unknown",
+] as const;
+export type AnnouncementKind = (typeof ANNOUNCEMENT_KINDS)[number];
+
 export interface IClassification {
   isSoftwareRelated: boolean;
   reason: string;
@@ -22,6 +36,31 @@ export interface ISourceDocument {
   byteSize: number | null;
   sha256: string | null;
   fetchedAt: Date;
+}
+
+export interface IProcurementAnnouncement {
+  announcementId: string;
+  typeName?: string;
+  kind: AnnouncementKind;
+  publishedAt?: Date;
+  hasFile: boolean;
+  /** Our stored copy's blob key. Internal — never exposed publicly. */
+  storageKey?: string | null;
+}
+
+export interface IBidDeadline {
+  date: Date;
+  source: "invitation-pdf" | "admin";
+  extractedAt: Date;
+}
+
+export interface IProcurement {
+  stage: ProcurementStage;
+  /** Raw e-GP contract status, e.g. "ระหว่างดำเนินการ". */
+  contractStatus?: string;
+  announcements: IProcurementAnnouncement[];
+  bidDeadline?: IBidDeadline | null;
+  lastCheckedAt: Date;
 }
 
 export interface IEvaluationCriterion {
@@ -68,6 +107,7 @@ export interface ITor {
   goodsCategory?: string;
   sourceContentHash?: string;
   sourceDocument?: ISourceDocument | null;
+  procurement?: IProcurement | null;
   agency?: string;
   department?: string;
   projectCode?: string;
@@ -178,6 +218,42 @@ const classificationSchema = new Schema<IClassification>(
 );
 
 /**
+ * procurement — where the project sits in the e-GP procurement lifecycle, derived from its
+ * announcements and contract status. Always fetched with the TOR.
+ */
+const procurementAnnouncementSchema = new Schema<IProcurementAnnouncement>(
+  {
+    announcementId: { type: String, required: true },
+    typeName: { type: String },
+    kind: { type: String, enum: ANNOUNCEMENT_KINDS, required: true },
+    publishedAt: { type: Date },
+    hasFile: { type: Boolean, default: false },
+    storageKey: { type: String, default: null },
+  },
+  { _id: false }
+);
+
+const bidDeadlineSchema = new Schema<IBidDeadline>(
+  {
+    date: { type: Date, required: true },
+    source: { type: String, enum: ["invitation-pdf", "admin"], required: true },
+    extractedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const procurementSchema = new Schema<IProcurement>(
+  {
+    stage: { type: String, enum: ["draft", "inviting", "awarded", "cancelled"], required: true },
+    contractStatus: { type: String },
+    announcements: { type: [procurementAnnouncementSchema], default: [] },
+    bidDeadline: { type: bidDeadlineSchema, default: null },
+    lastCheckedAt: { type: Date, required: true },
+  },
+  { _id: false }
+);
+
+/**
  * tors — the central entity.
  */
 const torSchema = new Schema<ITor>(
@@ -195,6 +271,7 @@ const torSchema = new Schema<ITor>(
     // sha256 of the canonicalised e-GP detail JSON — drives create vs update vs unchanged
     sourceContentHash: { type: String, index: true },
     sourceDocument: { type: sourceDocumentSchema, default: null },
+    procurement: { type: procurementSchema, default: null },
     agency: { type: String, index: true },
     department: { type: String },
     // stable identifier from the source system (e.g. e-GP project code)
@@ -242,6 +319,10 @@ torSchema.index({ category: 1, announcementDate: -1 });
 torSchema.index({ agency: 1, announcementDate: -1 });
 torSchema.index({ pipelineStatus: 1, announcementDate: -1 });
 torSchema.index({ categoryTags: 1 });
+
+// Procurement lifecycle (stage filter; refresh job picks the oldest-checked first)
+torSchema.index({ "procurement.stage": 1 });
+torSchema.index({ "procurement.lastCheckedAt": 1 });
 
 export const Tor = model<ITor>("Tor", torSchema);
 export default Tor;
