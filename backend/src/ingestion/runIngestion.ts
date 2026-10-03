@@ -5,6 +5,7 @@ import { TOR_TYPE_ID, type EgpClientLike } from "../scraper/egpClient.types";
 import { getStorage } from "../storage";
 import type { BlobStorage } from "../storage/storage.types";
 import { mapProject } from "./mapProject";
+import { mergeProcurement } from "./procurementStage";
 import { fetchAndStoreTorPdf } from "./fetchAndStoreTorPdf";
 import { logIngestionEvent } from "./log";
 import type { PdfParseFn } from "./pdfInspect";
@@ -86,6 +87,7 @@ async function processProject(
   const mapped = mapProject(project, detail, announcements, {
     fileBase: egpConfigFromEnv().fileBase,
     listingBase: listingUrl("", process.env).replace(/\/$/, ""),
+    now: ctx.now(),
   });
 
   let tor = await Tor.findOne({ projectCode: mapped.projectCode });
@@ -100,16 +102,33 @@ async function processProject(
     });
     created = true;
     stats.torsCreated += 1;
-  } else if (tor.sourceContentHash !== mapped.sourceContentHash) {
-    tor.set({ ...mapped.set, sourceContentHash: mapped.sourceContentHash, ingestionRunId: runId });
-    await tor.save();
-    updated = true;
-    stats.torsUpdated += 1;
   } else {
-    // Found, but the source content hash matches what we already have — a
-    // deliberate idempotent no-op, not an unaccounted-for outcome.
-    stats.torsUnchanged += 1;
+    // A hash stored before procurement stages existed also covered the contract status. When
+    // that is the only difference, adopt the new hash quietly instead of calling it a change
+    // (which would re-download the PDF and re-run AI enrichment).
+    if (
+      tor.sourceContentHash === mapped.legacySourceContentHash &&
+      tor.sourceContentHash !== mapped.sourceContentHash
+    ) {
+      tor.sourceContentHash = mapped.sourceContentHash;
+    }
+
+    if (tor.sourceContentHash !== mapped.sourceContentHash) {
+      tor.set({ ...mapped.set, sourceContentHash: mapped.sourceContentHash, ingestionRunId: runId });
+      await tor.save();
+      updated = true;
+      stats.torsUpdated += 1;
+    } else {
+      // Found, but the source content hash matches what we already have — a
+      // deliberate idempotent no-op, not an unaccounted-for outcome.
+      stats.torsUnchanged += 1;
+    }
   }
+
+  // Procurement is refreshed on every sighting. mergeProcurement keeps `bidDeadline` and each
+  // announcement's stored copy, which other pipeline stages own.
+  tor.procurement = mergeProcurement(tor.toObject().procurement, mapped.procurement);
+  await tor.save();
 
   for (const message of mapped.ingestErrors) {
     await logIngestionEvent({ severity: "warning", message, component: "runIngestion", ingestionRunId: runId });

@@ -9,6 +9,7 @@ import type {
 } from "../../scraper/egpClient.types";
 import type { BlobStorage } from "../../storage/storage.types";
 import { runIngestion, markInterruptedRunsFailed } from "../runIngestion";
+import { canonicalDetailHash, legacyDetailHash } from "../mapProject";
 
 let mongod: MongoMemoryServer;
 
@@ -31,7 +32,7 @@ const projects: EgpSearchProject[] = [
   { projectId: "p-2", projectNumber: "69000000002" },
 ];
 
-function detailFor(name: string): EgpProjectDetail {
+function detailFor(name: string, contractStatus = "ระหว่างดำเนินการ"): EgpProjectDetail {
   return {
     projectName: name,
     masterOrgGroupName: "สำนักการแพทย์",
@@ -41,7 +42,7 @@ function detailFor(name: string): EgpProjectDetail {
     masterMethodIdName: "ประกวดราคา",
     masterTypeIdName: "จ้าง",
     masterGoodsIdName: "งานจ้างพัฒนาระบบ",
-    masterContractAvailableName: "ระหว่างดำเนินการ",
+    masterContractAvailableName: contractStatus,
   };
 }
 
@@ -76,6 +77,8 @@ function fakeStorage(): BlobStorage {
 interface FakeClientOpts {
   detailNames?: Record<string, string>;
   failDetailFor?: string;
+  contractStatus?: string;
+  extraAnnouncements?: EgpAnnouncement[];
 }
 
 function fakeClient(opts: FakeClientOpts = {}): EgpClientLike {
@@ -88,10 +91,10 @@ function fakeClient(opts: FakeClientOpts = {}): EgpClientLike {
     async projectDetail(projectId) {
       if (opts.failDetailFor === projectId) throw new Error("e-GP 500");
       const num = projects.find((p) => p.projectId === projectId)?.projectNumber ?? "?";
-      return detailFor(opts.detailNames?.[projectId] ?? `โครงการ ${num}`);
+      return detailFor(opts.detailNames?.[projectId] ?? `โครงการ ${num}`, opts.contractStatus);
     },
     async announcements(projectId) {
-      return torAnnFor(projectId);
+      return [...torAnnFor(projectId), ...(opts.extraAnnouncements ?? [])];
     },
     async downloadFile() {
       return Buffer.from("%PDF-1.4 bytes");
@@ -235,6 +238,119 @@ describe("runIngestion", () => {
     expect(spy).toHaveBeenCalled();
     tor = await Tor.findOne({ projectCode: "69000000001" }).lean();
     expect(tor?.sourceDocument?.storageKey).toBeTruthy();
+  });
+
+  it("stores the procurement stage and announcements on a new Tor", async () => {
+    const invitation: EgpAnnouncement = {
+      id: "ann-inv",
+      masterAnnounceTypeName: "ประกาศเชิญชวน",
+      projectAnnouncementPublishDate: "2026-09-10T00:00:00Z",
+      projectAnnouncementPath: "inv.pdf",
+    };
+    await (
+      await runIngestion(baseOpts, {
+        client: fakeClient({ extraAnnouncements: [invitation] }),
+        storage: fakeStorage(),
+        parse,
+        enqueueEnrichment: jest.fn(),
+      })
+    ).done;
+
+    const t = await Tor.findOne({ projectCode: "69000000001" }).lean();
+    expect(t?.procurement?.stage).toBe("inviting");
+    expect(t?.procurement?.contractStatus).toBe("ระหว่างดำเนินการ");
+    expect(t?.procurement?.announcements.map((a) => a.kind)).toEqual(["tor-draft", "invitation"]);
+    expect(t?.procurement?.lastCheckedAt).toBeInstanceOf(Date);
+  });
+
+  it("a contract-status change refreshes procurement but is not an update and does not re-enqueue", async () => {
+    const enqueue = jest.fn();
+    const deps = { storage: fakeStorage(), parse, enqueueEnrichment: enqueue };
+    await (await runIngestion(baseOpts, { ...deps, client: fakeClient() })).done;
+    enqueue.mockClear();
+
+    const { runId, done } = await runIngestion(baseOpts, {
+      ...deps,
+      client: fakeClient({ contractStatus: "ส่งงานครบถ้วน" }),
+    });
+    await done;
+
+    const run = await IngestionRun.findById(runId).lean();
+    expect(run?.stats).toMatchObject({ torsCreated: 0, torsUpdated: 0, torsUnchanged: 2 });
+    expect(enqueue).not.toHaveBeenCalled();
+    const t = await Tor.findOne({ projectCode: "69000000001" }).lean();
+    expect(t?.procurement?.contractStatus).toBe("ส่งงานครบถ้วน");
+  });
+
+  it("adopts the new hash quietly when the stored hash is the legacy (contract-inclusive) form", async () => {
+    const enqueue = jest.fn();
+    const deps = { client: fakeClient(), storage: fakeStorage(), parse, enqueueEnrichment: enqueue };
+    await (await runIngestion(baseOpts, deps)).done;
+    for (const p of projects) {
+      await Tor.updateOne(
+        { projectCode: p.projectNumber },
+        { sourceContentHash: legacyDetailHash(detailFor(`โครงการ ${p.projectNumber}`)) }
+      );
+    }
+    enqueue.mockClear();
+
+    const { runId, done } = await runIngestion(baseOpts, deps);
+    await done;
+
+    const run = await IngestionRun.findById(runId).lean();
+    expect(run?.stats).toMatchObject({ torsUpdated: 0, torsUnchanged: 2 });
+    expect(enqueue).not.toHaveBeenCalled();
+    for (const p of projects) {
+      const t = await Tor.findOne({ projectCode: p.projectNumber }).lean();
+      expect(t?.sourceContentHash).toBe(canonicalDetailHash(detailFor(`โครงการ ${p.projectNumber}`)));
+    }
+  });
+
+  it("still treats a genuine detail change on a legacy-hash Tor as an update", async () => {
+    const enqueue = jest.fn();
+    const deps = { storage: fakeStorage(), parse, enqueueEnrichment: enqueue };
+    await (await runIngestion(baseOpts, { ...deps, client: fakeClient() })).done;
+    await Tor.updateOne(
+      { projectCode: "69000000001" },
+      { sourceContentHash: legacyDetailHash(detailFor("โครงการ 69000000001")) }
+    );
+    enqueue.mockClear();
+
+    const { runId, done } = await runIngestion(baseOpts, {
+      ...deps,
+      client: fakeClient({ detailNames: { "p-1": "โครงการ 69000000001 ซอฟต์แวร์ (แก้ไข)" } }),
+    });
+    await done;
+
+    const run = await IngestionRun.findById(runId).lean();
+    expect(run?.stats).toMatchObject({ torsUpdated: 1, torsUnchanged: 1 });
+    expect(enqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an existing bidDeadline and stored announcement copy across a re-sighting", async () => {
+    const deps = { storage: fakeStorage(), parse, enqueueEnrichment: jest.fn() };
+    await (await runIngestion(baseOpts, { ...deps, client: fakeClient() })).done;
+    await Tor.updateOne(
+      { projectCode: "69000000001" },
+      {
+        $set: {
+          "procurement.bidDeadline": {
+            date: new Date("2026-10-20T00:00:00Z"),
+            source: "admin",
+            extractedAt: new Date("2026-10-01T00:00:00Z"),
+          },
+          "procurement.announcements.0.storageKey": "tor-pdfs/69000000001/ann-p-1.pdf",
+        },
+      }
+    );
+
+    await (await runIngestion(baseOpts, { ...deps, client: fakeClient({ contractStatus: "ส่งงานครบถ้วน" }) })).done;
+
+    const t = await Tor.findOne({ projectCode: "69000000001" }).lean();
+    expect(t?.procurement?.bidDeadline?.source).toBe("admin");
+    expect(t?.procurement?.bidDeadline?.date).toEqual(new Date("2026-10-20T00:00:00Z"));
+    expect(t?.procurement?.announcements[0]?.storageKey).toBe("tor-pdfs/69000000001/ann-p-1.pdf");
+    expect(t?.procurement?.contractStatus).toBe("ส่งงานครบถ้วน");
   });
 });
 
