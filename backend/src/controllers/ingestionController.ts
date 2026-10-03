@@ -3,10 +3,13 @@ import { IngestionRun } from "../models";
 import { httpError } from "../utils/httpError";
 import { runIngestion } from "../ingestion/runIngestion";
 import { drainEnrichmentQueue } from "../ingestion/enrichment/drainEnrichmentQueue";
+import { countRunnable, maxCallsPerRun } from "../ingestion/enrichment/enrichmentJobRepo";
+import { sweepStaleEnrichmentRuns } from "../ingestion/enrichment/sweepStaleRuns";
 import { selectExtractor } from "../jobs/enrichment";
 
 const MAX_PROJECTS_CEILING = 500;
 const LOOKBACK_DAYS_CEILING = 6000; // ~200 months
+const ENRICHMENT_MAX_CALLS_CEILING = 200;
 
 function parseMaxProjects(raw: unknown): number {
   const fallback = Number(process.env.INGEST_DEFAULT_MAX_PROJECTS) || 50;
@@ -24,6 +27,15 @@ function parseLookbackDays(raw: unknown): number {
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1 || n > LOOKBACK_DAYS_CEILING) {
     throw httpError(400, `lookbackDays must be an integer between 1 and ${LOOKBACK_DAYS_CEILING}`);
+  }
+  return n;
+}
+
+function parseEnrichmentMaxCalls(raw: unknown): number | undefined {
+  if (raw === undefined) return undefined; // fall back to MAX_AI_CALLS_PER_RUN
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > ENRICHMENT_MAX_CALLS_CEILING) {
+    throw httpError(400, `maxCalls must be an integer between 1 and ${ENRICHMENT_MAX_CALLS_CEILING}`);
   }
   return n;
 }
@@ -60,20 +72,33 @@ export async function createRun(req: Request, res: Response): Promise<void> {
 }
 
 /** POST /api/ingestion/enrichment/runs — admin-triggered enrichment drain. */
-export async function createEnrichmentRun(_req: Request, res: Response): Promise<void> {
+export async function createEnrichmentRun(req: Request, res: Response): Promise<void> {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const maxCalls = parseEnrichmentMaxCalls(body.maxCalls);
+
+  // A run whose worker died (e.g. backend restart) must not block new runs forever.
+  await sweepStaleEnrichmentRuns();
   const active = await IngestionRun.exists({ status: "running", phase: "enrichment" });
   if (active) throw httpError(409, "An enrichment run is already in progress");
 
   const extractor = selectExtractor();
-  void drainEnrichmentQueue({ extractor }).catch((err) => {
+  void drainEnrichmentQueue({ extractor, maxCalls }).catch((err) => {
     console.error("enrichment run failed:", err);
   });
 
   res.status(202).json({ status: "running" });
 }
 
+/** GET /api/ingestion/enrichment/pending — how many TORs the next enrichment run would process. */
+export async function getEnrichmentPending(_req: Request, res: Response): Promise<void> {
+  const runnable = await countRunnable();
+  const maxCalls = maxCallsPerRun();
+  res.status(200).json({ runnable, maxCalls, willProcess: Math.max(0, Math.min(runnable, maxCalls)) });
+}
+
 /** GET /api/ingestion/runs — recent run history (FR-34). */
 export async function listRuns(req: Request, res: Response): Promise<void> {
+  await sweepStaleEnrichmentRuns(); // so the admin UI sees a dead run as failed, not "running"
   const limitRaw = Number(req.query.limit);
   const limit = Number.isInteger(limitRaw) && limitRaw >= 1 && limitRaw <= 100 ? limitRaw : 20;
   const runs = await IngestionRun.find({}).sort({ startedAt: -1 }).limit(limit).lean();

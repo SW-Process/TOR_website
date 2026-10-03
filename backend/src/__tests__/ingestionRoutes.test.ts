@@ -22,7 +22,7 @@ jest.mock("../jobs/enrichment", () => ({
 
 import app from "../app";
 import { User } from "../models";
-import { IngestionRun } from "../models";
+import { IngestionRun, EnrichmentJob } from "../models";
 
 let mongod: MongoMemoryServer;
 
@@ -146,6 +146,53 @@ describe("POST /api/ingestion/enrichment/runs", () => {
     expect(drainEnrichmentQueueMock.mock.calls[0][0]).toMatchObject({ extractor });
   });
 
+  it("passes an explicit maxCalls through to the drain", async () => {
+    selectExtractorMock.mockReturnValue({ id: "fake", extract: jest.fn() });
+    drainEnrichmentQueueMock.mockResolvedValue({
+      runId: "r",
+      claimed: 0,
+      enrichedOk: 0,
+      enrichedRejected: 0,
+      enrichedFailed: 0,
+    });
+    const agent = await adminAgent();
+
+    const res = await agent.post("/api/ingestion/enrichment/runs").send({ maxCalls: 7 });
+
+    expect(res.status).toBe(202);
+    expect(drainEnrichmentQueueMock.mock.calls[0][0]).toMatchObject({ maxCalls: 7 });
+  });
+
+  it.each([0, -1, 1.5, 201, "abc"])("400 when maxCalls is %p", async (maxCalls) => {
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/enrichment/runs").send({ maxCalls });
+    expect(res.status).toBe(400);
+    expect(drainEnrichmentQueueMock).not.toHaveBeenCalled();
+  });
+
+  it("sweeps an idle (dead-worker) run instead of blocking on it with 409", async () => {
+    selectExtractorMock.mockReturnValue({ id: "fake", extract: jest.fn() });
+    drainEnrichmentQueueMock.mockResolvedValue({
+      runId: "r",
+      claimed: 0,
+      enrichedOk: 0,
+      enrichedRejected: 0,
+      enrichedFailed: 0,
+    });
+    const dead = await IngestionRun.create({ trigger: "scheduled", phase: "enrichment", status: "running" });
+    // bypass mongoose timestamps so the row looks untouched for 11 minutes
+    await IngestionRun.collection.updateOne(
+      { _id: dead._id },
+      { $set: { updatedAt: new Date(Date.now() - 11 * 60_000) } }
+    );
+    const agent = await adminAgent();
+
+    const res = await agent.post("/api/ingestion/enrichment/runs").send({});
+
+    expect(res.status).toBe(202);
+    expect((await IngestionRun.findById(dead._id).lean())?.status).toBe("failed");
+  });
+
   it("409 when an enrichment run is already in progress", async () => {
     await IngestionRun.create({ trigger: "scheduled", phase: "enrichment", status: "running" });
     const agent = await adminAgent();
@@ -155,7 +202,65 @@ describe("POST /api/ingestion/enrichment/runs", () => {
   });
 });
 
+describe("GET /api/ingestion/enrichment/pending", () => {
+  const OLD_MAX = process.env.MAX_AI_CALLS_PER_RUN;
+  afterEach(async () => {
+    await EnrichmentJob.deleteMany({});
+    if (OLD_MAX === undefined) delete process.env.MAX_AI_CALLS_PER_RUN;
+    else process.env.MAX_AI_CALLS_PER_RUN = OLD_MAX;
+  });
+
+  it("401 without a session", async () => {
+    const res = await request(app).get("/api/ingestion/enrichment/pending");
+    expect(res.status).toBe(401);
+  });
+
+  it("403 for a vendor", async () => {
+    const agent = request.agent(app);
+    await agent.post("/api/auth/register").send({ email: "v3@test.com", password: "secret123" });
+    const res = await agent.get("/api/ingestion/enrichment/pending");
+    expect(res.status).toBe(403);
+  });
+
+  it("reports runnable jobs capped by MAX_AI_CALLS_PER_RUN", async () => {
+    process.env.MAX_AI_CALLS_PER_RUN = "2";
+    for (let i = 0; i < 3; i++) {
+      await EnrichmentJob.create({ torId: new mongoose.Types.ObjectId(), sourceContentHash: `h${i}` });
+    }
+    // terminal jobs are not runnable
+    await EnrichmentJob.create({
+      torId: new mongoose.Types.ObjectId(),
+      sourceContentHash: "done",
+      status: "done",
+    });
+    const agent = await adminAgent();
+
+    const res = await agent.get("/api/ingestion/enrichment/pending");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ runnable: 3, maxCalls: 2, willProcess: 2 });
+  });
+
+  it("reports zero when the queue is empty", async () => {
+    const agent = await adminAgent();
+    const res = await agent.get("/api/ingestion/enrichment/pending");
+    expect(res.body.runnable).toBe(0);
+    expect(res.body.willProcess).toBe(0);
+  });
+});
+
 describe("GET /api/ingestion/runs", () => {
+  it("reports an idle enrichment run as failed rather than running", async () => {
+    const dead = await IngestionRun.create({ trigger: "scheduled", phase: "enrichment", status: "running" });
+    await IngestionRun.collection.updateOne(
+      { _id: dead._id },
+      { $set: { updatedAt: new Date(Date.now() - 11 * 60_000) } }
+    );
+    const agent = await adminAgent();
+    const res = await agent.get("/api/ingestion/runs");
+    expect(res.body.runs[0].status).toBe("failed");
+  });
+
   it("lists runs newest first for an admin", async () => {
     const agent = await adminAgent();
     await IngestionRun.create({ trigger: "manual", startedAt: new Date("2026-08-01"), status: "success" });

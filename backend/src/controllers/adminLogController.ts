@@ -12,17 +12,31 @@ function escapeRegExp(input: string): string {
 
 const SEVERITIES = ["info", "warning", "error"] as const;
 
-const listQuerySchema = z.object({
-  severity: z.enum(SEVERITIES).optional(),
-  source: z.enum(["ingestion", "ai-pipeline", "application"]).optional(),
-  q: z.string().trim().min(1).max(200).optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(50),
-});
+/** An ISO-8601 date or date-time (callers should include an offset); yields a Date. */
+const isoDate = z
+  .string()
+  .refine((s) => !Number.isNaN(Date.parse(s)), "must be an ISO-8601 date or date-time")
+  .transform((s) => new Date(s));
+
+const listQuerySchema = z
+  .object({
+    severity: z.enum(SEVERITIES).optional(),
+    source: z.enum(["ingestion", "ai-pipeline", "application"]).optional(),
+    q: z.string().trim().min(1).max(200).optional(),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .refine((v) => !v.from || !v.to || v.from <= v.to, {
+    message: "from must not be after to",
+    path: ["from"],
+  });
 
 /**
  * GET /api/admin/logs — system logs newest first (FR-37, FR-38), filterable by
- * severity / source and a case-insensitive search over component + message.
+ * severity / source, an inclusive `from`..`to` timestamp range, and a
+ * case-insensitive search over component + message.
  * `counts` are per severity under the other filters, for the tab badges.
  */
 export async function listLogs(req: Request, res: Response): Promise<void> {
@@ -32,6 +46,9 @@ export async function listLogs(req: Request, res: Response): Promise<void> {
 
   const base: QueryFilter<ISystemLog> = {};
   if (q.source) base.source = q.source;
+  if (q.from || q.to) {
+    base.timestamp = { ...(q.from && { $gte: q.from }), ...(q.to && { $lte: q.to }) };
+  }
   if (q.q) {
     const re = { $regex: escapeRegExp(q.q), $options: "i" };
     base.$or = [{ message: re }, { component: re }];

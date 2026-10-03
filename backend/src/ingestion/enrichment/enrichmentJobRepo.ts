@@ -1,5 +1,5 @@
 // backend/src/ingestion/enrichment/enrichmentJobRepo.ts
-import type { HydratedDocument, Types } from "mongoose";
+import type { HydratedDocument, QueryFilter, Types } from "mongoose";
 import { EnrichmentJob, type IEnrichmentJob } from "../../models";
 
 export const LEASE_MS = 600_000; // 10 minutes
@@ -31,6 +31,28 @@ export async function enqueue(torId: Types.ObjectId, sourceContentHash: string):
   );
 }
 
+/** Max jobs one enrichment run may claim (`MAX_AI_CALLS_PER_RUN`, default 50). */
+export function maxCallsPerRun(): number {
+  const envMax = Number(process.env.MAX_AI_CALLS_PER_RUN);
+  return Number.isFinite(envMax) ? envMax : 50;
+}
+
+function runnableFilter(now: Date): QueryFilter<IEnrichmentJob> {
+  return {
+    attempts: { $lt: MAX_ATTEMPTS },
+    $or: [
+      { status: "queued" },
+      { status: "processing", lockedUntil: { $lte: now } },
+      { status: "failed", nextRunAt: { $lte: now } },
+    ],
+  };
+}
+
+/** How many jobs `claimNext` could hand out right now. */
+export async function countRunnable(now: Date = new Date()): Promise<number> {
+  return EnrichmentJob.countDocuments(runnableFilter(now));
+}
+
 /** Atomically claim the next runnable job under a lease. */
 export async function claimNext(
   workerId: string,
@@ -38,14 +60,7 @@ export async function claimNext(
 ): Promise<HydratedDocument<IEnrichmentJob> | null> {
   const lockedUntil = new Date(now.getTime() + LEASE_MS);
   return EnrichmentJob.findOneAndUpdate(
-    {
-      attempts: { $lt: MAX_ATTEMPTS },
-      $or: [
-        { status: "queued" },
-        { status: "processing", lockedUntil: { $lte: now } },
-        { status: "failed", nextRunAt: { $lte: now } },
-      ],
-    },
+    runnableFilter(now),
     { $set: { status: "processing", lockedBy: workerId, lockedUntil }, $inc: { attempts: 1 } },
     { sort: { nextRunAt: 1, createdAt: 1 }, returnDocument: "after" }
   );

@@ -30,6 +30,10 @@ interface LogPage {
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
 
+/** Day boundaries in Thai time (UTC+7), as the offset-bearing ISO strings the API expects. */
+const startOfDayBkk = (ymd: string) => `${ymd}T00:00:00+07:00`;
+const endOfDayBkk = (ymd: string) => `${ymd}T23:59:59.999+07:00`;
+
 const levelTabs: { label: string; value: LogLevel | "ทั้งหมด" }[] = [
   { label: "ทั้งหมด", value: "ทั้งหมด" },
   { label: "Info", value: "info" },
@@ -126,6 +130,8 @@ export default function SystemLogs() {
   const [query, setQuery] = useState("");
   const [level, setLevel] = useState<LogLevel | "ทั้งหมด">("ทั้งหมด");
   const [source, setSource] = useState<LogSource | "">("");
+  const [dateFrom, setDateFrom] = useState(""); // YYYY-MM-DD from <input type="date">
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<LogPage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -135,10 +141,13 @@ export default function SystemLogs() {
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
 
   useEffect(() => {
+    if (dateFrom && dateTo && dateFrom > dateTo) return; // inverted range: nothing to fetch
     const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
     if (level !== "ทั้งหมด") params.set("severity", level);
     if (source) params.set("source", source);
     if (debouncedQuery.trim()) params.set("q", debouncedQuery.trim());
+    if (dateFrom) params.set("from", startOfDayBkk(dateFrom));
+    if (dateTo) params.set("to", endOfDayBkk(dateTo));
 
     let cancelled = false;
     const timer = setTimeout(() => {
@@ -162,11 +171,12 @@ export default function SystemLogs() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [debouncedQuery, level, source, page]);
+  }, [debouncedQuery, level, source, dateFrom, dateTo, page]);
 
   const counts = result?.counts;
   const countFor = (v: LogLevel | "ทั้งหมด") =>
     !counts ? null : v === "ทั้งหมด" ? counts.info + counts.warning + counts.error : counts[v];
+  const invalidRange = dateFrom !== "" && dateTo !== "" && dateFrom > dateTo;
   const rows = result?.data ?? [];
   const totalPages = result ? Math.max(1, Math.ceil(result.totalCount / PAGE_SIZE)) : 1;
 
@@ -207,6 +217,44 @@ export default function SystemLogs() {
               </option>
             ))}
           </select>
+          <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+            <input
+              type="date"
+              aria-label="ตั้งแต่วันที่"
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-full border border-[var(--color-border)] bg-white px-4 py-2 text-sm text-[var(--color-text)] shadow-[var(--shadow-sm)] focus:outline-none"
+            />
+            <span>ถึง</span>
+            <input
+              type="date"
+              aria-label="ถึงวันที่"
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-full border border-[var(--color-border)] bg-white px-4 py-2 text-sm text-[var(--color-text)] shadow-[var(--shadow-sm)] focus:outline-none"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom("");
+                  setDateTo("");
+                  setPage(1);
+                }}
+                className="underline hover:text-[var(--color-text)]"
+              >
+                ล้างวันที่
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -257,7 +305,11 @@ export default function SystemLogs() {
             <span className="w-4 shrink-0" />
           </div>
 
-          {loading && !result ? (
+          {invalidRange ? (
+            <div className="p-10 text-center text-sm text-[var(--color-text-muted)]">
+              ช่วงวันที่ไม่ถูกต้อง — วันที่เริ่มต้องไม่เกินวันที่สิ้นสุด
+            </div>
+          ) : loading && !result ? (
             <div className="p-10 flex items-center justify-center gap-2 text-sm text-[var(--color-text-muted)]">
               <Loader2 size={16} className="animate-spin" />
               กำลังโหลด log...

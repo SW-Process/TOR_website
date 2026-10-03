@@ -26,6 +26,19 @@ export async function fetchAdminStats(months: 5 | 8 = 5): Promise<AdminStats> {
   return (await res.json()) as AdminStats;
 }
 
+const STATS_REFRESH_EVENT = "admin-stats-refresh";
+
+/** Ask mounted admin status widgets (e.g. the sidebar) to refetch now instead of on their timer. */
+export function requestAdminStatsRefresh(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(STATS_REFRESH_EVENT));
+}
+
+/** Subscribe to {@link requestAdminStatsRefresh}; returns the unsubscribe function. */
+export function onAdminStatsRefresh(listener: () => void): () => void {
+  window.addEventListener(STATS_REFRESH_EVENT, listener);
+  return () => window.removeEventListener(STATS_REFRESH_EVENT, listener);
+}
+
 export const RUN_STATUS_LABELS: Record<RunStatus, string> = {
   running: "กำลังทำงาน",
   success: "สำเร็จ",
