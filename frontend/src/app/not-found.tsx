@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Bookmark, Clock, FileQuestion, FileSearch, Home, Search } from "lucide-react";
+import { ArrowUpRight, Clock, FileQuestion, FileSearch, Home, Search } from "lucide-react";
 import mascotLost from "@/components/picture/404.png";
 
 // Root not-found renders inside the root layout only (outside `(site)/layout`),
@@ -10,7 +10,6 @@ import mascotLost from "@/components/picture/404.png";
 const shortcuts = [
   { href: "/tor", icon: Search, label: "ค้นหา TOR ทั้งหมด" },
   { href: "/tor?sort=deadline", icon: Clock, label: "TOR ใกล้ปิดรับ" },
-  { href: "/bookmarks", icon: Bookmark, label: "รายการที่บันทึก" },
 ];
 
 export default function NotFound() {
@@ -96,8 +95,8 @@ export default function NotFound() {
           </div>
         </div>
 
-        {/* Mascot scene */}
-        <div className="relative order-1 mx-auto h-[300px] w-full max-w-[460px] sm:h-[400px] lg:order-2 lg:h-[480px]">
+        {/* Mascot scene — shifted right on desktop so it only overlaps part of the ghost "4". */}
+        <div className="relative order-1 mx-auto h-[300px] w-full max-w-[460px] sm:h-[400px] lg:order-2 lg:h-[480px] lg:translate-x-12 xl:translate-x-32">
           <div className="animate-blob-a absolute -top-6 right-0 h-64 w-64 rounded-full bg-[var(--color-rose-light)] blur-3xl opacity-80" />
           <div
             className="animate-blob-b absolute bottom-6 -left-6 h-56 w-56 rounded-full bg-white blur-3xl opacity-80"
