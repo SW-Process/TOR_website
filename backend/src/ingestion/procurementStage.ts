@@ -1,4 +1,10 @@
-import type { AnnouncementKind, IProcurementAnnouncement, ProcurementStage } from "../models/Tor";
+import type { EgpAnnouncement } from "../scraper/egpClient.types";
+import type {
+  AnnouncementKind,
+  IProcurement,
+  IProcurementAnnouncement,
+  ProcurementStage,
+} from "../models/Tor";
 
 const CANCELLED_CONTRACT_STATUS = "ยกเลิกโครงการ";
 
@@ -51,4 +57,64 @@ export function deriveStage(
   if (announcements.some((a) => a.kind === "winner")) return "awarded";
   if (announcements.some((a) => a.kind === "invitation")) return "inviting";
   return "draft";
+}
+
+function parsePublishDate(value: string | null | undefined): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function compareByDate(a: IProcurementAnnouncement, b: IProcurementAnnouncement): number {
+  const ta = a.publishedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+  const tb = b.publishedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+  return ta === tb ? 0 : ta < tb ? -1 : 1;
+}
+
+/**
+ * Pure transform: e-GP announcements + contract status → a fresh `procurement` payload.
+ * Announcements are stored oldest first (undated first) for the detail-page timeline.
+ */
+export function buildProcurement(
+  announcements: EgpAnnouncement[],
+  contractStatus: string | null | undefined,
+  now: Date
+): IProcurement {
+  const items: IProcurementAnnouncement[] = announcements
+    .map((a) => ({
+      announcementId: a.id,
+      typeName: a.masterAnnounceTypeName?.trim() || undefined,
+      kind: classifyAnnouncement(a.masterAnnounceTypeName),
+      publishedAt: parsePublishDate(a.projectAnnouncementPublishDate),
+      hasFile: Boolean(a.projectAnnouncementPath),
+    }))
+    .sort(compareByDate); // Array#sort is stable, so equal dates keep e-GP's order
+
+  return {
+    stage: deriveStage(items, contractStatus),
+    contractStatus: contractStatus?.trim() || undefined,
+    announcements: items,
+    lastCheckedAt: now,
+  };
+}
+
+/**
+ * Apply a fresh payload over what is stored, keeping the fields other pipeline stages own:
+ * `bidDeadline` (invitation-PDF extraction / admin edit) and each announcement's `storageKey`.
+ */
+export function mergeProcurement(
+  existing: IProcurement | null | undefined,
+  fresh: IProcurement
+): IProcurement {
+  const storedKeys = new Map(
+    (existing?.announcements ?? []).map((a) => [a.announcementId, a.storageKey ?? null])
+  );
+  return {
+    ...fresh,
+    announcements: fresh.announcements.map((a) => ({
+      ...a,
+      storageKey: storedKeys.get(a.announcementId) ?? null,
+    })),
+    bidDeadline: existing?.bidDeadline ?? null,
+  };
 }
