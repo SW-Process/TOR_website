@@ -6,6 +6,7 @@ import { Tor } from "../models";
 import type { ITor } from "../models";
 import { httpError } from "../utils/httpError";
 import { PROJECT_TYPES } from "../config/projectTypes";
+import { TOR_STATUSES, statusClause, withDisplayStatus, type StatusInput } from "../utils/torStatus";
 
 /** Escape a user string so it is a literal inside a RegExp. */
 function escapeRegExp(input: string): string {
@@ -17,7 +18,6 @@ const asArray = (v: unknown): string[] | undefined => {
   return Array.isArray(v) ? v.map(String) : [String(v)];
 };
 
-const TOR_STATUSES = ["open", "closing_soon", "closed"] as const;
 const SORT_FIELDS = ["announcementDate", "submissionDeadline", "budget"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
 
@@ -59,36 +59,9 @@ const listQuerySchema = z.object({
 export type ListQuery = z.infer<typeof listQuerySchema>;
 
 export const LIST_PROJECTION =
-  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl";
+  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt";
 
 const LIST_PROJECT_STAGE = Object.fromEntries(LIST_PROJECTION.split(" ").map((f) => [f, 1]));
-
-/** A TOR whose submission deadline is at most this many days away is "closing soon". */
-export const CLOSING_SOON_DAYS = 7;
-const DAY_MS = 86_400_000;
-
-/**
- * Effective lifecycle status, derived from submissionDeadline rather than the
- * stored `status` (which defaults to "open" and is never recomputed):
- *   closed       — deadline passed, or an admin stored "closed"
- *   closing_soon — deadline within CLOSING_SOON_DAYS from now
- *   open         — deadline further out, or unknown
- * Mirrors mapStatus in frontend/src/lib/torApi.ts.
- */
-function statusClause(status: (typeof TOR_STATUSES)[number], now: Date): QueryFilter<ITor> {
-  const soon = new Date(now.getTime() + CLOSING_SOON_DAYS * DAY_MS);
-  const notStoredClosed = { status: { $ne: "closed" as const } };
-  switch (status) {
-    case "closed":
-      return { $or: [{ submissionDeadline: { $lt: now } }, { status: "closed" }] };
-    case "closing_soon":
-      return { $and: [notStoredClosed, { submissionDeadline: { $gte: now, $lte: soon } }] };
-    case "open":
-      return {
-        $and: [notStoredClosed, { $or: [{ submissionDeadline: { $gt: soon } }, { submissionDeadline: null }] }],
-      };
-  }
-}
 
 export function buildFilter(q: ListQuery): QueryFilter<ITor> {
   const filter: QueryFilter<ITor> = { pipelineStatus: "enriched" };
@@ -226,7 +199,7 @@ export async function listTors(req: Request, res: Response): Promise<void> {
   ]);
   const totalCount = result?.meta[0]?.totalCount ?? 0;
   res.status(200).json({
-    data: result?.data ?? [],
+    data: (result?.data ?? []).map((row) => withDisplayStatus(row as StatusInput)),
     page: q.page,
     pageSize: q.pageSize,
     sort: q.sort,
@@ -274,7 +247,7 @@ export async function getTor(req: Request, res: Response): Promise<void> {
     )
     .lean();
   if (!tor) throw httpError(404, "TOR not found");
-  res.status(200).json({ tor });
+  res.status(200).json({ tor: withDisplayStatus(tor) });
 }
 
 function percentile(sorted: number[], p: number): number {

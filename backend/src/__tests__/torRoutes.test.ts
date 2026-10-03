@@ -160,27 +160,80 @@ describe("GET /api/tors", () => {
     ]);
   });
 
-  it("filters by effective status, derived from the deadline rather than what is stored", async () => {
+  it("filters by the six effective statuses, derived from procurement rather than the stored status", async () => {
     const day = 86_400_000;
-    await Tor.create([
-      { title: "ปิดอีก 10 วัน", pipelineStatus: "enriched", status: "open", submissionDeadline: new Date(Date.now() + 10 * day) },
-      { title: "ปิดอีก 3 วัน", pipelineStatus: "enriched", status: "open", submissionDeadline: new Date(Date.now() + 3 * day) },
-      { title: "เลยกำหนดแต่ยัง open", pipelineStatus: "enriched", status: "open", submissionDeadline: new Date(Date.now() - day) },
-      // a stored closing_soon no longer matters without a near deadline
-      { title: "เก็บไว้ว่าใกล้ปิด", pipelineStatus: "enriched", status: "closing_soon" },
-      { title: "แอดมินปิดแล้ว", pipelineStatus: "enriched", status: "closed", submissionDeadline: new Date(Date.now() + 2 * day) },
-      { title: "ไม่ทราบวันปิด", pipelineStatus: "enriched" },
+    const stage = (s: string) => ({ stage: s, announcements: [], lastCheckedAt: new Date() });
+    const inviting = (daysAhead?: number) => ({
+      ...stage("inviting"),
+      ...(daysAhead === undefined
+        ? {}
+        : { bidDeadline: { date: new Date(Date.now() + daysAhead * day), source: "admin", extractedAt: new Date() } }),
+    });
+    await Tor.insertMany([
+      { title: "เปิด 10 วัน", pipelineStatus: "enriched", procurement: inviting(10) },
+      { title: "เปิด ไม่ระบุวันปิด", pipelineStatus: "enriched", procurement: inviting() },
+      { title: "ใกล้ปิด 3 วัน", pipelineStatus: "enriched", procurement: inviting(3) },
+      { title: "เลยกำหนด", pipelineStatus: "enriched", procurement: inviting(-1) },
+      { title: "แอดมินปิดแล้ว", pipelineStatus: "enriched", status: "closed", procurement: inviting(10) },
+      { title: "ประกาศผู้ชนะแล้ว", pipelineStatus: "enriched", procurement: stage("awarded") },
+      { title: "ยกเลิก", pipelineStatus: "enriched", procurement: stage("cancelled") },
+      { title: "ร่าง", pipelineStatus: "enriched", procurement: stage("draft") },
+      { title: "ยังไม่มีข้อมูลสถานะ", pipelineStatus: "enriched" },
+      { title: "ยังไม่ผ่าน AI", pipelineStatus: "pending", procurement: stage("awarded") },
     ]);
     const titles = async (qs: string) =>
       (await request(app).get(`/api/tors?${qs}`)).body.data.map((t: { title: string }) => t.title).sort();
 
-    expect(await titles("status=closed")).toEqual(["เลยกำหนดแต่ยัง open", "แอดมินปิดแล้ว"].sort());
-    expect(await titles("status=closing_soon")).toEqual(["ปิดอีก 3 วัน"]);
-    expect(await titles("status=open")).toEqual(["ปิดอีก 10 วัน", "เก็บไว้ว่าใกล้ปิด", "ไม่ทราบวันปิด"].sort());
-    expect(await titles("status=closing_soon&status=closed")).toEqual(
-      ["ปิดอีก 3 วัน", "เลยกำหนดแต่ยัง open", "แอดมินปิดแล้ว"].sort()
+    expect(await titles("status=open")).toEqual(["เปิด 10 วัน", "เปิด ไม่ระบุวันปิด"].sort());
+    expect(await titles("status=closing_soon")).toEqual(["ใกล้ปิด 3 วัน"]);
+    expect(await titles("status=closed")).toEqual(["เลยกำหนด", "แอดมินปิดแล้ว"].sort());
+    expect(await titles("status=awarded")).toEqual(["ประกาศผู้ชนะแล้ว"]);
+    expect(await titles("status=cancelled")).toEqual(["ยกเลิก"]);
+    expect(await titles("status=draft")).toEqual(["ยังไม่มีข้อมูลสถานะ", "ร่าง"].sort());
+    expect(await titles("status=open&status=closing_soon")).toEqual(
+      ["เปิด 10 วัน", "เปิด ไม่ระบุวันปิด", "ใกล้ปิด 3 วัน"].sort()
     );
     expect((await request(app).get("/api/tors?status=bogus")).status).toBe(400);
+  });
+
+  it("stamps displayStatus and a procurement summary (no announcements) on list rows", async () => {
+    await Tor.create({
+      title: "มีขั้นตอน",
+      pipelineStatus: "enriched",
+      procurement: {
+        stage: "inviting",
+        contractStatus: "ระหว่างดำเนินการ",
+        announcements: [{ announcementId: "a-1", kind: "invitation", hasFile: true, storageKey: "tor-pdfs/x/a-1.pdf" }],
+        bidDeadline: { date: new Date(Date.now() + 3 * 86_400_000), source: "admin", extractedAt: new Date() },
+        lastCheckedAt: new Date(),
+      },
+    });
+    const res = await request(app).get("/api/tors");
+    const row = res.body.data[0];
+    expect(row.displayStatus).toBe("closing_soon");
+    expect(row.procurement).toMatchObject({ stage: "inviting", contractStatus: "ระหว่างดำเนินการ" });
+    expect(row.procurement.bidDeadline.date).toBeTruthy();
+    expect(row.procurement).not.toHaveProperty("announcements");
+    expect(JSON.stringify(res.body)).not.toContain("tor-pdfs/x/a-1.pdf");
+  });
+
+  it("returns displayStatus and the announcement timeline (never a storageKey) on the detail", async () => {
+    const tor = await Tor.create({
+      title: "รายละเอียด",
+      pipelineStatus: "enriched",
+      procurement: {
+        stage: "awarded",
+        announcements: [
+          { announcementId: "a-1", kind: "invitation", typeName: "ประกาศเชิญชวน", hasFile: true, storageKey: "tor-pdfs/x/a-1.pdf" },
+          { announcementId: "a-2", kind: "winner", hasFile: false },
+        ],
+        lastCheckedAt: new Date(),
+      },
+    });
+    const res = await request(app).get(`/api/tors/${tor.id}`);
+    expect(res.body.tor.displayStatus).toBe("awarded");
+    expect(res.body.tor.procurement.announcements.map((a: { kind: string }) => a.kind)).toEqual(["invitation", "winner"]);
+    expect(JSON.stringify(res.body)).not.toContain("tor-pdfs/x/a-1.pdf");
   });
 
   it("paginates and reports totals over the whole result set", async () => {
