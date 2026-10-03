@@ -4,12 +4,15 @@ import { httpError } from "../utils/httpError";
 import { runIngestion } from "../ingestion/runIngestion";
 import { drainEnrichmentQueue } from "../ingestion/enrichment/drainEnrichmentQueue";
 import { countRunnable, maxCallsPerRun } from "../ingestion/enrichment/enrichmentJobRepo";
-import { sweepStaleEnrichmentRuns } from "../ingestion/enrichment/sweepStaleRuns";
+import { refreshLifecycle } from "../ingestion/lifecycle/refreshLifecycle";
+import { countLifecycleCandidates, maxLifecycleRefreshPerRun } from "../ingestion/lifecycle/candidates";
+import { sweepStaleEnrichmentRuns, sweepStaleRuns } from "../ingestion/enrichment/sweepStaleRuns";
 import { selectExtractor } from "../jobs/enrichment";
 
 const MAX_PROJECTS_CEILING = 500;
 const LOOKBACK_DAYS_CEILING = 6000; // ~200 months
 const ENRICHMENT_MAX_CALLS_CEILING = 200;
+const LIFECYCLE_MAX_TORS_CEILING = 300;
 
 function parseMaxProjects(raw: unknown): number {
   const fallback = Number(process.env.INGEST_DEFAULT_MAX_PROJECTS) || 50;
@@ -36,6 +39,15 @@ function parseEnrichmentMaxCalls(raw: unknown): number | undefined {
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1 || n > ENRICHMENT_MAX_CALLS_CEILING) {
     throw httpError(400, `maxCalls must be an integer between 1 and ${ENRICHMENT_MAX_CALLS_CEILING}`);
+  }
+  return n;
+}
+
+function parseLifecycleMaxTors(raw: unknown): number | undefined {
+  if (raw === undefined) return undefined; // fall back to MAX_LIFECYCLE_REFRESH_PER_RUN
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > LIFECYCLE_MAX_TORS_CEILING) {
+    throw httpError(400, `maxTors must be an integer between 1 and ${LIFECYCLE_MAX_TORS_CEILING}`);
   }
   return n;
 }
@@ -96,9 +108,34 @@ export async function getEnrichmentPending(_req: Request, res: Response): Promis
   res.status(200).json({ runnable, maxCalls, willProcess: Math.max(0, Math.min(runnable, maxCalls)) });
 }
 
+/** POST /api/ingestion/lifecycle/runs — admin-triggered procurement-stage refresh. */
+export async function createLifecycleRun(req: Request, res: Response): Promise<void> {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const maxTors = parseLifecycleMaxTors(body.maxTors);
+
+  // A run whose worker died (e.g. backend restart) must not block new runs forever.
+  await sweepStaleRuns("lifecycle");
+  const active = await IngestionRun.exists({ status: "running", phase: "lifecycle" });
+  if (active) throw httpError(409, "A lifecycle refresh is already in progress");
+
+  void refreshLifecycle({ trigger: "manual", triggeredBy: req.user!.id, maxTors }).catch((err) => {
+    console.error("lifecycle run failed:", err);
+  });
+
+  res.status(202).json({ status: "running" });
+}
+
+/** GET /api/ingestion/lifecycle/pending — how many TORs the next refresh would check. */
+export async function getLifecyclePending(_req: Request, res: Response): Promise<void> {
+  const candidates = await countLifecycleCandidates();
+  const maxTors = maxLifecycleRefreshPerRun();
+  res.status(200).json({ candidates, maxTors, willCheck: Math.min(candidates, maxTors) });
+}
+
 /** GET /api/ingestion/runs — recent run history (FR-34). */
 export async function listRuns(req: Request, res: Response): Promise<void> {
-  await sweepStaleEnrichmentRuns(); // so the admin UI sees a dead run as failed, not "running"
+  // so the admin UI sees a dead run as failed, not "running"
+  await Promise.all([sweepStaleEnrichmentRuns(), sweepStaleRuns("lifecycle")]);
   const limitRaw = Number(req.query.limit);
   const limit = Number.isInteger(limitRaw) && limitRaw >= 1 && limitRaw <= 100 ? limitRaw : 20;
   const runs = await IngestionRun.find({}).sort({ startedAt: -1 }).limit(limit).lean();

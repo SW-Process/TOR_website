@@ -15,6 +15,11 @@ jest.mock("../ingestion/enrichment/drainEnrichmentQueue", () => ({
   drainEnrichmentQueue: (...args: unknown[]) => drainEnrichmentQueueMock(...args),
 }));
 
+const refreshLifecycleMock = jest.fn();
+jest.mock("../ingestion/lifecycle/refreshLifecycle", () => ({
+  refreshLifecycle: (...args: unknown[]) => refreshLifecycleMock(...args),
+}));
+
 const selectExtractorMock = jest.fn();
 jest.mock("../jobs/enrichment", () => ({
   selectExtractor: () => selectExtractorMock(),
@@ -22,7 +27,7 @@ jest.mock("../jobs/enrichment", () => ({
 
 import app from "../app";
 import { User } from "../models";
-import { IngestionRun, EnrichmentJob } from "../models";
+import { IngestionRun, EnrichmentJob, Tor } from "../models";
 
 let mongod: MongoMemoryServer;
 
@@ -249,7 +254,146 @@ describe("GET /api/ingestion/enrichment/pending", () => {
   });
 });
 
+describe("POST /api/ingestion/lifecycle/runs", () => {
+  const settled = {
+    runId: "r",
+    selected: 0,
+    changed: 0,
+    unchanged: 0,
+    skipped: 0,
+    failed: 0,
+  };
+
+  it("401 without a session", async () => {
+    expect((await request(app).post("/api/ingestion/lifecycle/runs").send({})).status).toBe(401);
+  });
+
+  it("403 for a vendor", async () => {
+    const agent = request.agent(app);
+    await agent.post("/api/auth/register").send({ email: "v4@test.com", password: "secret123" });
+    expect((await agent.post("/api/ingestion/lifecycle/runs").send({})).status).toBe(403);
+  });
+
+  it("202 for an admin and starts one manual refresh", async () => {
+    refreshLifecycleMock.mockResolvedValue(settled);
+    const agent = await adminAgent();
+
+    const res = await agent.post("/api/ingestion/lifecycle/runs").send({});
+
+    expect(res.status).toBe(202);
+    expect(res.body).toEqual({ status: "running" });
+    expect(refreshLifecycleMock).toHaveBeenCalledTimes(1);
+    expect(refreshLifecycleMock.mock.calls[0][0]).toMatchObject({
+      trigger: "manual",
+      triggeredBy: expect.any(String),
+    });
+    expect(refreshLifecycleMock.mock.calls[0][0].maxTors).toBeUndefined();
+  });
+
+  it("passes an explicit maxTors through", async () => {
+    refreshLifecycleMock.mockResolvedValue(settled);
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/lifecycle/runs").send({ maxTors: 7 });
+    expect(res.status).toBe(202);
+    expect(refreshLifecycleMock.mock.calls[0][0]).toMatchObject({ maxTors: 7 });
+  });
+
+  it.each([0, -1, 1.5, 301, "abc"])("400 when maxTors is %p", async (maxTors) => {
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/lifecycle/runs").send({ maxTors });
+    expect(res.status).toBe(400);
+    expect(refreshLifecycleMock).not.toHaveBeenCalled();
+  });
+
+  it("409 when a lifecycle run is already in progress", async () => {
+    await IngestionRun.create({ trigger: "scheduled", phase: "lifecycle", status: "running" });
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/lifecycle/runs").send({});
+    expect(res.status).toBe(409);
+    expect(refreshLifecycleMock).not.toHaveBeenCalled();
+  });
+
+  it("is not blocked by a running run of another phase", async () => {
+    refreshLifecycleMock.mockResolvedValue(settled);
+    await IngestionRun.create({ trigger: "scheduled", phase: "enrichment", status: "running" });
+    const agent = await adminAgent();
+    expect((await agent.post("/api/ingestion/lifecycle/runs").send({})).status).toBe(202);
+  });
+
+  it("sweeps a dead (idle) lifecycle run instead of blocking on it with 409", async () => {
+    refreshLifecycleMock.mockResolvedValue(settled);
+    const dead = await IngestionRun.create({ trigger: "scheduled", phase: "lifecycle", status: "running" });
+    await IngestionRun.collection.updateOne(
+      { _id: dead._id },
+      { $set: { updatedAt: new Date(Date.now() - 11 * 60_000) } }
+    );
+    const agent = await adminAgent();
+
+    const res = await agent.post("/api/ingestion/lifecycle/runs").send({});
+
+    expect(res.status).toBe(202);
+    expect((await IngestionRun.findById(dead._id).lean())?.status).toBe("failed");
+  });
+});
+
+describe("GET /api/ingestion/lifecycle/pending", () => {
+  const OLD_MAX = process.env.MAX_LIFECYCLE_REFRESH_PER_RUN;
+  afterEach(async () => {
+    await Tor.deleteMany({});
+    if (OLD_MAX === undefined) delete process.env.MAX_LIFECYCLE_REFRESH_PER_RUN;
+    else process.env.MAX_LIFECYCLE_REFRESH_PER_RUN = OLD_MAX;
+  });
+
+  it("401 without a session and 403 for a vendor", async () => {
+    expect((await request(app).get("/api/ingestion/lifecycle/pending")).status).toBe(401);
+    const agent = request.agent(app);
+    await agent.post("/api/auth/register").send({ email: "v5@test.com", password: "secret123" });
+    expect((await agent.get("/api/ingestion/lifecycle/pending")).status).toBe(403);
+  });
+
+  it("reports eligible TORs capped by MAX_LIFECYCLE_REFRESH_PER_RUN", async () => {
+    process.env.MAX_LIFECYCLE_REFRESH_PER_RUN = "2";
+    const url = (id: string) => `https://egp.test/project-detail/${id}`;
+    await Tor.create([
+      { title: "a", pipelineStatus: "enriched", sourceListingUrl: url("a") },
+      { title: "b", pipelineStatus: "enriched", sourceListingUrl: url("b") },
+      { title: "c", pipelineStatus: "enriched", sourceListingUrl: url("c") },
+      { title: "pending", pipelineStatus: "pending", sourceListingUrl: url("d") },
+      {
+        title: "cancelled",
+        pipelineStatus: "enriched",
+        sourceListingUrl: url("e"),
+        procurement: { stage: "cancelled", announcements: [], lastCheckedAt: new Date() },
+      },
+    ]);
+    const agent = await adminAgent();
+
+    const res = await agent.get("/api/ingestion/lifecycle/pending");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ candidates: 3, maxTors: 2, willCheck: 2 });
+  });
+
+  it("reports zero when nothing is eligible", async () => {
+    const agent = await adminAgent();
+    const res = await agent.get("/api/ingestion/lifecycle/pending");
+    expect(res.body.candidates).toBe(0);
+    expect(res.body.willCheck).toBe(0);
+  });
+});
+
 describe("GET /api/ingestion/runs", () => {
+  it("reports an idle lifecycle run as failed rather than running", async () => {
+    const dead = await IngestionRun.create({ trigger: "scheduled", phase: "lifecycle", status: "running" });
+    await IngestionRun.collection.updateOne(
+      { _id: dead._id },
+      { $set: { updatedAt: new Date(Date.now() - 11 * 60_000) } }
+    );
+    const agent = await adminAgent();
+    const res = await agent.get("/api/ingestion/runs");
+    expect(res.body.runs[0].status).toBe("failed");
+  });
+
   it("reports an idle enrichment run as failed rather than running", async () => {
     const dead = await IngestionRun.create({ trigger: "scheduled", phase: "enrichment", status: "running" });
     await IngestionRun.collection.updateOne(

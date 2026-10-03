@@ -5,6 +5,8 @@ import {
   getRun,
   createEnrichmentRun,
   getEnrichmentPending,
+  createLifecycleRun,
+  getLifecyclePending,
 } from "../controllers/ingestionController";
 import { requireAuth, requireRole } from "../middleware/auth";
 
@@ -17,5 +19,7 @@ router.get("/runs", listRuns);
 router.get("/runs/:id", getRun);
 router.post("/enrichment/runs", createEnrichmentRun);
 router.get("/enrichment/pending", getEnrichmentPending);
+router.post("/lifecycle/runs", createLifecycleRun);
+router.get("/lifecycle/pending", getLifecyclePending);
 
 export default router;
