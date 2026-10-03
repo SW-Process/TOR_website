@@ -91,6 +91,15 @@ API (`GET /api/tors`, `/:id`, `/price-stats`) to `"enriched"` rows only. Extract
 is behind the `TorExtractor` seam (`EXTRACTOR` env). Deploy: two Cloud Run Jobs on
 Cloud Scheduler — see `docs/deployment/gcp.md`.
 
+### Lifecycle refresh (`backend/src/ingestion/lifecycle/`)
+`Tor.procurement` (stage `draft|inviting|awarded|cancelled`, announcements, contract
+status) is derived from e-GP announcements by `ingestion/procurementStage.ts`. Discovery
+fills it for sighted TORs; a separate daily batch (`refreshLifecycle`, entrypoint
+`dist/jobs/lifecycle.js`, admin `POST /api/ingestion/lifecycle/runs`) re-checks existing
+enriched, unfinished TORs oldest-first up to `MAX_LIFECYCLE_REFRESH_PER_RUN`. It writes only
+the refresh-owned `procurement` paths and never touches `sourceContentHash`,
+`pipelineStatus` or the AI queue — a status check costs no Gemini call.
+
 ## Environment
 
 - `backend/.env` — needs `MONGODB_URI` (and `PORT`). `backend/.env.example` lists every required key; `MONGODB_URI` is the one the app throws without.

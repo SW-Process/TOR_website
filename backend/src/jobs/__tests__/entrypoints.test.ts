@@ -18,6 +18,16 @@ const drainEnrichmentQueue = jest.fn(async () => ({
 }));
 jest.mock("../../ingestion/enrichment/drainEnrichmentQueue", () => ({ drainEnrichmentQueue }));
 
+const refreshLifecycle = jest.fn(async () => ({
+  runId: "r3",
+  selected: 2,
+  changed: 1,
+  unchanged: 1,
+  skipped: 0,
+  failed: 0,
+}));
+jest.mock("../../ingestion/lifecycle/refreshLifecycle", () => ({ refreshLifecycle }));
+
 // ADAPTATION (documented in the report): stub GeminiExtractor so the enrichment
 // entrypoint's factory does not pull in @google/genai or try to build a Vertex
 // client during the unit test. The real class is exercised by its own suite.
@@ -91,6 +101,21 @@ describe("job entrypoints", () => {
     const { runEnrichmentJob } = await import("../enrichment");
     await runEnrichmentJob();
     expect(drainEnrichmentQueue).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("runLifecycleJob refreshes the lifecycle once as a scheduled run", async () => {
+    const { runLifecycleJob } = await import("../lifecycle");
+    await runLifecycleJob();
+    expect(refreshLifecycle).toHaveBeenCalledTimes(1);
+    expect(refreshLifecycle).toHaveBeenCalledWith(expect.objectContaining({ trigger: "scheduled" }));
+    expect(process.exitCode).toBe(0);
+  });
+
+  it("runLifecycleJob sets exitCode 1 when the refresh throws", async () => {
+    refreshLifecycle.mockRejectedValueOnce(new Error("boom"));
+    const { runLifecycleJob } = await import("../lifecycle");
+    await runLifecycleJob();
     expect(process.exitCode).toBe(1);
   });
 });

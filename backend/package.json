@@ -11,7 +11,8 @@
     "test": "jest --runInBand",
     "create-admin": "tsx src/scripts/createAdmin.ts",
     "job:discovery": "node dist/jobs/discovery.js",
-    "job:enrichment": "node dist/jobs/enrichment.js"
+    "job:enrichment": "node dist/jobs/enrichment.js",
+    "job:lifecycle": "node dist/jobs/lifecycle.js"
   },
   "keywords": [],
   "author": "",
