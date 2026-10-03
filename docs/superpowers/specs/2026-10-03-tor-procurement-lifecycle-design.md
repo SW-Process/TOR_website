@@ -103,7 +103,8 @@ meaning or retired in favour of `bidDeadline`.
   Scheduler (see `docs/deployment/gcp.md`), plus an admin "run now" card on the
   scraper-status page and `POST /api/ingestion/lifecycle/runs`.
 - Selects `enriched` TORs that are not finished (stage not `cancelled`, and
-  `contractStatus` not "ส่งงานครบถ้วน"), oldest `lastCheckedAt` first, capped by
+  `contractStatus` not one of "ส่งงานครบถ้วน", "ส่งงานตามกำหนด", "ส่งงานล่าช้ากว่ากำหนด" — work
+  delivered in full, on time or late), oldest `lastCheckedAt` first, capped by
   `MAX_LIFECYCLE_REFRESH_PER_RUN` (default 100; add to `.env.example`). Each TOR
   costs two e-GP requests through the existing polite `EgpClient`.
 - Updates `procurement` only. It must **not** modify `sourceContentHash` and must

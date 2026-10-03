@@ -2,8 +2,11 @@
 import type { QueryFilter } from "mongoose";
 import { Tor, type ITor } from "../../models";
 
-/** Contract status after which a project no longer changes, so it is no longer refreshed. */
-const FINISHED_CONTRACT_STATUS = "ส่งงานครบถ้วน";
+/**
+ * Contract statuses after which a project no longer changes, so it is no longer refreshed:
+ * work delivered in full, on time, or late. ("ยกเลิกโครงการ" is covered by the cancelled stage.)
+ */
+const FINISHED_CONTRACT_STATUSES = ["ส่งงานครบถ้วน", "ส่งงานตามกำหนด", "ส่งงานล่าช้ากว่ากำหนด"];
 
 const DEFAULT_MAX_PER_RUN = 100;
 
@@ -15,7 +18,7 @@ export function maxLifecycleRefreshPerRun(env: NodeJS.ProcessEnv = process.env):
 
 /**
  * TORs worth re-checking: publicly visible (enriched), reachable (has a listing URL) and not
- * finished (not cancelled, contract not yet complete). `$ne` also matches a missing field, so
+ * finished (not cancelled, work not yet delivered). `$ne` / `$nin` also match a missing field, so
  * TORs that have never been checked are included.
  */
 export function lifecycleFilter(): QueryFilter<ITor> {
@@ -23,7 +26,7 @@ export function lifecycleFilter(): QueryFilter<ITor> {
     pipelineStatus: "enriched",
     sourceListingUrl: { $type: "string", $ne: "" },
     "procurement.stage": { $ne: "cancelled" },
-    "procurement.contractStatus": { $ne: FINISHED_CONTRACT_STATUS },
+    "procurement.contractStatus": { $nin: FINISHED_CONTRACT_STATUSES },
   };
 }
 

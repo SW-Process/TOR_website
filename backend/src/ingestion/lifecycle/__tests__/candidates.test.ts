@@ -73,6 +73,8 @@ describe("lifecycleFilter", () => {
       { title: "rejected", pipelineStatus: "rejected", sourceListingUrl: url("e") },
       { title: "cancelled", pipelineStatus: "enriched", sourceListingUrl: url("f"), procurement: procurement("cancelled") },
       { title: "contract complete", pipelineStatus: "enriched", sourceListingUrl: url("g"), procurement: procurement("awarded", "ส่งงานครบถ้วน") },
+      { title: "delivered on time", pipelineStatus: "enriched", sourceListingUrl: url("h"), procurement: procurement("awarded", "ส่งงานตามกำหนด") },
+      { title: "delivered late", pipelineStatus: "enriched", sourceListingUrl: url("i"), procurement: procurement("awarded", "ส่งงานล่าช้ากว่ากำหนด") },
       { title: "no listing url", pipelineStatus: "enriched" },
       { title: "empty listing url", pipelineStatus: "enriched", sourceListingUrl: "" },
     ] as any);
