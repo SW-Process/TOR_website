@@ -1,9 +1,11 @@
 import type { Types } from "mongoose";
-import { SystemLog } from "../models";
+import { SystemLog, type LogSource } from "../models";
 
 export type IngestSeverity = "info" | "warning" | "error";
 
 export interface LogIngestionEventInput {
+  /** Which pipeline stage wrote this; defaults to "ingestion" (discovery). */
+  source?: LogSource;
   severity: IngestSeverity;
   message: string;
   component?: string;
@@ -12,13 +14,13 @@ export interface LogIngestionEventInput {
 }
 
 /**
- * Append one ingestion diagnostic row (FR-37/38). A logging failure must never
+ * Append one pipeline diagnostic row (FR-37/38). A logging failure must never
  * abort a run, so this swallows its own errors after printing them.
  */
 export async function logIngestionEvent(input: LogIngestionEventInput): Promise<void> {
   try {
     await SystemLog.create({
-      source: "ingestion",
+      source: input.source ?? "ingestion",
       component: input.component,
       severity: input.severity,
       message: input.message,

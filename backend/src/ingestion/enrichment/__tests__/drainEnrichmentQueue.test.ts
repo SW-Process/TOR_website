@@ -2,7 +2,7 @@
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 import { Readable } from "node:stream";
-import { Tor, EnrichmentJob, IngestionRun } from "../../../models";
+import { Tor, EnrichmentJob, IngestionRun, SystemLog } from "../../../models";
 import { enqueue } from "../enrichmentJobRepo";
 import { drainEnrichmentQueue } from "../drainEnrichmentQueue";
 import type { TorExtractor, TorExtractionResult } from "../torExtractor";
@@ -12,7 +12,7 @@ let mongod: MongoMemoryServer;
 beforeAll(async () => { mongod = await MongoMemoryServer.create(); await mongoose.connect(mongod.getUri()); await EnrichmentJob.init(); });
 afterAll(async () => { await mongoose.disconnect(); await mongod.stop(); });
 afterEach(async () => {
-  await Promise.all([Tor.deleteMany({}), EnrichmentJob.deleteMany({}), IngestionRun.deleteMany({})]);
+  await Promise.all([Tor.deleteMany({}), EnrichmentJob.deleteMany({}), IngestionRun.deleteMany({}), SystemLog.deleteMany({})]);
   setStorageForTest(null);
 });
 
@@ -129,6 +129,21 @@ describe("drainEnrichmentQueue", () => {
     expect(job?.attempts).toBe(1);
     const run = await IngestionRun.findById(out.runId).lean();
     expect(run?.status).toBe("success"); // no terminal failures this run
+    expect(run?.stats.enrichmentRetried).toBe(1); // but visible as a retry, not silently dropped
+  });
+
+  it("files its logs under source ai-pipeline, not ingestion", async () => {
+    setStorageForTest(fakeStorage);
+    await seedTorWithJob();
+    await seedTorWithJob();
+    // first TOR errors (transient), second succeeds -> a component log + the run summary
+    await drainEnrichmentQueue({ extractor: extractorReturning(new Error("boom"), result()) });
+    const logs = await SystemLog.find({}).lean();
+    expect(logs.length).toBeGreaterThanOrEqual(2);
+    expect(logs.every((l) => l.source === "ai-pipeline")).toBe(true);
+    expect(logs.map((l) => l.component)).toEqual(
+      expect.arrayContaining(["classifier.gemini", "drainEnrichmentQueue"])
+    );
   });
 
   it("writes no IngestionRun row when the queue is empty", async () => {
@@ -177,6 +192,44 @@ describe("drainEnrichmentQueue", () => {
     expect(out.claimed).toBe(2);
     const queued = await EnrichmentJob.countDocuments({ status: "queued" });
     expect(queued).toBe(1);
+  });
+
+  it("records the planned total on the run: min(runnable, maxCalls)", async () => {
+    setStorageForTest(fakeStorage);
+    await seedTorWithJob();
+    await seedTorWithJob();
+    await seedTorWithJob();
+    const out = await drainEnrichmentQueue({ extractor: extractorReturning(result()), maxCalls: 2 });
+    const run = await IngestionRun.findById(out.runId).lean();
+    expect(run?.stats.enrichmentPlanned).toBe(2);
+    expect(run?.stats.torsFound).toBe(2);
+  });
+
+  it("persists progress counters while the run is still going", async () => {
+    setStorageForTest(fakeStorage);
+    await seedTorWithJob();
+    await seedTorWithJob();
+    const seen: { planned: number; found: number; ok: number }[] = [];
+    let call = 0;
+    const extractor: TorExtractor = {
+      id: "fake",
+      extract: async () => {
+        // On the 2nd call the 1st job has finished — its progress must be in Mongo already,
+    // and the job in flight is not yet counted as processed.
+        if (++call === 2) {
+          const run = await IngestionRun.findOne({ phase: "enrichment" }).lean();
+          seen.push({
+            planned: run!.stats.enrichmentPlanned,
+            found: run!.stats.torsFound,
+            ok: run!.stats.enrichedOk,
+          });
+          expect(run!.status).toBe("running");
+        }
+        return result();
+      },
+    };
+    await drainEnrichmentQueue({ extractor });
+    expect(seen).toEqual([{ planned: 2, found: 1, ok: 1 }]);
   });
 
   it("completes a job whose TOR vanished", async () => {

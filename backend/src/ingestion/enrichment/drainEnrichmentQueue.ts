@@ -4,11 +4,9 @@ import type { HydratedDocument, Types } from "mongoose";
 import { Tor, IngestionRun, type IIngestionRun } from "../../models";
 import { getStorage, type BlobStorage } from "../../storage";
 import { logIngestionEvent } from "../log";
-import { claimNext, complete, fail } from "./enrichmentJobRepo";
+import { claimNext, complete, countRunnable, fail, maxCallsPerRun } from "./enrichmentJobRepo";
+import { sweepStaleEnrichmentRuns } from "./sweepStaleRuns";
 import { applyExtractionToTor, type TorExtractor } from "./torExtractor";
-
-/** Runs older than this while still "running" are treated as interrupted. */
-export const STALE_ENRICHMENT_RUN_MS = 35 * 60_000;
 
 export interface DrainDeps {
   extractor: TorExtractor;
@@ -34,26 +32,12 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 
 export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult> {
   const storage = deps.storage ?? getStorage();
-  const envMax = Number(process.env.MAX_AI_CALLS_PER_RUN);
-  const maxCalls = deps.maxCalls ?? (Number.isFinite(envMax) ? envMax : 50);
+  const maxCalls = deps.maxCalls ?? maxCallsPerRun();
   const now = deps.now ?? (() => new Date());
   const workerId = `enrich-${randomUUID()}`;
 
-  // Sweep enrichment runs left "running" by an interrupted Cloud Run Job task.
-  await IngestionRun.updateMany(
-    {
-      status: "running",
-      phase: "enrichment",
-      startedAt: { $lt: new Date(Date.now() - STALE_ENRICHMENT_RUN_MS) },
-    },
-    {
-      $set: {
-        status: "failed",
-        completedAt: new Date(),
-        outcomeSummary: "interrupted (stale enrichment run swept)",
-      },
-    }
-  );
+  // Sweep enrichment runs left "running" by an interrupted worker.
+  await sweepStaleEnrichmentRuns();
 
   // The IngestionRun row is created lazily — only once there is a job to do —
   // so an empty queue writes no run row.
@@ -64,6 +48,7 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
         trigger: "scheduled",
         phase: "enrichment",
         status: "running",
+        stats: { enrichmentPlanned: planned },
       });
     }
     return run;
@@ -73,9 +58,32 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
   let enrichedOk = 0;
   let enrichedRejected = 0;
   let enrichedFailed = 0;
+  let enrichedRetried = 0;
+
+  // Progress denominator for the admin UI: what this run will claim at most.
+  const planned = Math.max(0, Math.min(await countRunnable(now()), maxCalls));
+
+  /** Persist running counters so the admin UI can show "X / planned" mid-run. */
+  const flushProgress = async (): Promise<void> => {
+    if (!run) return;
+    await IngestionRun.updateOne(
+      { _id: run._id },
+      {
+        $set: {
+          "stats.torsFound": claimed,
+          "stats.enrichedOk": enrichedOk,
+          "stats.enrichedRejected": enrichedRejected,
+          "stats.enrichedFailed": enrichedFailed,
+          "stats.enrichmentRetried": enrichedRetried,
+        },
+      }
+    );
+  };
 
   try {
     while (claimed < maxCalls) {
+      // Reflect the previous job's outcome before starting the next one.
+      await flushProgress();
       const job = await claimNext(workerId, now());
       if (!job) break;
       const activeRun = await ensureRun();
@@ -146,10 +154,12 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
           tor.pipelineStatus = "failed";
         } else {
           // Transient: leave it re-runnable, not stuck in "processing".
+          enrichedRetried += 1;
           tor.pipelineStatus = "pending";
         }
         await tor.save().catch(() => undefined);
         await logIngestionEvent({
+          source: "ai-pipeline",
           severity: "error",
           message: `enrichment ${terminal ? "failed" : "errored (will retry)"} for TOR ${
             tor.projectCode ?? tor.id
@@ -171,12 +181,14 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
     activeRun.stats.enrichedOk = enrichedOk;
     activeRun.stats.enrichedRejected = enrichedRejected;
     activeRun.stats.enrichedFailed = enrichedFailed;
+    activeRun.stats.enrichmentRetried = enrichedRetried;
     activeRun.completedAt = new Date();
     activeRun.status =
       enrichedFailed === 0 ? "success" : enrichedOk + enrichedRejected === 0 ? "failed" : "partial";
     activeRun.outcomeSummary = `claimed ${claimed}, ok ${enrichedOk}, rejected ${enrichedRejected}, failed ${enrichedFailed}`;
     await activeRun.save();
     await logIngestionEvent({
+      source: "ai-pipeline",
       severity: "info",
       message: activeRun.outcomeSummary,
       component: "drainEnrichmentQueue",
@@ -191,6 +203,7 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
       activeRun.outcomeSummary = `enrichment aborted: ${(fatal as Error).message}`;
       await activeRun.save();
       await logIngestionEvent({
+        source: "ai-pipeline",
         severity: "error",
         message: activeRun.outcomeSummary,
         component: "drainEnrichmentQueue",

@@ -17,6 +17,7 @@ import {
 import RunStatusBadge from "./RunStatusBadge";
 import {
   fetchAdminStats,
+  onAdminStatsRefresh,
   overallRunStatus,
   RUN_STATUS_LABELS,
   timeAgo,
@@ -26,6 +27,8 @@ import {
 
 /** Re-check pipeline health this often while the admin panel is open. */
 const STATUS_REFRESH_MS = 60_000;
+/** ...but much faster while a run is in progress, so completion shows up promptly. */
+const STATUS_REFRESH_RUNNING_MS = 5_000;
 
 function runLine(label: string, run: RunSummary | null): string {
   return run ? `${label}: ${RUN_STATUS_LABELS[run.status]} · ${timeAgo(run.startedAt)}` : `${label}: ยังไม่เคยรัน`;
@@ -44,6 +47,8 @@ export default function AdminSidebar() {
   const pathname = usePathname();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [statsError, setStatsError] = useState(false);
+  const overallStatus = stats ? overallRunStatus(stats) : null;
+  const isRunning = overallStatus === "running";
 
   useEffect(() => {
     const load = () =>
@@ -54,11 +59,13 @@ export default function AdminSidebar() {
         })
         .catch(() => setStatsError(true));
     void load();
-    const timer = setInterval(load, STATUS_REFRESH_MS);
-    return () => clearInterval(timer);
-  }, []);
-
-  const overallStatus = stats ? overallRunStatus(stats) : null;
+    const timer = setInterval(load, isRunning ? STATUS_REFRESH_RUNNING_MS : STATUS_REFRESH_MS);
+    const unsubscribe = onAdminStatsRefresh(() => void load());
+    return () => {
+      clearInterval(timer);
+      unsubscribe();
+    };
+  }, [isRunning]);
 
   return (
     <aside className="hidden lg:flex w-60 shrink-0 flex-col bg-white">
