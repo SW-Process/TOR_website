@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { requestAdminStatsRefresh } from "@/lib/adminStats";
 
 export type IngestionRunStatus = "running" | "success" | "partial" | "failed";
 export type IngestionPhase = "discovery" | "enrichment";
@@ -97,6 +98,7 @@ export function useIngestionRuns() {
           if (!stillRunning || Date.now() - startedAt > POLL_TIMEOUT_MS[phase]) {
             setPending(false);
             stop();
+            requestAdminStatsRefresh();
             if (phase === "enrichment") void refreshEnrichmentQueue();
           }
         } catch {
@@ -165,6 +167,7 @@ export function useIngestionRuns() {
           const body = await res.json().catch(() => null);
           throw new Error((body as { message?: string } | null)?.message || "failed to trigger ingestion");
         }
+        requestAdminStatsRefresh();
         pollUntilSettled("discovery", setIngestionPending);
       } catch (err) {
         setError(err instanceof Error ? err.message : "สั่งรัน ingestion ไม่สำเร็จ");
@@ -191,6 +194,7 @@ export function useIngestionRuns() {
       if (!res.ok && res.status !== 409) {
         throw new Error("failed to trigger enrichment");
       }
+      requestAdminStatsRefresh();
       pollUntilSettled("enrichment", setEnrichmentPending);
     } catch {
       setError("สั่งรัน enrichment ไม่สำเร็จ");
