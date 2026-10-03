@@ -115,6 +115,16 @@ describe("buildProcurement", () => {
     expect(p.contractStatus).toBeUndefined();
   });
 
+  it("drops announcements with a blank id and still derives the stage from the rest", () => {
+    const p = buildProcurement(
+      [egp("", "ประกาศเชิญชวน", "2026-09-10T00:00:00Z"), egp("  ", "ประกาศเชิญชวน", "2026-09-11T00:00:00Z"), egp("tor", "ร่างขอบเขตของงาน (TOR)", "2026-09-01T00:00:00Z")],
+      null,
+      NOW
+    );
+    expect(p.announcements.map((x) => x.announcementId)).toEqual(["tor"]);
+    expect(p.stage).toBe("draft");
+  });
+
   it("returns draft with no announcements", () => {
     expect(buildProcurement([], null, NOW).stage).toBe("draft");
   });

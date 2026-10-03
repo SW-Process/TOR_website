@@ -80,7 +80,9 @@ export function buildProcurement(
   contractStatus: string | null | undefined,
   now: Date
 ): IProcurement {
+  // An announcement without an id cannot be stored (id is required) and must never block a TOR.
   const items: IProcurementAnnouncement[] = announcements
+    .filter((a) => Boolean(a.id?.trim()))
     .map((a) => ({
       announcementId: a.id,
       typeName: a.masterAnnounceTypeName?.trim() || undefined,

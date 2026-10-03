@@ -90,6 +90,10 @@ async function processProject(
     now: ctx.now(),
   });
 
+  // Procurement is refreshed on every sighting. mergeProcurement keeps `bidDeadline` and each
+  // announcement's stored copy, which other pipeline stages own. It is saved together with the
+  // rest of the Tor (one save per path) so a failed procurement write can never strand a Tor
+  // with its new hash but without its enrichment enqueue.
   let tor = await Tor.findOne({ projectCode: mapped.projectCode });
   let created = false;
   let updated = false;
@@ -99,26 +103,28 @@ async function processProject(
       projectCode: mapped.projectCode,
       sourceContentHash: mapped.sourceContentHash,
       ingestionRunId: runId,
+      procurement: mergeProcurement(null, mapped.procurement),
     });
     created = true;
     stats.torsCreated += 1;
   } else {
+    tor.set("procurement", mergeProcurement(tor.toObject().procurement, mapped.procurement));
+
     // A hash stored before procurement stages existed also covered the contract status. Adopt
     // the new hash quietly (no update, PDF fetch or AI enqueue) when either:
     //  (i) the stored hash equals the legacy hash of the fresh detail (nothing at all changed), or
-    //  (ii) the Tor is legacy-era (never sighted under the new code: no `procurement`) and every
-    //       hashed core field is unchanged, so the only possible difference is contract status.
+    //  (ii) every stored hashed core field equals the fresh one, so the only possible difference
+    //       is the contract status. Deliberately not conditioned on `procurement` being absent:
+    //       the lifecycle refresh job may already have written it onto a legacy-hash Tor.
     if (
       tor.sourceContentHash !== mapped.sourceContentHash &&
-      (tor.sourceContentHash === mapped.legacySourceContentHash ||
-        (!tor.procurement && sameCoreFields(tor, mapped.set)))
+      (tor.sourceContentHash === mapped.legacySourceContentHash || sameCoreFields(tor, mapped.set))
     ) {
       tor.sourceContentHash = mapped.sourceContentHash;
     }
 
     if (tor.sourceContentHash !== mapped.sourceContentHash) {
       tor.set({ ...mapped.set, sourceContentHash: mapped.sourceContentHash, ingestionRunId: runId });
-      await tor.save();
       updated = true;
       stats.torsUpdated += 1;
     } else {
@@ -126,12 +132,8 @@ async function processProject(
       // deliberate idempotent no-op, not an unaccounted-for outcome.
       stats.torsUnchanged += 1;
     }
+    await tor.save();
   }
-
-  // Procurement is refreshed on every sighting. mergeProcurement keeps `bidDeadline` and each
-  // announcement's stored copy, which other pipeline stages own.
-  tor.procurement = mergeProcurement(tor.toObject().procurement, mapped.procurement);
-  await tor.save();
 
   for (const message of mapped.ingestErrors) {
     await logIngestionEvent({ severity: "warning", message, component: "runIngestion", ingestionRunId: runId });

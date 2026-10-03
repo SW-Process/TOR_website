@@ -413,6 +413,56 @@ describe("runIngestion", () => {
       expect(enqueue).toHaveBeenCalledTimes(1);
     });
   });
+
+  it("creates and enqueues a Tor even when an e-GP announcement has an empty id", async () => {
+    const enqueue = jest.fn();
+    const bad: EgpAnnouncement = {
+      id: "",
+      masterAnnounceTypeName: "ประกาศเชิญชวน",
+      projectAnnouncementPublishDate: "2026-09-10T00:00:00Z",
+      projectAnnouncementPath: "inv.pdf",
+    };
+    const { runId, done } = await runIngestion(baseOpts, {
+      client: fakeClient({ extraAnnouncements: [bad] }),
+      storage: fakeStorage(),
+      parse,
+      enqueueEnrichment: enqueue,
+    });
+    await done;
+
+    const run = await IngestionRun.findById(runId).lean();
+    expect(run?.stats).toMatchObject({ torsCreated: 2, torsFailed: 0 });
+    expect(enqueue).toHaveBeenCalledTimes(2);
+    const t = await Tor.findOne({ projectCode: "69000000001" }).lean();
+    expect(t?.procurement?.announcements.map((a) => a.kind)).toEqual(["tor-draft"]);
+  });
+
+  it("adopts the new hash quietly for a legacy-hash Tor that already has procurement", async () => {
+    const enqueue = jest.fn();
+    const deps = { storage: fakeStorage(), parse, enqueueEnrichment: enqueue };
+    await (await runIngestion(baseOpts, { ...deps, client: fakeClient() })).done;
+    expect(enqueue).toHaveBeenCalledTimes(2);
+    for (const p of projects) {
+      await Tor.updateOne(
+        { projectCode: p.projectNumber },
+        { sourceContentHash: legacyDetailHash(detailFor(`โครงการ ${p.projectNumber}`, "ระหว่างดำเนินการ")) }
+      );
+    }
+    enqueue.mockClear();
+
+    const { runId, done } = await runIngestion(baseOpts, {
+      ...deps,
+      client: fakeClient({ contractStatus: "ส่งงานครบถ้วน" }),
+    });
+    await done;
+
+    const run = await IngestionRun.findById(runId).lean();
+    expect(run?.stats).toMatchObject({ torsUpdated: 0, torsUnchanged: 2 });
+    expect(enqueue).not.toHaveBeenCalled();
+    const t = await Tor.findOne({ projectCode: "69000000001" }).lean();
+    expect(t?.sourceContentHash).toBe(canonicalDetailHash(detailFor("โครงการ 69000000001")));
+    expect(t?.procurement?.contractStatus).toBe("ส่งงานครบถ้วน");
+  });
 });
 
 describe("markInterruptedRunsFailed", () => {

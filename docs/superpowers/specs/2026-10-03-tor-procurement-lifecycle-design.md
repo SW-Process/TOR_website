@@ -62,7 +62,7 @@ New embedded `Tor.procurement`:
 | Field | Meaning |
 |---|---|
 | `stage` | `draft` \| `inviting` \| `awarded` \| `cancelled` |
-| `contractStatus` | raw e-GP string (and code if present) |
+| `contractStatus` | raw e-GP string |
 | `announcements[]` | `{ announcementId, typeName, kind, publishedAt, hasFile, storageKey? }`; `kind` is the normalised type |
 | `bidDeadline` | `{ date, source: "invitation-pdf" \| "admin", extractedAt }` |
 | `lastCheckedAt` | last successful refresh |
@@ -117,10 +117,11 @@ meaning or retired in favour of `bidDeadline`.
   adopts the new hash lazily when it sees a TOR again, writing it silently and counting
   the TOR as unchanged (no PDF re-download, no enrichment) in two cases: (i) the stored
   hash equals `legacyDetailHash` (the old hash, which still includes contract status) of
-  the freshly fetched detail; or (ii) the TOR is legacy-era (has no `procurement` yet)
-  and its stored core fields (title, agency, department, budget, reference price,
+  the freshly fetched detail; or (ii) its stored core fields (title, agency, department, budget, reference price,
   method, type, goods category) equal the fresh ones, so the only possible difference is
-  the contract status. This is robust to admin edits: an admin-edited legacy TOR simply
+  the contract status. This must keep working after the lifecycle refresh job starts
+  writing `procurement`, so it is deliberately not conditioned on `procurement` being
+  absent. This is robust to admin edits: an admin-edited legacy TOR simply
   falls through to the normal update path, as it did before. A script recomputing
   hashes from stored fields would have mis-hashed such TORs.
 
@@ -154,7 +155,7 @@ meaning or retired in favour of `bidDeadline`.
 
 Each step is independently shippable and gets its own PR:
 
-1. Schema, stage derivation, `kind` normalisation, hash change + migration script.
+1. Schema, stage derivation, `kind` normalisation, hash change with lazy legacy-hash adoption.
 2. Lifecycle refresh job, run record, admin trigger, env + deployment docs.
 3. API fields/filter and UI for all stages (including the admin pipeline view).
 4. Invitation download + bid-deadline extraction (after the PDF verification above).
@@ -166,13 +167,15 @@ Each step is independently shippable and gets its own PR:
 - Refresh job against a fake `EgpClientLike`: updates `procurement`, respects the
   cap and ordering, never touches the hash or enqueues full enrichment, logs
   failures without advancing `lastCheckedAt`.
-- Legacy-hash adoption: unchanged detail, or contract-status-only drift on a legacy-era TOR → no update and no enqueue; genuine change → still an update.
+- Legacy-hash adoption: unchanged detail, or contract-status-only drift on a TOR with a legacy hash → no update and no enqueue; genuine change → still an update.
+- Re-sighting must save once per TOR (procurement + hash/fields together) so a failed procurement write can never strand a TOR without its enrichment enqueue.
 - Deadline extraction with a fake extractor: stored once per invitation id,
   admin value wins, unreadable PDF leaves it empty.
 - API: new fields, status computation at the 7-day boundary, stage filter.
 
 ## Open items
 
+- A winner announcement dated after the latest cancellation currently reads as `cancelled` (literal precedence rule); confirm with real data whether a cancelled bidding followed by an award without a new invitation should read as `awarded` before step 3 shows stages to users.
 - Meaning of the current `submissionDeadline` (verify on real PDFs).
 - Other cancellation announcement names beyond "ยกเลิกประกาศเชิญชวน"; widen the
   sample before finalising `kind` normalisation.
