@@ -129,6 +129,7 @@ describe("drainEnrichmentQueue", () => {
     expect(job?.attempts).toBe(1);
     const run = await IngestionRun.findById(out.runId).lean();
     expect(run?.status).toBe("success"); // no terminal failures this run
+    expect(run?.stats.enrichmentRetried).toBe(1); // but visible as a retry, not silently dropped
   });
 
   it("writes no IngestionRun row when the queue is empty", async () => {

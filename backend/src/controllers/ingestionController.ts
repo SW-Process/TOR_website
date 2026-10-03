@@ -4,6 +4,7 @@ import { httpError } from "../utils/httpError";
 import { runIngestion } from "../ingestion/runIngestion";
 import { drainEnrichmentQueue } from "../ingestion/enrichment/drainEnrichmentQueue";
 import { countRunnable, maxCallsPerRun } from "../ingestion/enrichment/enrichmentJobRepo";
+import { sweepStaleEnrichmentRuns } from "../ingestion/enrichment/sweepStaleRuns";
 import { selectExtractor } from "../jobs/enrichment";
 
 const MAX_PROJECTS_CEILING = 500;
@@ -75,6 +76,8 @@ export async function createEnrichmentRun(req: Request, res: Response): Promise<
   const body = (req.body ?? {}) as Record<string, unknown>;
   const maxCalls = parseEnrichmentMaxCalls(body.maxCalls);
 
+  // A run whose worker died (e.g. backend restart) must not block new runs forever.
+  await sweepStaleEnrichmentRuns();
   const active = await IngestionRun.exists({ status: "running", phase: "enrichment" });
   if (active) throw httpError(409, "An enrichment run is already in progress");
 
@@ -95,6 +98,7 @@ export async function getEnrichmentPending(_req: Request, res: Response): Promis
 
 /** GET /api/ingestion/runs — recent run history (FR-34). */
 export async function listRuns(req: Request, res: Response): Promise<void> {
+  await sweepStaleEnrichmentRuns(); // so the admin UI sees a dead run as failed, not "running"
   const limitRaw = Number(req.query.limit);
   const limit = Number.isInteger(limitRaw) && limitRaw >= 1 && limitRaw <= 100 ? limitRaw : 20;
   const runs = await IngestionRun.find({}).sort({ startedAt: -1 }).limit(limit).lean();

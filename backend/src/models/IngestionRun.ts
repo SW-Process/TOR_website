@@ -16,6 +16,8 @@ export interface IIngestionRunStats {
   enrichedFailed: number;
   /** Enrichment runs only: how many jobs this run set out to process (progress denominator). */
   enrichmentPlanned: number;
+  /** Enrichment runs: jobs that errored transiently and were re-queued with backoff. */
+  enrichmentRetried: number;
 }
 
 export interface IIngestionRun {
@@ -74,6 +76,7 @@ const ingestionRunSchema = new Schema<IIngestionRun>(
       enrichedRejected: { type: Number, default: 0 },
       enrichedFailed: { type: Number, default: 0 },
       enrichmentPlanned: { type: Number, default: 0 },
+      enrichmentRetried: { type: Number, default: 0 },
     },
     outcomeSummary: { type: String },
   },

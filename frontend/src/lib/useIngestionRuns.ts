@@ -18,6 +18,8 @@ export interface IngestionRunStats {
   enrichedFailed: number;
   /** Enrichment runs: jobs this run set out to process (progress denominator). */
   enrichmentPlanned: number;
+  /** Enrichment runs: jobs that errored transiently and were re-queued. */
+  enrichmentRetried: number;
 }
 
 /** What the next enrichment run would do (GET /api/ingestion/enrichment/pending). */

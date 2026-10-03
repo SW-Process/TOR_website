@@ -52,7 +52,8 @@ function EnrichmentStatus({
         <p className="mt-4 text-xs text-[var(--color-text-muted)]">กำลังเตรียมคิววิเคราะห์...</p>
       );
     }
-    const { torsFound: done, enrichedOk, enrichedRejected, enrichedFailed } = run.stats;
+    const { torsFound: done, enrichedOk, enrichedRejected, enrichedFailed, enrichmentRetried } =
+      run.stats;
     const percent = Math.min(100, Math.round((done / planned) * 100));
     return (
       <div className="mt-4" aria-live="polite">
@@ -76,6 +77,7 @@ function EnrichmentStatus({
         </div>
         <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
           สำเร็จ {enrichedOk} · ไม่เกี่ยวกับซอฟต์แวร์ {enrichedRejected} · ล้มเหลว {enrichedFailed}
+          {enrichmentRetried > 0 && ` · รอลองใหม่ ${enrichmentRetried}`}
         </p>
       </div>
     );

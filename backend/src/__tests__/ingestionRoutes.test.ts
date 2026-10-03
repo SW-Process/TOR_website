@@ -170,6 +170,29 @@ describe("POST /api/ingestion/enrichment/runs", () => {
     expect(drainEnrichmentQueueMock).not.toHaveBeenCalled();
   });
 
+  it("sweeps an idle (dead-worker) run instead of blocking on it with 409", async () => {
+    selectExtractorMock.mockReturnValue({ id: "fake", extract: jest.fn() });
+    drainEnrichmentQueueMock.mockResolvedValue({
+      runId: "r",
+      claimed: 0,
+      enrichedOk: 0,
+      enrichedRejected: 0,
+      enrichedFailed: 0,
+    });
+    const dead = await IngestionRun.create({ trigger: "scheduled", phase: "enrichment", status: "running" });
+    // bypass mongoose timestamps so the row looks untouched for 11 minutes
+    await IngestionRun.collection.updateOne(
+      { _id: dead._id },
+      { $set: { updatedAt: new Date(Date.now() - 11 * 60_000) } }
+    );
+    const agent = await adminAgent();
+
+    const res = await agent.post("/api/ingestion/enrichment/runs").send({});
+
+    expect(res.status).toBe(202);
+    expect((await IngestionRun.findById(dead._id).lean())?.status).toBe("failed");
+  });
+
   it("409 when an enrichment run is already in progress", async () => {
     await IngestionRun.create({ trigger: "scheduled", phase: "enrichment", status: "running" });
     const agent = await adminAgent();
@@ -227,6 +250,17 @@ describe("GET /api/ingestion/enrichment/pending", () => {
 });
 
 describe("GET /api/ingestion/runs", () => {
+  it("reports an idle enrichment run as failed rather than running", async () => {
+    const dead = await IngestionRun.create({ trigger: "scheduled", phase: "enrichment", status: "running" });
+    await IngestionRun.collection.updateOne(
+      { _id: dead._id },
+      { $set: { updatedAt: new Date(Date.now() - 11 * 60_000) } }
+    );
+    const agent = await adminAgent();
+    const res = await agent.get("/api/ingestion/runs");
+    expect(res.body.runs[0].status).toBe("failed");
+  });
+
   it("lists runs newest first for an admin", async () => {
     const agent = await adminAgent();
     await IngestionRun.create({ trigger: "manual", startedAt: new Date("2026-08-01"), status: "success" });
