@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -16,8 +17,18 @@ import HeroSearch from "@/components/HeroSearch";
 import TORCard from "@/components/TORCard";
 import AlertSignup from "@/components/AlertSignup";
 import CategoryGrid from "@/components/CategoryGrid";
+import StatusBadge from "@/components/StatusBadge";
+import mascotPeek from "@/components/picture/bottom.png";
+import mascotSign from "@/components/picture/circle.png";
+import mascotPoint from "@/components/picture/good.png";
 import { formatBudget } from "@/lib/mockData";
 import { fetchTorList } from "@/lib/torApi";
+
+/** "฿8.5M"-style budget for the compact hero card. */
+function formatCompactBaht(amount: number): string {
+  if (!amount) return "ไม่ระบุงบ";
+  return `฿${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(amount)}`;
+}
 
 export default async function Home() {
   const torList = await fetchTorList();
@@ -27,6 +38,8 @@ export default async function Home() {
   const latest = [...torList]
     .sort((a, b) => (a.announceDate < b.announceDate ? 1 : -1))
     .slice(0, 6);
+  // Hero showcase: the newest TOR still taking bids.
+  const featured = latest.find((t) => t.status !== "ปิดรับแล้ว") ?? latest[0];
 
   const trust = [
     { icon: ShieldCheck, title: "ข้อมูลจาก e-GP", sub: "กรมบัญชีกลาง" },
@@ -121,50 +134,86 @@ export default async function Home() {
               style={{ animationDelay: "-2s" }}
             />
 
-            <div className="absolute top-[210px] left-16 h-8 w-[240px] rotate-[-4deg] rounded-full bg-black/15 blur-xl" />
-            <div className="animate-card-bob absolute top-10 left-6 w-[300px]">
-              <div
-                className="rotate-[-4deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
-                style={{ boxShadow: "0 24px 48px -16px rgba(224,87,119,0.35), 0 10px 24px rgba(34,26,24,0.06)" }}
-              >
-                <span className="badge bg-[var(--color-success-bg)] text-[var(--color-success)]">เปิดรับ</span>
-                <p className="mt-3 font-[family-name:var(--font-heading)] font-bold text-[var(--color-text)] leading-snug">
-                  จ้างพัฒนาระบบแพลตฟอร์มสืบค้นประกาศจัดซื้อจัดจ้างกลาง
-                </p>
-                <p className="mt-2 text-xs text-[var(--color-text-muted)]">สำนักยุทธศาสตร์และประเมินผล</p>
-                <div className="mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-3">
-                  <span className="font-[family-name:var(--font-heading)] font-extrabold text-[var(--color-rose-dark)]">
-                    ฿8.5M
-                  </span>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ink)] text-white">
-                    <ArrowUpRight size={15} />
-                  </span>
+            {featured && (
+              <>
+                <div className="absolute top-[210px] left-16 h-8 w-[240px] rotate-[-4deg] rounded-full bg-black/15 blur-xl" />
+                <div className="animate-card-bob absolute top-10 left-6 w-[300px]">
+                  <Link
+                    href={`/tor/${featured.id}`}
+                    className="group relative block rotate-[-4deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
+                    style={{ boxShadow: "0 24px 48px -16px rgba(224,87,119,0.35), 0 10px 24px rgba(34,26,24,0.06)" }}
+                  >
+                    {/* Mascot peeking over the card's top-right edge; its paws sit on the edge. */}
+                    <Image
+                      src={mascotPeek}
+                      alt=""
+                      width={150}
+                      priority
+                      className="pointer-events-none absolute z-10 select-none"
+                      style={{
+                        top: -76,
+                        right: -16,
+                        width: 150,
+                        height: "auto",
+                        filter: "drop-shadow(0 8px 12px rgba(224,87,119,0.18))",
+                      }}
+                    />
+                    <StatusBadge status={featured.status} />
+                    <p className="mt-3 line-clamp-2 font-[family-name:var(--font-heading)] font-bold text-[var(--color-text)] leading-snug">
+                      {featured.title}
+                    </p>
+                    <p className="mt-2 truncate text-xs text-[var(--color-text-muted)]">{featured.agency}</p>
+                    <div className="mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-3">
+                      <span className="font-[family-name:var(--font-heading)] font-extrabold text-[var(--color-rose-dark)]">
+                        {formatCompactBaht(featured.budget)}
+                      </span>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ink)] text-white transition-transform group-hover:scale-110">
+                        <ArrowUpRight size={15} />
+                      </span>
+                    </div>
+                  </Link>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
 
             <div className="absolute bottom-2 right-8 h-7 w-44 rotate-[3deg] rounded-full bg-black/15 blur-xl" />
             <div className="animate-card-bob absolute bottom-10 right-4 w-56" style={{ animationDelay: "-2.5s" }}>
               <div
-                className="rotate-[3deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
+                className="relative rotate-[3deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
                 style={{ boxShadow: "0 24px 48px -16px rgba(224,87,119,0.3), 0 10px 24px rgba(34,26,24,0.06)" }}
               >
+                {/* Mascot on the bottom-right corner, pointing back at the label. */}
+                <Image
+                  src={mascotPoint}
+                  alt=""
+                  width={120}
+                  className="pointer-events-none absolute z-10 select-none"
+                  style={{ right: -30, bottom: -36, width: 120, height: "auto", filter: "drop-shadow(0 10px 14px rgba(224,87,119,0.22))" }}
+                />
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-rose-light)] text-[var(--color-rose-dark)]">
                   <Sparkles size={16} />
                 </span>
                 <p className="mt-3 text-sm font-bold text-[var(--color-text)]">สรุปด้วย AI แล้ว</p>
-                <p className="text-xs text-[var(--color-text-muted)]">ทุกประกาศ 100%</p>
+                {/* /api/tors only serves enriched TORs, so every one listed has a summary. */}
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {torList.length.toLocaleString("th-TH")} ประกาศ
+                </p>
               </div>
             </div>
 
-            <div className="absolute top-[calc(50%+58px)] right-14 h-6 w-20 -translate-x-1/2 rounded-full bg-black/20 blur-lg" />
-            <div
-              className="animate-card-bob absolute top-1/2 right-16 -translate-y-1/2"
-              style={{ animationDelay: "-4s" }}
-            >
+            {/* Mascot holding the open-TOR count up like a sign: the stick's tip
+                (≈79%, 8% of circle.png) tucks behind the bottom of the circle. */}
+            <div className="animate-card-bob absolute" style={{ top: 96, right: 28, width: 182, height: 201, animationDelay: "-4s" }}>
+              <Image
+                src={mascotSign}
+                alt=""
+                width={170}
+                className="pointer-events-none absolute select-none"
+                style={{ left: 0, top: 62, width: 170, height: "auto", filter: "drop-shadow(0 12px 16px rgba(224,87,119,0.22))" }}
+              />
               <div
-                className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-[var(--color-ink)] text-center text-white"
-                style={{ boxShadow: "0 20px 40px -12px rgba(34,26,24,0.45)" }}
+                className="absolute z-10 flex h-24 w-24 flex-col items-center justify-center rounded-full bg-[var(--color-ink)] text-center text-white"
+                style={{ left: 86, top: 0, boxShadow: "0 20px 40px -12px rgba(34,26,24,0.45)" }}
               >
                 <span className="font-[family-name:var(--font-heading)] text-base font-extrabold">
                   {openTOR.length}
@@ -236,9 +285,9 @@ export default async function Home() {
               <div>
                 <Sparkles size={18} className="text-[var(--color-rose-dark)]" />
                 <p className="mt-2 font-[family-name:var(--font-heading)] text-xl sm:text-2xl font-extrabold text-[var(--color-text)]">
-                  100%
+                  {torList.length.toLocaleString("th-TH")} ประกาศ
                 </p>
-                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">สรุปด้วย AI</p>
+                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">สรุปด้วย AI แล้ว</p>
               </div>
               <div>
                 <Building2 size={18} className="text-[var(--color-rose-dark)]" />

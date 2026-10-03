@@ -3,6 +3,7 @@ import { isValidObjectId } from "mongoose";
 import { z } from "zod";
 import { ErrorReport, Tor, User, VendorProfile } from "../models";
 import { httpError } from "../utils/httpError";
+import { key, person, type UserLite } from "../utils/personView";
 
 /**
  * Admin inbox for "this TOR's info is wrong" reports (FR-41): who reported it
@@ -22,28 +23,6 @@ const updateSchema = z
     resolutionNote: z.string().trim().max(1000).optional(),
   })
   .strict();
-
-type Id = { toString(): string };
-const key = (id: Id | null | undefined) => (id ? id.toString() : "");
-
-interface UserLite {
-  _id: Id;
-  email: string;
-  role: string;
-  avatarKey?: string;
-}
-
-function person(u: UserLite | undefined, companyName?: string) {
-  if (!u) return null;
-  return {
-    id: key(u._id),
-    email: u.email,
-    displayName: companyName || u.email.split("@")[0],
-    companyName: companyName ?? null,
-    role: u.role,
-    avatarUrl: u.avatarKey ? `/api/auth/avatar/${key(u._id)}` : null,
-  };
-}
 
 /** GET /api/admin/reports?status=open|resolved|all — newest first, with reporter and TOR. */
 export async function listReports(req: Request, res: Response): Promise<void> {

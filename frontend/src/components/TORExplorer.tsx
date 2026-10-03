@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Plus, Search, SlidersHorizontal, X } from "l
 import TORCard from "./TORCard";
 import { categories, formatBudget } from "@/lib/mockData";
 import {
+  CLOSING_SOON_DAYS,
   fetchAgencies,
   fetchTechnologies,
   searchTors,
@@ -248,6 +249,9 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
                 className="rounded border-[var(--color-border)] accent-[var(--color-rose-dark)]"
               />
               {s}
+              {s === "ใกล้ปิดรับ" && (
+                <span className="text-xs text-[var(--color-text-faint)]">(ภายใน {CLOSING_SOON_DAYS} วัน)</span>
+              )}
             </label>
           ))}
         </div>

@@ -1,16 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeftRight, Bell, LogOut, MessageSquare, Search } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
+import { CHAT_POLL_IDLE_MS, fetchAdminChats } from "@/lib/chat";
 
 export default function AdminTopbar() {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const { user, displayName, avatarSrc, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadChats, setUnreadChats] = useState(0);
+
+  // Threads with visitor messages no admin has read yet, for the chat badge.
+  useEffect(() => {
+    const load = () =>
+      fetchAdminChats("all", 1)
+        .then((r) => setUnreadChats(r.counts.unread))
+        .catch(() => {});
+    void load();
+    const timer = setInterval(load, CHAT_POLL_IDLE_MS);
+    return () => clearInterval(timer);
+  }, []);
 
   async function handleLogout() {
     setMenuOpen(false);
@@ -54,13 +67,18 @@ export default function AdminTopbar() {
           รายงาน
         </Link>
 
-        <button
-          type="button"
-          aria-label="ข้อความ"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-[var(--shadow-sm)] text-[var(--color-ink-soft)] hover:text-[var(--color-rose-dark)] transition-colors"
+        <Link
+          href="/admin/chats"
+          aria-label={unreadChats > 0 ? `แชทจากผู้ใช้ (ยังไม่ได้อ่าน ${unreadChats})` : "แชทจากผู้ใช้"}
+          className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-[var(--shadow-sm)] text-[var(--color-ink-soft)] hover:text-[var(--color-rose-dark)] transition-colors"
         >
           <MessageSquare size={15} />
-        </button>
+          {unreadChats > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-rose)] px-1 text-[9px] font-bold text-white ring-2 ring-[var(--color-surface-alt)]">
+              {unreadChats > 9 ? "9+" : unreadChats}
+            </span>
+          )}
+        </Link>
         <button
           type="button"
           aria-label="การแจ้งเตือน"

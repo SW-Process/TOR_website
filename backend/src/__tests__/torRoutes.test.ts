@@ -160,20 +160,26 @@ describe("GET /api/tors", () => {
     ]);
   });
 
-  it("filters by effective status: a passed deadline counts as closed whatever is stored", async () => {
+  it("filters by effective status, derived from the deadline rather than what is stored", async () => {
     const day = 86_400_000;
     await Tor.create([
-      { title: "เปิดอยู่", pipelineStatus: "enriched", status: "open", submissionDeadline: new Date(Date.now() + day) },
+      { title: "ปิดอีก 10 วัน", pipelineStatus: "enriched", status: "open", submissionDeadline: new Date(Date.now() + 10 * day) },
+      { title: "ปิดอีก 3 วัน", pipelineStatus: "enriched", status: "open", submissionDeadline: new Date(Date.now() + 3 * day) },
       { title: "เลยกำหนดแต่ยัง open", pipelineStatus: "enriched", status: "open", submissionDeadline: new Date(Date.now() - day) },
-      { title: "ใกล้ปิด", pipelineStatus: "enriched", status: "closing_soon" },
+      // a stored closing_soon no longer matters without a near deadline
+      { title: "เก็บไว้ว่าใกล้ปิด", pipelineStatus: "enriched", status: "closing_soon" },
+      { title: "แอดมินปิดแล้ว", pipelineStatus: "enriched", status: "closed", submissionDeadline: new Date(Date.now() + 2 * day) },
       { title: "ไม่ทราบวันปิด", pipelineStatus: "enriched" },
     ]);
     const titles = async (qs: string) =>
       (await request(app).get(`/api/tors?${qs}`)).body.data.map((t: { title: string }) => t.title).sort();
 
-    expect(await titles("status=closed")).toEqual(["เลยกำหนดแต่ยัง open"]);
-    expect(await titles("status=open")).toEqual(["เปิดอยู่", "ไม่ทราบวันปิด"].sort());
-    expect(await titles("status=closing_soon&status=closed")).toEqual(["ใกล้ปิด", "เลยกำหนดแต่ยัง open"].sort());
+    expect(await titles("status=closed")).toEqual(["เลยกำหนดแต่ยัง open", "แอดมินปิดแล้ว"].sort());
+    expect(await titles("status=closing_soon")).toEqual(["ปิดอีก 3 วัน"]);
+    expect(await titles("status=open")).toEqual(["ปิดอีก 10 วัน", "เก็บไว้ว่าใกล้ปิด", "ไม่ทราบวันปิด"].sort());
+    expect(await titles("status=closing_soon&status=closed")).toEqual(
+      ["ปิดอีก 3 วัน", "เลยกำหนดแต่ยัง open", "แอดมินปิดแล้ว"].sort()
+    );
     expect((await request(app).get("/api/tors?status=bogus")).status).toBe(400);
   });
 

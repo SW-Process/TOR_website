@@ -172,12 +172,26 @@ h6 {
 .animate-card-bob { animation: card-bob 6s ease-in-out infinite; }
 .animate-dot-pulse { animation: dot-pulse 3s ease-in-out infinite; }
 
+@keyframes mascot-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-4px) rotate(3deg); }
+}
+@keyframes chat-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-mascot-bob { animation: mascot-bob 3s ease-in-out infinite; }
+.animate-chat-pop { animation: chat-pop 0.2s ease-out; }
+
 @media (prefers-reduced-motion: reduce) {
   .animate-blob-a,
   .animate-blob-b,
   .animate-blob-c,
   .animate-card-bob,
-  .animate-dot-pulse {
+  .animate-dot-pulse,
+  .animate-mascot-bob,
+  .animate-chat-pop {
     animation: none;
   }
 }
