@@ -70,7 +70,9 @@ export function statusNote(tor: Pick<TOR, "status" | "procurement">): string {
     case "ร่าง TOR":
       return "ยังไม่ประกาศเชิญชวน";
     case "ประกาศผู้ชนะแล้ว":
-      return "ประกาศผู้ชนะแล้ว";
+      // The bid deadline is stored for every stage; show it like the other cards, or the plain
+      // label when it could not be read.
+      return bid ? `ปิดรับเมื่อ ${formatThaiDate(bid)}` : "ประกาศผู้ชนะแล้ว";
     case "ยกเลิก":
       return "ยกเลิกการจัดซื้อ";
     case "ปิดรับแล้ว":
