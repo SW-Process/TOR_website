@@ -5,14 +5,11 @@ import { isValidObjectId, type PipelineStage, type QueryFilter } from "mongoose"
 import { Tor } from "../models";
 import type { ITor } from "../models";
 import { httpError } from "../utils/httpError";
+import { escapeRegExp } from "../utils/escapeRegExp";
 import { hiddenTorIdsOf } from "./hiddenTorController";
 import { PROJECT_TYPES } from "../config/projectTypes";
 import { TOR_STATUSES, statusClause, withDisplayStatus, type StatusInput } from "../utils/torStatus";
 
-/** Escape a user string so it is a literal inside a RegExp. */
-function escapeRegExp(input: string): string {
-  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 const asArray = (v: unknown): string[] | undefined => {
   if (v === undefined) return undefined;
