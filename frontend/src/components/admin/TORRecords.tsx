@@ -78,6 +78,12 @@ interface Draft {
   deadline: string;
   /** Close the TOR by hand: it then shows as ปิดรับแล้ว whatever its real stage is. */
   manualClosed: boolean;
+  /** Only for `inviting` TORs. `YYYY-MM-DD` (Bangkok day); "" = unknown. */
+  bidDeadline: string;
+  /** Value loaded from the API, so an untouched field is never sent back (it would turn an AI value into an admin one). */
+  originalBidDeadline: string;
+  /** The field is shown only while the TOR is in the invitation stage. */
+  canSetBidDeadline: boolean;
   openFlags: AdminTor["openFlags"];
 }
 
@@ -86,6 +92,14 @@ function toAdminTor(raw: ApiAdminTor): AdminTor {
     ...mapApiTor(raw),
     openFlags: (raw.fairnessFlags ?? []).filter((f) => f.status === "open"),
   };
+}
+
+/** The Bangkok calendar day of an ISO instant, as `YYYY-MM-DD`; "" when absent. */
+function bangkokDay(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok" }).format(d);
 }
 
 function toDraft(tor: AdminTor): Draft {
@@ -98,6 +112,9 @@ function toDraft(tor: AdminTor): Draft {
     budget: tor.budget ? String(tor.budget) : "",
     deadline: isUnknownDeadline(tor.deadline) ? "" : tor.deadline.slice(0, 10),
     manualClosed: tor.manualClosed ?? false,
+    bidDeadline: bangkokDay(tor.procurement?.bidDeadline),
+    originalBidDeadline: bangkokDay(tor.procurement?.bidDeadline),
+    canSetBidDeadline: tor.procurement?.stage === "inviting",
     openFlags: tor.openFlags,
   };
 }
@@ -232,6 +249,10 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
         submissionDeadline: draft.deadline || null,
         // Only "closed" has an effect (manual close); any other stored value means "no override".
         status: draft.manualClosed ? "closed" : "open",
+        // Sent only when the admin changed it; "" clears the deadline.
+        ...(draft.canSetBidDeadline && draft.bidDeadline !== draft.originalBidDeadline
+          ? { bidDeadline: draft.bidDeadline || null }
+          : {}),
         resolveFlags: true,
       }),
     }).catch(() => null);
@@ -550,6 +571,21 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                   />
                 </label>
               </div>
+
+              {draft.canSetBidDeadline && (
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold text-[var(--color-text)]">กำหนดยื่นข้อเสนอ</span>
+                  <input
+                    type="date"
+                    value={draft.bidDeadline}
+                    onChange={(e) => setDraft({ ...draft, bidDeadline: e.target.value })}
+                    className="rounded-full border border-[var(--color-border)] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[var(--color-ink)]"
+                  />
+                  <span className="text-xs text-[var(--color-text-muted)]">
+                    ระบบอ่านจากประกาศเชิญชวนให้อัตโนมัติ — ค่าที่กรอกเองจะใช้แทนและไม่ถูกเขียนทับ
+                  </span>
+                </label>
+              )}
 
               <label className="flex items-start gap-2.5 rounded-2xl bg-[var(--color-surface-alt)] px-3.5 py-3 text-sm text-[var(--color-text)]">
                 <input
