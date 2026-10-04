@@ -1120,6 +1120,47 @@ git commit -m "feat(frontend): filter admin records by every status and replace 
 
 ---
 
+### Task 8b: Tracking board shows the same status note (added after Task 8's grep)
+
+Found by Task 8's Review-Focus grep: `frontend/src/components/TrackingBoard.tsx` still derives a status-like line ("ไม่ระบุวันปิดรับ" / "ปิดรับเมื่อ …" / "เหลือ N วัน") from the legacy `tor.deadline` and the mock clock (`daysUntil`), which contradicts Global Constraints and Review Focus 5.
+
+**Files:**
+- Modify: `frontend/src/components/TrackingBoard.tsx`
+
+**Interfaces:**
+- Consumes: `statusNote` (Task 5).
+
+- [ ] **Step 1: Replace the deadline text and the colour rule**
+
+Read the whole file first. Add `import { statusNote } from "@/lib/torStatus";`. Replace the `<span className={\`text-[11px] font-medium ${ remaining <= 3 && remaining >= 0 ? … : … }\`}> {isUnknownDeadline(tor.deadline) ? … : … } </span>` block (around lines 120-135, the one that prints the deadline under the agency line) with:
+
+```tsx
+                      <span
+                        className={`text-[11px] font-medium ${
+                          tor.status === "ใกล้ปิดรับ"
+                            ? "text-[var(--color-warning)]"
+                            : "text-[var(--color-text-faint)]"
+                        }`}
+                      >
+                        {statusNote(tor)}
+                      </span>
+```
+
+Delete the now-unused `const remaining = daysUntil(tor.deadline);` (wherever it is defined in the item renderer) and remove the imports that become unused (`daysUntil`, `formatThaiDate`, `isUnknownDeadline` — check each before removing). Change nothing else in the file.
+
+- [ ] **Step 2: Verify**
+
+Run: `cd frontend && npx tsc --noEmit 2>&1 | grep -c "TrackingBoard"` → `0`; `npx eslint src/components/TrackingBoard.tsx` exits 0 with no new warnings. Re-run the Task 8 grep (`grep -rn "daysUntil" frontend/src --include=*.tsx --include=*.ts`) and report the remaining `daysUntil` users with a one-line reason each (the dashboard `upcoming`/`byUrgency` logic, the calendar and mock data legitimately use the legacy deadline — they are deadline views, not status text).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add frontend/src/components/TrackingBoard.tsx
+git commit -m "fix(frontend): show the real status note on the bookmark tracking board"
+```
+
+---
+
 ## After this plan
 
 Open a PR into `main` from `feat/tor-procurement-status-ui` (stacked on `feat/tor-procurement-refresh` until steps 1–2 merge; rebase after). Then plan step 3b (admin pipeline view: show `pending` / `rejected` / `failed` TORs and their last job error, plus `procurement.lastCheckedAt`) and step 4 (invitation-PDF bid deadline — which also makes `closing_soon` reachable, and must first add the optimistic-precondition guard to both `procurement` writers, see the spec's Open items).
