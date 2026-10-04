@@ -119,6 +119,7 @@ In e-bidding announcements the deadline is the sentence "ผู้ยื่น�
 Do NOT return: the announcement's own date ("ประกาศ ณ วันที่", "ลงวันที่"), the dates for downloading or buying bidding documents, the date to send questions or for the clarification session ("ชี้แจงรายละเอียด"), site visits, the bid-opening or evaluation date, or contract dates.
 Numbers may be Thai numerals (๐-๙): read ๑๔ as 14. If the day, month or year is left blank (an unfilled template), the deadline is not stated: return null for "date".
 "date" MUST be Gregorian/ISO (ค.ศ., YYYY-MM-DD). Thai documents print พ.ศ. years (พ.ศ. = ค.ศ. + 543): "14 กันยายน 2569" means 2026-09-14, NOT "2569-09-14". Always subtract 543 from a printed พ.ศ. year.
+The bid deadline is on or after the announcement date given as "Known announcement date", normally a few days to a few weeks later and in the same or the next year. If the year you read would put the deadline before that date, re-read the year digits carefully (Thai numerals such as ๙ and ๔ are easy to confuse) and prefer the reading consistent with the announcement date. Never invent a date just to satisfy this: if the PDF states no deadline, return null.
 "time" is a 24-hour HH:mm (e.g. 16.00 น. → "16:00"), or null when no time is printed.
 "confidence" MUST be a decimal fraction between 0.0 and 1.0 (e.g. 0.9), never a percentage.
 Use null for "date" when the document does not state a bid-submission deadline or the PDF is unreadable.
@@ -225,7 +226,7 @@ export class GeminiExtractor implements TorExtractor {
 
   async extractBidDeadline(input: {
     pdf: { fileName: string; content: Buffer };
-    meta: { projectCode?: string; title: string };
+    meta: { projectCode?: string; title: string; announcementDate?: string };
   }): Promise<BidDeadlineResult> {
     if (input.pdf.content.length > MAX_INLINE_PDF_BYTES) {
       console.warn(
@@ -244,6 +245,7 @@ export class GeminiExtractor implements TorExtractor {
         text: [
           `Project code: ${input.meta.projectCode ?? "(unknown)"}`,
           `Known title: ${input.meta.title}`,
+          `Known announcement date (Gregorian, from e-GP metadata): ${input.meta.announcementDate ?? "(unknown)"}`,
           "",
           "The attached PDF is the invitation announcement (may be a scan — read it).",
         ].join("\n"),

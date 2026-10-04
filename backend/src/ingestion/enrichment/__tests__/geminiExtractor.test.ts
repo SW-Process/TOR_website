@@ -217,6 +217,26 @@ describe("GeminiExtractor.extractBidDeadline", () => {
     expect(call.contents.parts.some((p) => p.inlineData?.mimeType === "application/pdf")).toBe(true);
   });
 
+  it("sends the announcement date in the user text, or (unknown) when not given", async () => {
+    const generate = jest.fn().mockResolvedValue({ text: deadlineJson });
+    const x = new GeminiExtractor({ model: "gemini-2.5-flash", generate });
+    await x.extractBidDeadline({ ...input, meta: { ...input.meta, announcementDate: "2026-08-28" } });
+    await x.extractBidDeadline(input);
+    const textOf = (n: number) =>
+      (generate.mock.calls[n][0] as { contents: { parts: { text?: string }[] } }).contents.parts[0]?.text ?? "";
+    expect(textOf(0)).toContain("Known announcement date (Gregorian, from e-GP metadata): 2026-08-28");
+    expect(textOf(1)).toContain("Known announcement date (Gregorian, from e-GP metadata): (unknown)");
+  });
+
+  it("tells the model to check the year against the announcement date", async () => {
+    const generate = jest.fn().mockResolvedValue({ text: deadlineJson });
+    const x = new GeminiExtractor({ model: "gemini-2.5-flash", generate });
+    await x.extractBidDeadline(input);
+    const sys = (generate.mock.calls[0][0] as { config: { systemInstruction: string } }).config.systemInstruction;
+    expect(sys).toContain("announcement date");
+    expect(sys).toContain("re-read the year digits");
+  });
+
   it("leaves output headroom beyond the thinking budget so the JSON cannot be truncated", async () => {
     const generate = jest.fn().mockResolvedValue({ text: deadlineJson });
     const x = new GeminiExtractor({ model: "gemini-2.5-flash", generate });

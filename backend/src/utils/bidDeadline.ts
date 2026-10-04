@@ -8,13 +8,18 @@ const BUDDHIST_ERA_YEAR_THRESHOLD = 2400;
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const CLOCK = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+/** Asia/Bangkok calendar day of an instant, as `YYYY-MM-DD`. */
+export function bangkokDay(d: Date): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok" }).format(d);
+}
+
 function instant(isoDate: string, time: string): Date | null {
   const m = ISO_DATE.exec(isoDate);
   if (!m) return null;
   const d = new Date(`${isoDate}T${time}:00${BANGKOK_OFFSET}`);
   if (Number.isNaN(d.getTime())) return null;
   // reject rollovers such as 2026-02-31 → 2026-03-03
-  const back = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok" }).format(d);
+  const back = bangkokDay(d);
   return back === isoDate ? d : null;
 }
 

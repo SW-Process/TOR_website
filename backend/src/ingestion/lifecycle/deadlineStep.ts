@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 import { Tor, type ITor, type IProcurement, type IProcurementAnnouncement } from "../../models";
 import type { EgpClientLike } from "../../scraper/egpClient.types";
 import type { BlobStorage } from "../../storage/storage.types";
-import { resolveBidDeadline } from "../../utils/bidDeadline";
+import { bangkokDay, resolveBidDeadline } from "../../utils/bidDeadline";
 import type { BidDeadlineExtractor, BidDeadlineResult } from "../enrichment/torExtractor";
 
 export interface DeadlineStepArgs {
@@ -90,7 +90,11 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
   try {
     result = await deps.extractor.extractBidDeadline({
       pdf: { fileName: filename, content },
-      meta: { projectCode: args.projectCode, title: args.title },
+      meta: {
+        projectCode: args.projectCode,
+        title: args.title,
+        ...(invitation.publishedAt ? { announcementDate: bangkokDay(invitation.publishedAt) } : {}),
+      },
     });
   } catch (err) {
     // A PDF that always fails must not cost a Gemini call every day: record it as unreadable.

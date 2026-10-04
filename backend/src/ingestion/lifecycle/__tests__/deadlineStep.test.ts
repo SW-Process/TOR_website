@@ -94,6 +94,28 @@ describe("runDeadlineStep", () => {
     expect(saved?.announcements[0]?.storageKey).toBe("tor-pdfs/code-1/inv-1.pdf");
   });
 
+  it("passes the Bangkok day of the invitation's publish date to the extractor", async () => {
+    const p = procurementOf({
+      announcements: [
+        { announcementId: "inv-1", kind: "invitation", hasFile: true, publishedAt: new Date("2026-08-27T17:00:00Z") },
+      ],
+    });
+    const tor = await seed(p);
+    const h = harness();
+    await runDeadlineStep(args(p, tor._id), h);
+    expect((h.extractCalls[0] as { meta: { announcementDate?: string } }).meta.announcementDate).toBe("2026-08-28");
+  });
+
+  it("passes no announcement date when the invitation has no publish date", async () => {
+    const p = procurementOf({
+      announcements: [{ announcementId: "inv-1", kind: "invitation", hasFile: true }],
+    });
+    const tor = await seed(p);
+    const h = harness();
+    await runDeadlineStep(args(p, tor._id), h);
+    expect((h.extractCalls[0] as { meta: { announcementDate?: string } }).meta.announcementDate).toBeUndefined();
+  });
+
   it("records an unreadable attempt and leaves the deadline empty", async () => {
     const p = procurementOf();
     const tor = await seed(p);

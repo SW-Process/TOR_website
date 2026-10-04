@@ -57,7 +57,8 @@ export type BidDeadlineResult = z.infer<typeof bidDeadlineResultSchema>;
 export interface BidDeadlineExtractor {
   extractBidDeadline(input: {
     pdf: { fileName: string; content: Buffer };
-    meta: { projectCode?: string; title: string };
+    /** `announcementDate`: ISO YYYY-MM-DD (Gregorian, Asia/Bangkok day) the invitation was published. */
+    meta: { projectCode?: string; title: string; announcementDate?: string };
   }): Promise<BidDeadlineResult>;
 }
 
