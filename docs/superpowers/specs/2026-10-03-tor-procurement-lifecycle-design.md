@@ -151,8 +151,8 @@ After refresh writes a TOR whose stage is `inviting`, it does one more step in t
    the Buddhist-era year fix lives in `backend/src/utils/bidDeadline.ts`). Unreadable (or low
    confidence) writes `bidDeadline: null` and records `deadlineAttempt.outcome = "unreadable"`, so a
    stale deadline from an older invitation is cleared; the UI shows an unknown deadline ("เปิดรับ"
-   without a date). Non-retryable extractor errors (invalid JSON, 4xx other than 429) count as
-   unreadable; retryable ones (429, 5xx, network) record nothing and are retried next run.
+   without a date). Non-retryable extractor errors (invalid JSON, HTTP 400/413/422) count as
+   unreadable; retryable ones (401/403/404/408, 429, 5xx, network: deployment or transient problems) record nothing and are retried next run.
 4. Record `procurement.deadlineAttempt = { announcementId, at, outcome }` so the same
    announcement is never retried; a new invitation id re-opens extraction.
 5. Cap: `MAX_DEADLINE_EXTRACTIONS_PER_RUN` (default 20), separate from `MAX_AI_CALLS_PER_RUN`.

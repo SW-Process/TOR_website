@@ -28,13 +28,20 @@ export type DeadlineStepOutcome = "skipped" | "read" | "unreadable" | "conflict"
 
 const UNREADABLE: BidDeadlineResult = { date: null, time: null, confidence: 0 };
 
-/** Errors that will fail the same way tomorrow: bad model output or a 4xx (except 429) from the API. */
+/**
+ * Errors that will fail the same way tomorrow because of THIS PDF: unusable model output, or the
+ * API rejecting the request itself (400 bad request, 413 too large, 422 unprocessable). Auth,
+ * permission, not-found and timeout errors (401/403/404/408), 429, 5xx and network errors are
+ * deployment or transient problems (service account, role, model name, project, quota): they must
+ * stay retryable, or one misconfiguration would mark every inviting TOR "unreadable" for good.
+ */
+const PERMANENT_STATUSES = new Set([400, 413, 422]);
 function isNonRetryable(err: unknown): boolean {
   if (err instanceof ZodError) return true;
   const e = err as { message?: unknown; status?: unknown; code?: unknown } | null;
   if (typeof e?.message === "string" && e.message.startsWith("Gemini returned invalid JSON")) return true;
   const n = Number(e?.status ?? e?.code);
-  return Number.isInteger(n) && n >= 400 && n < 500 && n !== 429;
+  return PERMANENT_STATUSES.has(n);
 }
 
 const timeOf = (a: IProcurementAnnouncement): number => a.publishedAt?.getTime() ?? Number.NEGATIVE_INFINITY;

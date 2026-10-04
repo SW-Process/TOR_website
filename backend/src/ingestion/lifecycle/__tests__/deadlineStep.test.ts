@@ -265,7 +265,8 @@ describe("runDeadlineStep", () => {
       ["a ZodError", () => new ZodError([])],
       ["invalid JSON", () => new Error("Gemini returned invalid JSON: {")],
       ["a 400", () => Object.assign(new Error("bad request"), { status: 400 })],
-      ["a 4xx code", () => Object.assign(new Error("forbidden"), { code: 403 })],
+      ["a 422 code", () => Object.assign(new Error("unprocessable"), { code: 422 })],
+      ["a 413", () => Object.assign(new Error("too large"), { status: 413 })],
     ])("treats %s as unreadable and records the attempt", async (_n, make) => {
       const p = procurementOf();
       const tor = await seed(p);
@@ -276,6 +277,11 @@ describe("runDeadlineStep", () => {
     });
 
     it.each([
+      ["a 401", () => Object.assign(new Error("unauthenticated"), { status: 401 })],
+      ["a 403", () => Object.assign(new Error("permission denied"), { code: 403 })],
+      ["a 404", () => Object.assign(new Error("model not found"), { status: 404 })],
+      ["a 408", () => Object.assign(new Error("timeout"), { status: 408 })],
+      ["a string code", () => Object.assign(new Error("x"), { code: "PERMISSION_DENIED" })],
       ["a 429", () => Object.assign(new Error("rate"), { status: 429 })],
       ["a 503", () => Object.assign(new Error("down"), { code: 503 })],
       ["a network error", () => new Error("ECONNRESET")],
@@ -284,6 +290,15 @@ describe("runDeadlineStep", () => {
       const tor = await seed(p);
       await expect(runDeadlineStep(args(p, tor._id), harness(make()))).rejects.toThrow();
       expect(((await Tor.findById(tor._id).lean())?.procurement?.deadlineAttempt ?? null)).toBeNull();
+    });
+
+    it("a 403 does not clear an existing AI deadline", async () => {
+      const bid = { date: new Date("2026-10-30T16:59:00Z"), source: "invitation-pdf" as const, extractedAt: PUBLISHED };
+      const p = procurementOf({ bidDeadline: bid });
+      const tor = await seed(p);
+      const err = Object.assign(new Error("permission denied"), { code: 403 });
+      await expect(runDeadlineStep(args(p, tor._id), harness(err))).rejects.toThrow();
+      expect((await Tor.findById(tor._id).lean())?.procurement?.bidDeadline?.date).toEqual(bid.date);
     });
   });
 
