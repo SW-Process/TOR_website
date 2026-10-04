@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import type { Request, Response } from "express";
-import { User } from "../models";
+import { Bookmark, ChatConversation, ChatMessage, ErrorReport, Notification, User, VendorProfile } from "../models";
 import type { UserDocument } from "../models/User";
 import { signToken, cookieOptions, COOKIE_NAME } from "../utils/token";
 import { httpError } from "../utils/httpError";
@@ -80,11 +80,128 @@ export async function logout(_req: Request, res: Response): Promise<void> {
   res.status(200).json({ message: "Logged out" });
 }
 
+/** The caller's User with its password hash loaded (for account checks), or 401. */
+async function loadAccount(req: Request): Promise<UserDocument> {
+  const user = await User.findById(req.user!.id).select("+passwordHash");
+  if (!user) throw httpError(401, "Account no longer exists");
+  return user;
+}
+
+/** Public user JSON plus the account-settings flags the hash itself must never leak. */
+function accountView(user: UserDocument) {
+  return { ...user.toJSON(), hasPassword: !!user.passwordHash, googleLinked: !!user.googleOAuthId };
+}
+
+/** Accounts with a password must confirm it; Google-only accounts (no hash) have none to give. */
+async function confirmPassword(user: UserDocument, candidate: unknown): Promise<void> {
+  if (!user.passwordHash) return;
+  if (typeof candidate !== "string" || !(await user.comparePassword(candidate))) {
+    throw httpError(401, "Current password is incorrect");
+  }
+}
+
 /** GET /api/auth/me — return the authenticated user. */
 export async function me(req: Request, res: Response): Promise<void> {
-  const user = await User.findById(req.user!.id);
-  if (!user) throw httpError(401, "Account no longer exists");
-  res.status(200).json({ user });
+  const user = await loadAccount(req);
+  res.status(200).json({ user: accountView(user) });
+}
+
+const MAX_DISPLAY_NAME_LENGTH = 60;
+
+/** PATCH /api/auth/me — update the display name; blank resets it to the email-derived default. */
+export async function updateAccount(req: Request, res: Response): Promise<void> {
+  const { displayName } = (req.body ?? {}) as { displayName?: unknown };
+  if (typeof displayName !== "string") throw httpError(400, "displayName is required");
+  const name = displayName.trim();
+  if (name.length > MAX_DISPLAY_NAME_LENGTH) {
+    throw httpError(400, `Display name must be at most ${MAX_DISPLAY_NAME_LENGTH} characters`);
+  }
+
+  const user = await loadAccount(req);
+  user.displayName = name || null;
+  await user.save();
+  res.status(200).json({ user: accountView(user) });
+}
+
+/**
+ * PUT /api/auth/password — change the password (current one required), or set a
+ * first one on a Google-only account.
+ */
+export async function changePassword(req: Request, res: Response): Promise<void> {
+  const { currentPassword, newPassword } = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof newPassword !== "string" || newPassword.length < MIN_PASSWORD_LENGTH) {
+    throw httpError(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+  }
+
+  const user = await loadAccount(req);
+  await confirmPassword(user, currentPassword);
+  user.set("password", newPassword);
+  await user.save();
+  res.status(200).json({ user: accountView(user) });
+}
+
+/**
+ * PUT /api/auth/email — change the sign-in email. Needs the current password, so a
+ * Google-only account must set one first. A linked Google login keeps working: it
+ * matches on googleOAuthId, not on email.
+ */
+export async function changeEmail(req: Request, res: Response): Promise<void> {
+  const { email, currentPassword } = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof email !== "string" || !EMAIL_RE.test(email.trim())) {
+    throw httpError(400, "A valid email is required");
+  }
+  const next = email.trim().toLowerCase();
+
+  const user = await loadAccount(req);
+  if (!user.passwordHash) throw httpError(400, "Set a password before changing your email");
+  await confirmPassword(user, currentPassword);
+
+  if (next !== user.email) {
+    if (await User.exists({ email: next })) throw httpError(409, "Email is already registered");
+    user.email = next;
+    await user.save();
+  }
+  res.status(200).json({ user: accountView(user) });
+}
+
+/**
+ * DELETE /api/auth/me — permanently delete a vendor account and the data tied to it
+ * (profile, bookmarks, notifications, chat, avatar). Error reports it filed stay, but
+ * anonymised. Confirms with the password, or the account email for Google-only accounts.
+ * Admin accounts are not self-deletable, so the panel can't be locked out by accident.
+ */
+export async function deleteAccount(req: Request, res: Response): Promise<void> {
+  const { currentPassword, confirmEmail } = (req.body ?? {}) as Record<string, unknown>;
+  const user = await loadAccount(req);
+  if (user.role === "admin") throw httpError(403, "Admin accounts cannot be deleted here");
+
+  if (user.passwordHash) {
+    await confirmPassword(user, currentPassword);
+  } else if (typeof confirmEmail !== "string" || confirmEmail.trim().toLowerCase() !== user.email) {
+    throw httpError(400, "Type your account email to confirm");
+  }
+
+  const profile = await VendorProfile.findOne({ userId: user._id }).select("_id");
+  if (profile) {
+    await Promise.all([
+      Bookmark.deleteMany({ vendorId: profile._id }),
+      Notification.deleteMany({ vendorId: profile._id }),
+    ]);
+    await profile.deleteOne();
+  }
+
+  const conversations = await ChatConversation.find({ user: user._id }).distinct("_id");
+  await ChatMessage.deleteMany({ conversation: { $in: conversations } });
+  await ChatConversation.deleteMany({ _id: { $in: conversations } });
+  await ErrorReport.updateMany({ reportedBy: user._id }, { $set: { reportedBy: null } });
+
+  if (user.avatarKey) {
+    await getStorage().delete?.(user.avatarKey).catch(() => {}); // an orphaned blob is harmless
+  }
+  await user.deleteOne();
+
+  res.clearCookie(COOKIE_NAME, cookieOptions());
+  res.status(200).json({ message: "Account deleted" });
 }
 
 /** POST /api/auth/avatar — upload/replace the caller's profile picture. */

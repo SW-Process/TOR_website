@@ -7,6 +7,8 @@ export type UserRole = "vendor" | "admin";
 
 export interface IUser {
   email: string;
+  /** Name shown in the header and greetings; null falls back to the email's local part on the client. */
+  displayName: string | null;
   passwordHash: string | null;
   googleOAuthId?: string;
   role: UserRole;
@@ -41,6 +43,7 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
       lowercase: true,
       trim: true,
     },
+    displayName: { type: String, trim: true, maxlength: 60, default: null },
     // bcrypt hash — never selected by default, set via the `password` virtual
     passwordHash: { type: String, default: null, select: false },
     // Left unset (not null) for email/password accounts — a `null` default would

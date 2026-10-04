@@ -5,6 +5,7 @@ interface GcsFileLike {
   save(body: Buffer, opts: { contentType: string; resumable: boolean }): Promise<void>;
   createReadStream(): NodeJS.ReadableStream;
   exists(): Promise<[boolean]>;
+  delete?(opts: { ignoreNotFound: boolean }): Promise<unknown>;
 }
 interface GcsLike {
   bucket(name: string): { file(key: string): GcsFileLike };
@@ -30,6 +31,10 @@ export class GcsStorage implements BlobStorage {
 
   async getStream(key: string): Promise<NodeJS.ReadableStream> {
     return this.file(key).createReadStream();
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.file(key).delete?.({ ignoreNotFound: true });
   }
 
   async exists(key: string): Promise<boolean> {

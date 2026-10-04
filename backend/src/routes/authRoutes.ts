@@ -5,6 +5,10 @@ import {
   login,
   logout,
   me,
+  updateAccount,
+  changePassword,
+  changeEmail,
+  deleteAccount,
   uploadAvatar,
   streamAvatar,
   googleStart,
@@ -23,6 +27,10 @@ router.post("/register", register);
 router.post("/login", login);
 router.post("/logout", logout);
 router.get("/me", requireAuth, me);
+router.patch("/me", requireAuth, updateAccount);
+router.delete("/me", requireAuth, deleteAccount);
+router.put("/password", requireAuth, changePassword);
+router.put("/email", requireAuth, changeEmail);
 
 router.post("/avatar", requireAuth, avatarUpload.single("avatar"), uploadAvatar);
 router.get("/avatar/:userId", streamAvatar);
