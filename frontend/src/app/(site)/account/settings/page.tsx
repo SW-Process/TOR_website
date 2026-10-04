@@ -3,25 +3,25 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Building2, Clock, ExternalLink, Eye, EyeOff, Hash, Sparkles } from "lucide-react";
+import { AlertTriangle, Bookmark, BookmarkX, ChevronDown, Eye, EyeOff, KanbanSquare } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
-import StatusBadge from "@/components/StatusBadge";
+import AccountTorCard, { CardAction } from "@/components/account/AccountTorCard";
 import SettingsShell from "@/components/account/SettingsShell";
 import { AvatarCard, FieldBlock, SubmitBar, inputClass, useSubmit } from "@/components/account/ui";
-import { formatBudget, formatThaiDate, type TOR } from "@/lib/mockData";
-import { statusNote } from "@/lib/torStatus";
 import { useAuth } from "@/lib/useAuth";
+import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, useBookmarks, type ApplicationStatus } from "@/lib/useBookmarks";
 import { useHiddenTors } from "@/lib/useHiddenTors";
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_NAME_LENGTH = 60;
 
-type SectionId = "profile" | "email" | "password" | "hidden" | "delete";
+type SectionId = "profile" | "email" | "password" | "saved" | "hidden" | "delete";
 
 const SECTION_TITLES: Record<SectionId, string> = {
   profile: "แก้ไขโปรไฟล์",
   email: "อีเมล",
   password: "รหัสผ่านและความปลอดภัย",
+  saved: "รายการที่บันทึก",
   hidden: "TOR ที่ซ่อนไว้",
   delete: "ลบบัญชี",
 };
@@ -253,84 +253,88 @@ function PasswordSection() {
   );
 }
 
-/** One hidden TOR as a card, laid out like the admin report cards: meta, AI summary, TOR box, action. */
-function HiddenTorCard({ tor, hiddenAt, onUnhide }: { tor: TOR; hiddenAt: string; onUnhide: () => Promise<void> }) {
-  const [pending, setPending] = useState(false);
+/**
+ * Saved TORs in the settings theme, with the application status and an unsave
+ * action. The full tracker (Kanban, deadline calendar) stays on /bookmarks.
+ */
+function SavedSection() {
+  const { items, ready, error, toggle, setStatus } = useBookmarks();
 
   return (
-    <article className="flex flex-col gap-4 rounded-3xl border border-[var(--color-border)] bg-white p-5 shadow-[var(--shadow-sm)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <StatusBadge status={tor.status} />
-          <span className="badge bg-[var(--color-rose-light)] text-[var(--color-rose-dark)]">{tor.category}</span>
-        </div>
-        <span className="flex shrink-0 items-center gap-1 text-xs text-[var(--color-text-faint)]">
-          <Clock size={12} />
-          ซ่อนเมื่อ {formatThaiDate(hiddenAt.slice(0, 10))}
-        </span>
-      </div>
-
-      {/* aiSummary.summary is a model-written summary, never the agency's own text — label it so. */}
-      <div className="rounded-2xl bg-[var(--color-surface-alt)] px-4 py-3">
-        <p className="flex items-center gap-1 text-[11px] font-semibold text-[var(--color-rose-dark)]">
-          <Sparkles size={11} />
-          สรุปโดย AI
-        </p>
-        <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--color-ink-soft)]">
-          {tor.description || "ยังไม่มีสรุปสำหรับ TOR นี้"}
-        </p>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-2 rounded-2xl border border-[var(--color-border)] p-4">
-        <p className="text-[11px] font-semibold text-[var(--color-text-faint)]">TOR ที่ซ่อน</p>
-        <Link
-          href={`/tor/${tor.id}`}
-          className="line-clamp-2 text-[15px] font-bold leading-snug text-[var(--color-text)] hover:text-[var(--color-rose-dark)]"
-        >
-          {tor.title}
-        </Link>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--color-text-muted)]">
-          {tor.projectCode && (
-            <span className="flex items-center gap-1">
-              <Hash size={11} />
-              {tor.projectCode}
-            </span>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm leading-relaxed text-[var(--color-text-muted)]">
+          TOR ที่คุณบันทึกไว้ พร้อมสถานะการยื่นของคุณ
+          {ready && items.length > 0 && (
+            <span className="font-semibold text-[var(--color-text)]"> · บันทึกไว้ {items.length} รายการ</span>
           )}
-          <span className="flex min-w-0 items-center gap-1">
-            <Building2 size={11} className="shrink-0" />
-            <span className="truncate">{tor.agency}</span>
+        </p>
+        <Link
+          href="/bookmarks?view=tracking"
+          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border-strong)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text)] hover:border-[var(--color-ink)]/40"
+        >
+          <KanbanSquare size={13} />
+          เปิดบอร์ดติดตามสถานะ
+        </Link>
+      </div>
+
+      {error && (
+        <p className="flex items-center gap-1.5 text-sm text-[var(--color-rose-dark)]">
+          <AlertTriangle size={14} />
+          {error}
+        </p>
+      )}
+
+      {!ready ? null : items.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-center">
+          <span className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-[var(--color-ink)] text-[var(--color-ink)]">
+            <Bookmark size={32} strokeWidth={1.6} />
           </span>
-        </div>
-        <div className="mt-auto flex items-end justify-between gap-3 pt-2">
-          <div>
-            <p className="text-base font-extrabold text-[var(--color-rose-dark)]">{formatBudget(tor.budget)}</p>
-            <p className="text-[11px] text-[var(--color-text-faint)]">{statusNote(tor)}</p>
-          </div>
-          <Link
-            href={`/tor/${tor.id}`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-border-strong)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-ink)]/40"
-          >
-            <ExternalLink size={13} />
-            เปิดดู
+          <p className="mt-2 text-lg font-bold text-[var(--color-text)]">ยังไม่มี TOR ที่บันทึกไว้</p>
+          <p className="max-w-sm text-sm text-[var(--color-text-muted)]">
+            กดไอคอนบุ๊กมาร์กบนการ์ด TOR เพื่อบันทึกโครงการที่คุณสนใจไว้ที่นี่
+          </p>
+          <Link href="/tor" className="mt-2 rounded-xl bg-[var(--color-ink)] px-5 py-2.5 text-sm font-semibold text-white">
+            ไปค้นหา TOR
           </Link>
         </div>
-      </div>
-
-      <div className="flex justify-end">
-        <button
-          disabled={pending}
-          onClick={() => {
-            setPending(true);
-            // On success the card unmounts; on failure it stays, so re-enable the button.
-            void onUnhide().finally(() => setPending(false));
-          }}
-          className="inline-flex items-center gap-2 rounded-full bg-[var(--color-ink)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-black disabled:opacity-50"
-        >
-          <Eye size={15} />
-          เลิกซ่อน
-        </button>
-      </div>
-    </article>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {items.map(({ tor, bookmarkedAt, applicationStatus }) => (
+            <AccountTorCard
+              key={tor.id}
+              tor={tor}
+              timeLabel="บันทึกเมื่อ"
+              at={bookmarkedAt}
+              boxLabel="TOR ที่บันทึก"
+              actions={
+                <>
+                  <label className="relative mr-auto">
+                    <select
+                      aria-label="สถานะการยื่น"
+                      value={applicationStatus}
+                      onChange={(e) => void setStatus(tor.id, e.target.value as ApplicationStatus)}
+                      className="appearance-none rounded-full border border-[var(--color-border-strong)] bg-white py-2 pl-4 pr-9 text-sm font-medium text-[var(--color-text)] transition-colors hover:border-[var(--color-ink)]/40 focus:border-[var(--color-ink)]/40 focus:outline-none"
+                    >
+                      {APPLICATION_STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {APPLICATION_STATUS_LABELS[s]}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={15}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
+                    />
+                  </label>
+                  <CardAction icon={<BookmarkX size={15} />} label="เลิกบันทึก" onClick={() => toggle(tor.id)} />
+                </>
+              }
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -365,7 +369,14 @@ function HiddenSection() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {items.map(({ tor, hiddenAt }) => (
-            <HiddenTorCard key={tor.id} tor={tor} hiddenAt={hiddenAt} onUnhide={() => unhide(tor.id)} />
+            <AccountTorCard
+              key={tor.id}
+              tor={tor}
+              timeLabel="ซ่อนเมื่อ"
+              at={hiddenAt}
+              boxLabel="TOR ที่ซ่อน"
+              actions={<CardAction icon={<Eye size={15} />} label="เลิกซ่อน" onClick={() => unhide(tor.id)} />}
+            />
           ))}
         </div>
       )}
@@ -428,17 +439,18 @@ function SettingsContent() {
   const { user } = useAuth();
   const param = useSearchParams().get("section");
   // Desktop opens on แก้ไขโปรไฟล์; phones show the menu until a section is picked.
-  const vendorOnly = param === "delete" || param === "hidden";
+  const vendorOnly = param === "delete" || param === "hidden" || param === "saved";
   const picked = isSectionId(param) && (!vendorOnly || user?.role === "vendor");
   const section: SectionId = picked ? param : "profile";
 
   return (
-    <SettingsShell active={section} title={SECTION_TITLES[section]} showDetailOnMobile={picked} wide={section === "hidden"}>
+    <SettingsShell active={section} title={SECTION_TITLES[section]} showDetailOnMobile={picked} wide={section === "hidden" || section === "saved"}>
       {/* key: a fresh form state per section, so switching back doesn't show stale input */}
       <div key={section}>
         {section === "profile" && <ProfileSection />}
         {section === "email" && <EmailSection />}
         {section === "password" && <PasswordSection />}
+        {section === "saved" && <SavedSection />}
         {section === "hidden" && <HiddenSection />}
         {section === "delete" && <DeleteSection />}
       </div>

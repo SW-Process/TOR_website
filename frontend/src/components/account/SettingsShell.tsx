@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/useAuth";
 import { Avatar } from "./ui";
 
 /** Every page reachable from the settings sidebar; `/account/settings?section=<id>` unless noted. */
-export type SettingsPageId = "profile" | "email" | "password" | "hidden" | "delete" | "business";
+export type SettingsPageId = "profile" | "email" | "password" | "saved" | "hidden" | "delete" | "business";
 
 export const SETTINGS_ROOT = "/account/settings";
 
@@ -130,7 +130,7 @@ export default function SettingsShell({
             {isVendor && (
               <NavGroup title="การใช้งาน TOR Checker">
                 <NavItem icon={Briefcase} label="โปรไฟล์ธุรกิจ" href="/account/profile" active={active === "business"} />
-                <NavItem icon={Bookmark} label="รายการที่บันทึก" href="/bookmarks" />
+                <NavItem icon={Bookmark} label="รายการที่บันทึก" href={settingsHref("saved")} active={active === "saved"} />
                 <NavItem icon={EyeOff} label="TOR ที่ซ่อนไว้" href={settingsHref("hidden")} active={active === "hidden"} />
               </NavGroup>
             )}
