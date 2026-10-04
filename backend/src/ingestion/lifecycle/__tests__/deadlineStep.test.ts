@@ -323,6 +323,38 @@ describe("runDeadlineStep", () => {
       expect(((await Tor.findById(tor._id).lean())?.procurement?.deadlineAttempt ?? null)).toBeNull();
     });
 
+    const sdk = (code: number, text: string) => () => new Error(`got status: ${code} ${text}. {"error":{"code":${code},"message":"m","status":"S"}}`);
+    it.each([
+      ["SDK 400 (message only)", () => new Error('got status: 400 Bad Request. {"error":{"code":400,"message":"The document has no pages.","status":"INVALID_ARGUMENT"}}')],
+      ["SDK 413", sdk(413, "Payload Too Large")],
+      ["SDK 422", sdk(422, "Unprocessable Entity")],
+      ["SDK streaming form", () => new Error('got status: INVALID_ARGUMENT. {"error":{"code":400,"message":"x","status":"INVALID_ARGUMENT"}}')],
+    ])("treats %s as unreadable and records the attempt", async (_n, make) => {
+      const p = procurementOf();
+      const tor = await seed(p);
+      expect(await runDeadlineStep(args(p, tor._id), harness(make()))).toBe("unreadable");
+      const saved = (await Tor.findById(tor._id).lean())?.procurement;
+      expect(saved?.deadlineAttempt).toMatchObject({ announcementId: "inv-1", outcome: "unreadable" });
+      expect(saved?.announcements[0]?.storageKey).toBe("tor-pdfs/code-1/inv-1.pdf");
+    });
+
+    it.each([
+      ["SDK 401", sdk(401, "Unauthorized")],
+      ["SDK 403", sdk(403, "Forbidden")],
+      ["SDK 404", sdk(404, "Not Found")],
+      ["SDK 429", sdk(429, "Too Many Requests")],
+      ["SDK 503", sdk(503, "Service Unavailable")],
+      ["an e-GP 400", () => new Error("e-GP 400 for https://x")],
+    ])("rethrows %s, records nothing and keeps an existing AI deadline", async (_n, make) => {
+      const bid = { date: new Date("2026-10-30T16:59:00Z"), source: "invitation-pdf" as const, extractedAt: PUBLISHED };
+      const p = procurementOf({ bidDeadline: bid });
+      const tor = await seed(p);
+      await expect(runDeadlineStep(args(p, tor._id), harness(make()))).rejects.toThrow();
+      const saved = (await Tor.findById(tor._id).lean())?.procurement;
+      expect(saved?.deadlineAttempt ?? null).toBeNull();
+      expect(saved?.bidDeadline?.date).toEqual(bid.date);
+    });
+
     it("a 403 does not clear an existing AI deadline", async () => {
       const bid = { date: new Date("2026-10-30T16:59:00Z"), source: "invitation-pdf" as const, extractedAt: PUBLISHED };
       const p = procurementOf({ bidDeadline: bid });

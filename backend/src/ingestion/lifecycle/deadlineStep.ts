@@ -41,7 +41,22 @@ function isNonRetryable(err: unknown): boolean {
   const e = err as { message?: unknown; status?: unknown; code?: unknown } | null;
   if (typeof e?.message === "string" && e.message.startsWith("Gemini returned invalid JSON")) return true;
   const n = Number(e?.status ?? e?.code);
-  return PERMANENT_STATUSES.has(n);
+  if (PERMANENT_STATUSES.has(n)) return true;
+  return PERMANENT_STATUSES.has(sdkStatusFromMessage(e?.message));
+}
+
+/**
+ * @google/genai throws ClientError/ServerError with no numeric status field: only the message
+ * `got status: <code> <text>. <json>` (or, when streaming, `got status: INVALID_ARGUMENT. {..."code":400...}`).
+ * Anchored on that prefix so other errors (e.g. `e-GP 400 for <url>`) are never misread.
+ */
+function sdkStatusFromMessage(message: unknown): number {
+  if (typeof message !== "string") return NaN;
+  const m = /^got status:\s*(\d{3})\b/.exec(message);
+  if (m) return Number(m[1]);
+  if (!message.startsWith("got status:")) return NaN;
+  const j = /"code":\s*(\d{3})\b/.exec(message);
+  return j ? Number(j[1]) : NaN;
 }
 
 const timeOf = (a: IProcurementAnnouncement): number => a.publishedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
