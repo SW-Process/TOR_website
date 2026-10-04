@@ -42,6 +42,7 @@ describe("GET /api/tors/:id — procurement", () => {
             storageKey: "tor-pdfs/1/a-1.pdf",
           },
         ],
+        deadlineAttempt: { announcementId: "a-1", at: new Date("2026-10-03T00:00:00Z"), outcome: "read" },
         lastCheckedAt: new Date("2026-10-03T00:00:00Z"),
       },
     });
@@ -52,6 +53,7 @@ describe("GET /api/tors/:id — procurement", () => {
     expect(res.body.tor.procurement.stage).toBe("inviting");
     expect(res.body.tor.procurement.announcements[0]).toMatchObject({ kind: "invitation", hasFile: true });
     expect(res.body.tor.procurement.announcements[0]).not.toHaveProperty("storageKey");
+    expect(res.body.tor.procurement).not.toHaveProperty("deadlineAttempt");
     expect(JSON.stringify(res.body)).not.toContain("tor-pdfs/1/a-1.pdf");
   });
 });

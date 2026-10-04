@@ -54,12 +54,22 @@ export interface IBidDeadline {
   extractedAt: Date;
 }
 
+export type DeadlineAttemptOutcome = "read" | "unreadable";
+
+/** The last invitation-PDF deadline extraction attempt; stops the same announcement being retried. */
+export interface IDeadlineAttempt {
+  announcementId: string;
+  at: Date;
+  outcome: DeadlineAttemptOutcome;
+}
+
 export interface IProcurement {
   stage: ProcurementStage;
   /** Raw e-GP contract status, e.g. "ระหว่างดำเนินการ". */
   contractStatus?: string;
   announcements: IProcurementAnnouncement[];
   bidDeadline?: IBidDeadline | null;
+  deadlineAttempt?: IDeadlineAttempt | null;
   lastCheckedAt: Date;
 }
 
@@ -242,12 +252,22 @@ const bidDeadlineSchema = new Schema<IBidDeadline>(
   { _id: false }
 );
 
+const deadlineAttemptSchema = new Schema<IDeadlineAttempt>(
+  {
+    announcementId: { type: String, required: true },
+    at: { type: Date, required: true },
+    outcome: { type: String, enum: ["read", "unreadable"], required: true },
+  },
+  { _id: false }
+);
+
 const procurementSchema = new Schema<IProcurement>(
   {
     stage: { type: String, enum: ["draft", "inviting", "awarded", "cancelled"], required: true },
     contractStatus: { type: String },
     announcements: { type: [procurementAnnouncementSchema], default: [] },
     bidDeadline: { type: bidDeadlineSchema, default: null },
+    deadlineAttempt: { type: deadlineAttemptSchema, default: null },
     lastCheckedAt: { type: Date, required: true },
   },
   { _id: false }

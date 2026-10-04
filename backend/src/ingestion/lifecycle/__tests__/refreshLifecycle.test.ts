@@ -265,6 +265,29 @@ describe("refreshLifecycle", () => {
     expect(seen).toEqual([{ status: "running", found: 2, updated: 1 }]);
   });
 
+  it("skips a TOR whose procurement changed while its e-GP calls were in flight, then retries next run", async () => {
+    await seedTor("p1", { procurement: oldProcurement("2026-09-01") });
+    const client = fakeClient({
+      onDetail: async () => {
+        // another writer (e.g. discovery) advances the TOR mid-refresh
+        await Tor.updateOne(
+          { projectCode: "code-p1" },
+          { $set: { "procurement.lastCheckedAt": new Date("2026-09-30"), "procurement.stage": "awarded" } },
+          { timestamps: false }
+        );
+      },
+    });
+
+    const out = await refreshLifecycle(deps(client));
+
+    expect(out).toMatchObject({ selected: 1, changed: 0, unchanged: 0, skipped: 1, failed: 0 });
+    const saved = await Tor.findOne({ projectCode: "code-p1" }).lean();
+    expect(saved?.procurement?.stage).toBe("awarded"); // the other writer's value stands
+    const warn = await SystemLog.findOne({ severity: "warning", ingestionRunId: out.runId }).lean();
+    expect(warn?.message).toContain("code-p1");
+    expect(warn?.message).toContain("changed while");
+  });
+
   it("skips a TOR whose listing URL has no project id, with a warning", async () => {
     await seedTor("p1", { sourceListingUrl: "https://egp.test/project-detail/" });
     const client = fakeClient();

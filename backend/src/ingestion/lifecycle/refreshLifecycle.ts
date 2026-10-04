@@ -7,6 +7,7 @@ import type { EgpClientLike } from "../../scraper/egpClient.types";
 import { sweepStaleRuns } from "../enrichment/sweepStaleRuns";
 import { logIngestionEvent } from "../log";
 import { buildProcurement, mergeProcurement } from "../procurementStage";
+import { writeProcurementIfUnchanged } from "../procurementWrite";
 import { lifecycleFilter, maxLifecycleRefreshPerRun, projectIdFromListingUrl } from "./candidates";
 
 export interface RefreshLifecycleDeps {
@@ -48,36 +49,6 @@ export function procurementChanged(
   if (before.stage !== after.stage) return true;
   if ((before.contractStatus ?? null) !== (after.contractStatus ?? null)) return true;
   return announcementSignature(before) !== announcementSignature(after);
-}
-
-/**
- * Persist a refresh. Writes only the refresh-owned paths so `bidDeadline` (admin edit /
- * invitation-PDF extraction) can never be clobbered, and skips timestamps so `Tor.updatedAt`
- * is not bumped by a status check. When the TOR has no `procurement` yet the whole object is
- * set (a dotted `$set` under a null parent would error).
- */
-async function writeProcurement(
-  torId: Types.ObjectId,
-  existing: IProcurement | null | undefined,
-  merged: IProcurement
-): Promise<void> {
-  if (!existing) {
-    await Tor.updateOne({ _id: torId }, { $set: { procurement: merged } }, { timestamps: false });
-    return;
-  }
-  const $set: Record<string, unknown> = {
-    "procurement.stage": merged.stage,
-    "procurement.announcements": merged.announcements,
-    "procurement.lastCheckedAt": merged.lastCheckedAt,
-  };
-  const $unset: Record<string, 1> = {};
-  if (merged.contractStatus === undefined) $unset["procurement.contractStatus"] = 1;
-  else $set["procurement.contractStatus"] = merged.contractStatus;
-  await Tor.updateOne(
-    { _id: torId },
-    Object.keys($unset).length > 0 ? { $set, $unset } : { $set },
-    { timestamps: false }
-  );
 }
 
 /**
@@ -149,8 +120,16 @@ export async function refreshLifecycle(
           const fresh = buildProcurement(announcements, detail.masterContractAvailableName, now());
           const merged = mergeProcurement(tor.procurement, fresh);
           const didChange = procurementChanged(tor.procurement, merged);
-          await writeProcurement(tor._id, tor.procurement, merged);
-          if (didChange) changed += 1;
+          const written = await writeProcurementIfUnchanged(tor._id, tor.procurement, merged);
+          if (!written) {
+            skipped += 1;
+            await logIngestionEvent({
+              severity: "warning",
+              message: `lifecycle refresh skipped TOR ${label}: it changed while being checked; will retry next run`,
+              component: COMPONENT,
+              ingestionRunId: runId,
+            });
+          } else if (didChange) changed += 1;
           else unchanged += 1;
         }
       } catch (err) {

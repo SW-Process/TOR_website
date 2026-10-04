@@ -357,6 +357,38 @@ describe("runIngestion", () => {
     expect(t?.procurement?.contractStatus).toBe("ส่งงานครบถ้วน");
   });
 
+  it("does not overwrite procurement that another writer moved after discovery read it", async () => {
+    const deps = { storage: fakeStorage(), parse, enqueueEnrichment: jest.fn() };
+    await (await runIngestion(baseOpts, { ...deps, client: fakeClient() })).done;
+
+    // While discovery is fetching project p-1 the lifecycle refresh advances that TOR.
+    const client = fakeClient({ contractStatus: "ส่งงานครบถ้วน" });
+    const realAnnouncements = client.announcements.bind(client);
+    let moved = false;
+    client.announcements = async (projectId) => {
+      if (projectId === "p-1" && !moved) {
+        moved = true;
+        await Tor.updateOne(
+          { projectCode: "69000000001" },
+          { $set: { "procurement.lastCheckedAt": new Date("2026-10-02T00:00:00Z"), "procurement.stage": "awarded" } },
+          { timestamps: false }
+        );
+      }
+      return realAnnouncements(projectId);
+    };
+
+    const { runId, done } = await runIngestion(baseOpts, { ...deps, client });
+    await done;
+
+    const moved1 = await Tor.findOne({ projectCode: "69000000001" }).lean();
+    expect(moved1?.procurement?.stage).toBe("awarded"); // the other writer's value stands
+    expect(moved1?.procurement?.contractStatus).toBe("ระหว่างดำเนินการ"); // discovery skipped its write
+    const other = await Tor.findOne({ projectCode: "69000000002" }).lean();
+    expect(other?.procurement?.contractStatus).toBe("ส่งงานครบถ้วน"); // an unraced TOR is still refreshed
+    const run = await IngestionRun.findById(runId).lean();
+    expect(run?.stats).toMatchObject({ torsUpdated: 0, torsUnchanged: 2, torsFailed: 0 });
+  });
+
   describe("legacy-era Tor whose contract status moved before its first new-code sighting", () => {
     async function seedLegacy(enqueue: jest.Mock, deps: object) {
       await (await runIngestion(baseOpts, { ...deps, client: fakeClient() })).done;

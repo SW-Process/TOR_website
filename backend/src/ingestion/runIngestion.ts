@@ -6,6 +6,7 @@ import { getStorage } from "../storage";
 import type { BlobStorage } from "../storage/storage.types";
 import { mapProject, sameCoreFields } from "./mapProject";
 import { mergeProcurement } from "./procurementStage";
+import { writeProcurementIfUnchanged } from "./procurementWrite";
 import { fetchAndStoreTorPdf } from "./fetchAndStoreTorPdf";
 import { logIngestionEvent } from "./log";
 import type { PdfParseFn } from "./pdfInspect";
@@ -76,6 +77,11 @@ async function processProject(
   stats: { torsCreated: number; torsUpdated: number; torsSkipped: number; torsUnchanged: number },
   ctx: ProcessContext
 ): Promise<void> {
+  // The procurement the guarded write below is conditional on, read BEFORE the slow e-GP calls
+  // so a writer that advances the TOR meanwhile (lifecycle refresh) is detected, not overwritten.
+  const readProcurement = (
+    await Tor.findOne({ projectCode: project.projectNumber }).select("procurement").lean()
+  )?.procurement;
   const detail = await client.projectDetail(project.projectId);
 
   if (!isAgencyAllowed(detail.masterOrgGroupName, ctx.allowlist)) {
@@ -90,10 +96,10 @@ async function processProject(
     now: ctx.now(),
   });
 
-  // Procurement is refreshed on every sighting. mergeProcurement keeps `bidDeadline` and each
-  // announcement's stored copy, which other pipeline stages own. It is saved together with the
-  // rest of the Tor (one save per path) so a failed procurement write can never strand a Tor
-  // with its new hash but without its enrichment enqueue.
+  // Procurement is refreshed on every sighting through the guarded writer, BEFORE the rest of the
+  // Tor is saved: a failed write throws and leaves the Tor untouched (re-sighted next run), and a
+  // concurrent writer is detected (skipped, the lifecycle refresh repairs it) instead of being
+  // overwritten. mergeProcurement keeps `bidDeadline` and each announcement's stored copy.
   let tor = await Tor.findOne({ projectCode: mapped.projectCode });
   let created = false;
   let updated = false;
@@ -108,7 +114,11 @@ async function processProject(
     created = true;
     stats.torsCreated += 1;
   } else {
-    tor.set("procurement", mergeProcurement(tor.toObject().procurement, mapped.procurement));
+    await writeProcurementIfUnchanged(
+      tor._id as Types.ObjectId,
+      readProcurement,
+      mergeProcurement(readProcurement, mapped.procurement)
+    );
 
     // A hash stored before procurement stages existed also covered the contract status. Adopt
     // the new hash quietly (no update, PDF fetch or AI enqueue) when either:
