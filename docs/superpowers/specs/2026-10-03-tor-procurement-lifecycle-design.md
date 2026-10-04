@@ -65,6 +65,7 @@ New embedded `Tor.procurement`:
 | `contractStatus` | raw e-GP string |
 | `announcements[]` | `{ announcementId, typeName, kind, publishedAt, hasFile, storageKey? }`; `kind` is the normalised type |
 | `bidDeadline` | `{ date, source: "invitation-pdf" \| "admin", extractedAt }` |
+| `deadlineAttempt` | `{ announcementId, at, outcome }` — last extraction attempt (step 4) |
 | `lastCheckedAt` | last successful refresh |
 
 `kind` normalises type names: `tor-draft`, `bidding-draft`, `reference-price`,
@@ -130,17 +131,38 @@ meaning or retired in favour of `bidDeadline`.
 
 ### 3. Real bid deadline from the invitation
 
-- When refresh finds an `invitation` announcement with a file that has no stored
-  copy, download it via `EgpClient.downloadFile` into `BlobStorage`
-  (`tor-pdfs/<projectCode>/<announcementId>.pdf`) and enqueue a job.
-- Reuse `EnrichmentJob` with a new `kind` (`full` | `deadline`; default `full`) so
-  lease, backoff and dead-letter behaviour are shared. `TorExtractor` gains an
-  `extractBidDeadline(pdf)` method (small schema: date + confidence), counted
-  against `MAX_AI_CALLS_PER_RUN`.
-- Unreadable result → `bidDeadline` stays empty and the UI shows "ไม่ระบุวันปิดรับ".
-  Not retried until a new `invitation` announcement id appears.
-- Admin edits (existing TOR records page) write `bidDeadline` with
-  `source: "admin"`, which takes precedence over AI values.
+**Decision (2026-10-04, replaces the earlier "reuse `EnrichmentJob`" idea):** extraction runs
+inline in the lifecycle refresh, with no queue. `enrichmentjobs.torId` is unique, so a second
+job kind per TOR would mean reworking the index, lease and progress counters, and the scope
+below is only a handful of files. Scope is **`inviting` TORs only**: on 2026-10-04 production
+had 8 `inviting` TORs (6 with an invitation file); invitations of awarded or cancelled TORs
+are not fetched because the UI never uses their deadline.
+
+After refresh writes a TOR whose stage is `inviting`, it does one more step in the same run:
+
+1. Pick the latest `invitation` announcement with `hasFile`. Skip when
+   `procurement.deadlineAttempt.announcementId` already equals its id, or when
+   `bidDeadline.source` is `"admin"`.
+2. Download via `EgpClient.downloadFile` into `BlobStorage`
+   (`tor-pdfs/<projectCode>/<announcementId>.pdf`) and record `storageKey` on that announcement.
+3. `TorExtractor` gains `extractBidDeadline(pdf)` (one Gemini call; returns date + confidence;
+   reuses the Buddhist-era year fix in `torExtractor.ts`). Low confidence or unreadable →
+   write nothing; the UI shows an unknown deadline ("เปิดรับ" without a date).
+4. Record `procurement.deadlineAttempt = { announcementId, at, outcome }` so the same
+   announcement is never retried; a new invitation id re-opens extraction.
+5. Cap: `MAX_DEADLINE_EXTRACTIONS_PER_RUN` (default 20), separate from `MAX_AI_CALLS_PER_RUN`.
+6. A failure on one file is logged and never undoes the stage/announcement write already made
+   for that TOR, nor delays other TORs.
+
+- Admin edits write `bidDeadline` with `source: "admin"` via a new "กำหนดยื่นข้อเสนอ" field on
+  the TOR records page. It wins over AI values and neither refresh nor extraction overwrites it.
+  The existing "วันที่ระบุในเอกสาร TOR" (`submissionDeadline`) field stays as is.
+- Writers: `bidDeadline`, `storageKey` and `deadlineAttempt` are written by targeted `$set`
+  with an optimistic precondition (see the "Before step 4" open item), now implemented for
+  both the refresh and discovery writers.
+- First task of the plan: read 3–5 real invitation PDFs by eye to confirm where the bid
+  deadline appears before fixing the extraction prompt (also answers the `submissionDeadline`
+  meaning open item).
 
 ### 4. API and UI
 
