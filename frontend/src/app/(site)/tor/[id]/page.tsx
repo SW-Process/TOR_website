@@ -20,6 +20,7 @@ import { ANNOUNCEMENT_KIND_LABELS, statusNote } from "@/lib/torStatus";
 import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
 import ReportIssueButton from "@/components/ReportIssueButton";
+import ShareTorButtons from "@/components/ShareTorButtons";
 import TORCard from "@/components/TORCard";
 
 const FAIRNESS_FIELD_LABELS: Record<FairnessField, string> = {
@@ -315,6 +316,7 @@ export default async function TORDetailPage({
                 </a>
               )}
               <BookmarkButton id={tor.id} variant="full" />
+              <ShareTorButtons torId={tor.id} />
               <ReportIssueButton torId={tor.id} projectCode={tor.projectCode} />
             </div>
 

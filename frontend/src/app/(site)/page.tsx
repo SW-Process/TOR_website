@@ -20,7 +20,7 @@ import CategoryGrid from "@/components/CategoryGrid";
 import StatusBadge from "@/components/StatusBadge";
 import mascotPeek from "@/components/picture/bottom.png";
 import mascotSign from "@/components/picture/circle.png";
-import mascotPoint from "@/components/picture/good.png";
+import mascotHug from "@/components/picture/hug.png";
 import { formatBudget } from "@/lib/mockData";
 import { fetchTorList } from "@/lib/torApi";
 import { isBiddable } from "@/lib/torStatus";
@@ -149,6 +149,8 @@ export default async function Home() {
                       src={mascotPeek}
                       alt=""
                       width={150}
+                      // ~3× the drawn width so it stays sharp on retina screens and when zoomed in.
+                      sizes="450px"
                       priority
                       className="pointer-events-none absolute z-10 select-none"
                       style={{
@@ -177,19 +179,22 @@ export default async function Home() {
               </>
             )}
 
-            <div className="absolute bottom-2 right-8 h-7 w-44 rotate-[3deg] rounded-full bg-black/15 blur-xl" />
-            <div className="animate-card-bob absolute bottom-10 right-4 w-56" style={{ animationDelay: "-2.5s" }}>
+            <div className="absolute rotate-[3deg] rounded-full bg-black/15 blur-xl" style={{ bottom: -8, right: 46, width: 170, height: 28 }} />
+            <div className="animate-card-bob absolute" style={{ bottom: 0, right: 30, width: 202, animationDelay: "-2.5s" }}>
               <div
-                className="relative rotate-[3deg] rounded-[1.75rem] bg-white p-5 ring-1 ring-black/[0.03]"
-                style={{ boxShadow: "0 24px 48px -16px rgba(224,87,119,0.3), 0 10px 24px rgba(34,26,24,0.06)" }}
+                className="relative rotate-[3deg] rounded-[1.75rem] bg-white ring-1 ring-black/[0.03]"
+                style={{ padding: "20px 34px", boxShadow: "0 24px 48px -16px rgba(224,87,119,0.3), 0 10px 24px rgba(34,26,24,0.06)" }}
               >
-                {/* Mascot on the bottom-right corner, pointing back at the label. */}
+                {/* Mascot hugging the card: head above it, hands gripping its
+                    left/right edges (hands sit at ~17% / ~80% of hug.png). */}
                 <Image
-                  src={mascotPoint}
+                  src={mascotHug}
                   alt=""
-                  width={120}
+                  width={320}
+                  // ~3× the drawn width so it stays sharp on retina screens and when zoomed in.
+                  sizes="960px"
                   className="pointer-events-none absolute z-10 select-none"
-                  style={{ right: -30, bottom: -36, width: 120, height: "auto", filter: "drop-shadow(0 10px 14px rgba(224,87,119,0.22))" }}
+                  style={{ left: -54, top: -190, width: 320, maxWidth: "none", height: "auto", filter: "drop-shadow(0 10px 14px rgba(224,87,119,0.2))" }}
                 />
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-rose-light)] text-[var(--color-rose-dark)]">
                   <Sparkles size={16} />
@@ -204,11 +209,13 @@ export default async function Home() {
 
             {/* Mascot holding the open-TOR count up like a sign: the stick's tip
                 (≈79%, 8% of circle.png) tucks behind the bottom of the circle. */}
-            <div className="animate-card-bob absolute" style={{ top: 96, right: 28, width: 182, height: 201, animationDelay: "-4s" }}>
+            <div className="animate-card-bob absolute" style={{ left: 30, bottom: -40, width: 182, height: 201, animationDelay: "-4s" }}>
               <Image
                 src={mascotSign}
                 alt=""
                 width={170}
+                // ~3× the drawn width so it stays sharp on retina screens and when zoomed in.
+                sizes="510px"
                 className="pointer-events-none absolute select-none"
                 style={{ left: 0, top: 62, width: 170, height: "auto", filter: "drop-shadow(0 12px 16px rgba(224,87,119,0.22))" }}
               />
@@ -223,7 +230,7 @@ export default async function Home() {
               </div>
             </div>
 
-            <div className="animate-card-bob absolute bottom-16 left-0" style={{ animationDelay: "-3.5s" }}>
+            <div className="animate-card-bob absolute" style={{ top: 40, right: 0, animationDelay: "-3.5s" }}>
               <div
                 className="flex items-center gap-2 rounded-full bg-white pl-1.5 pr-4 py-1.5 ring-1 ring-black/[0.03]"
                 style={{ boxShadow: "0 16px 32px -14px rgba(224,87,119,0.3), 0 6px 16px rgba(34,26,24,0.06)" }}

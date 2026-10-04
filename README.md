@@ -1,6 +1,42 @@
-# TOR Project
+# TOR Checker
 
-### for Collaborative Software Process and Project Management 
+**ค้นหาและวิเคราะห์ประกาศจัดซื้อจัดจ้าง (TOR) ด้านซอฟต์แวร์ของกรุงเทพมหานคร**
+
+A project for the *Collaborative Software Process and Project Management* course.
+
+TOR Checker aggregates software-procurement TOR (Terms of Reference)
+announcements from Bangkok Metropolitan Administration agencies via the public
+e-GP system, writes AI summaries of each document, and surfaces AI-generated
+*fairness signals* — neutral review prompts (e.g. a brand name in the spec or an
+unusually short submission window), never accusations of wrongdoing.
+
+## Features
+
+| Role | What they can do |
+|---|---|
+| **Public** | Search and filter TORs by keyword, agency, category, budget, and deadline; read AI summaries; report incorrect data |
+| **Vendor** | Everything above, plus a company profile, TOR matching, bookmarks with application tracking, a deadline calendar, and notifications |
+| **Admin** | Data-quality review, fairness-flag review, error reports, ingestion runs, system logs, and user chat |
+
+## Tech stack
+
+| Part | Stack |
+|---|---|
+| `frontend/` | Next.js 16 (App Router), React 19, Tailwind CSS v4, TypeScript |
+| `backend/` | Express 5, Mongoose 9, TypeScript, Jest |
+| Database | MongoDB |
+| AI | Gemini on Vertex AI (`@google/genai`) |
+| Ingestion | e-GP public API scraper, PDF inspection, enrichment queue |
+| Deploy | Docker, Google Cloud Run + Cloud Scheduler, Cloud Storage |
+
+## Project structure
+
+```
+TOR_website/
+├── frontend/   # Next.js app — public, vendor, and admin pages
+├── backend/    # Express API, TOR ingestion, AI enrichment jobs
+└── docs/       # Deployment guide and design notes
+```
 
 ## Run with Docker
 
@@ -58,3 +94,37 @@ frontend):
 docker build --target runner -t tor-backend ./backend
 docker build --target runner -t tor-frontend ./frontend
 ```
+
+## Run without Docker
+
+Each app runs on its own. Copy the env templates first (`backend/.env.example`;
+the frontend needs `MONGODB_URI` in `frontend/.env.local`).
+
+```sh
+# Backend — http://localhost:8000
+cd backend
+npm install
+npm run dev
+
+# Frontend — http://localhost:3000
+cd frontend
+npm install
+npm run dev
+```
+
+Backend checks: `npm test`, `npm run typecheck`. Frontend checks: `npm run lint`, `npm run build`.
+
+## Documentation
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — branching, commit messages, and pull requests
+- [docs/deployment/gcp.md](docs/deployment/gcp.md) — deploying to Google Cloud
+
+## Team
+
+- Paranya
+- Pakorn
+- Karnpon
+
+## License
+
+[MIT](LICENSE) © 2026 Paranya, Pakorn, Karnpon
