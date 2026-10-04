@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import Image from "next/image";
 import {
   ArrowRight,
@@ -33,8 +34,9 @@ function formatCompactBaht(amount: number): string {
 
 export default async function Home() {
   // torList is only the newest page (pageSize=100); headline numbers come from collection-wide totals.
+  // The session cookie goes along so a vendor's hidden TORs drop out of the latest list.
   const [torList, openStats, { agencies, totalCount }] = await Promise.all([
-    fetchTorList(),
+    fetchTorList((await cookies()).toString()),
     fetchOpenTorStats(),
     fetchAgencies(),
   ]);

@@ -37,6 +37,12 @@ interface State {
 const EMPTY: State = { userId: null, ready: false, ids: new Set(), items: [], error: null };
 
 let state: State = EMPTY;
+/**
+ * TORs hidden since this page loaded. Their cards show the undo notice; a TOR
+ * hidden on an earlier visit simply isn't rendered (the API already drops it
+ * from most lists), so a refresh makes hidden TORs disappear.
+ */
+const hiddenThisVisit = new Set<string>();
 const listeners = new Set<() => void>();
 let inflight: Promise<void> | null = null;
 
@@ -83,8 +89,12 @@ async function setHidden(torId: string, hidden: boolean) {
   if (!userId || state.ids.has(torId) === hidden) return;
 
   const ids = new Set(state.ids);
-  if (hidden) ids.add(torId);
-  else ids.delete(torId);
+  if (hidden) {
+    ids.add(torId);
+    hiddenThisVisit.add(torId);
+  } else {
+    ids.delete(torId);
+  }
   setState({ ids, items: hidden ? state.items : state.items.filter((i) => i.tor.id !== torId), error: null });
 
   try {
@@ -109,6 +119,7 @@ export function useHiddenTors() {
   const s = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const ready = authReady && s.userId === userId && s.ready;
   const isHidden = useCallback((id: string) => s.ids.has(id), [s.ids]);
+  const wasHiddenThisVisit = useCallback((id: string) => hiddenThisVisit.has(id), []);
 
   return {
     ready,
@@ -116,6 +127,7 @@ export function useHiddenTors() {
     items: s.items,
     error: s.error,
     isHidden,
+    wasHiddenThisVisit,
     hide: (id: string) => setHidden(id, true),
     unhide: (id: string) => setHidden(id, false),
   };

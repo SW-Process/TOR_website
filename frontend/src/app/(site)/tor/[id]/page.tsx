@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   Building2,
@@ -51,7 +52,8 @@ export default async function TORDetailPage({
 
   const procurement = tor.procurement ?? null;
   const bidDeadline = procurement?.bidDeadline ?? null;
-  const torList = await fetchTorList();
+  // Forward the session so the vendor's hidden TORs are left out of "similar TORs".
+  const torList = await fetchTorList((await cookies()).toString());
   const related = torList
     .filter((t) => t.category === tor.category && t.id !== tor.id)
     .slice(0, 3);

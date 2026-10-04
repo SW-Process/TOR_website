@@ -8,9 +8,10 @@ import { loadOrCreateProfile } from "./vendorProfileController";
 /** Upper bound on one vendor's hidden list, so the embedded array stays small. */
 export const MAX_HIDDEN_TORS = 1000;
 
-// Same public fields the TOR list exposes (torController LIST_PROJECTION).
+// The public TOR list fields (torController LIST_PROJECTION), plus the AI summary line the
+// settings cards show.
 const TOR_PROJECTION =
-  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt";
+  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt aiSummary.summary";
 
 function torIdParam(req: Request): string {
   const torId = String(req.params.torId);

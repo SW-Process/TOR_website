@@ -43,12 +43,14 @@ export default function HideTorButton({ id, variant = "icon" }: { id: string; va
 }
 
 /**
- * Wraps a TOR card: once the vendor hides that TOR, the card collapses into an
- * Instagram-style "hidden" notice with an undo, instead of vanishing mid-scroll.
+ * Wraps a TOR card: hiding it collapses the card into an Instagram-style "hidden"
+ * notice with an undo, instead of vanishing mid-scroll. A TOR hidden on an earlier
+ * visit renders nothing, so after a refresh hidden TORs are simply gone.
  */
 export function HideableCard({ id, children }: { id: string; children: React.ReactNode }) {
-  const { isHidden, unhide, ready } = useHiddenTors();
+  const { isHidden, wasHiddenThisVisit, unhide, ready } = useHiddenTors();
   if (!ready || !isHidden(id)) return <>{children}</>;
+  if (!wasHiddenThisVisit(id)) return null;
 
   return (
     <div className="card flex flex-col items-center justify-center gap-3 p-6 text-center">
