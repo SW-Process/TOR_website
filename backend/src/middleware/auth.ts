@@ -1,45 +1,60 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
+import { isValidObjectId } from "mongoose";
+import { User } from "../models";
 import { verifyToken, COOKIE_NAME } from "../utils/token";
 import type { UserRole } from "../models/User";
+import type { AuthUser } from "../types/http";
 
 /**
- * Require a valid auth cookie. Attaches `req.user = { id, role }` on success,
- * responds 401 otherwise.
+ * The account a session cookie belongs to, or null when the token is invalid or
+ * expired, the account is gone, or the session was signed out (its token version
+ * is behind the user's — see User.tokenVersion). The role comes from the database,
+ * not the token, so a role change applies at once.
  */
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export async function sessionUser(token: string | undefined): Promise<AuthUser | null> {
+  if (!token) return null;
+  let payload;
+  try {
+    payload = verifyToken(token);
+  } catch {
+    return null;
+  }
+  if (!isValidObjectId(payload.sub)) return null;
+
+  const user = await User.findById(payload.sub).select("role tokenVersion").lean();
+  if (!user || (user.tokenVersion ?? 0) !== (payload.tv ?? 0)) return null;
+  return { id: String(user._id), role: user.role };
+}
+
+/**
+ * Require a valid, still-current session cookie. Attaches `req.user = { id, role }`
+ * on success, responds 401 otherwise.
+ */
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = req.cookies?.[COOKIE_NAME] as string | undefined;
   if (!token) {
     res.status(401).json({ message: "Authentication required" });
     return;
   }
 
-  try {
-    const payload = verifyToken(token);
-    req.user = { id: payload.sub, role: payload.role };
-    next();
-  } catch {
+  const user = await sessionUser(token);
+  if (!user) {
     res.status(401).json({ message: "Invalid or expired session" });
+    return;
   }
+  req.user = user;
+  next();
 }
 
 /**
- * Attach `req.user` when a valid auth cookie is present, but never blocks the
+ * Attach `req.user` when a valid session cookie is present, but never blocks the
  * request — for endpoints usable by both anonymous and logged-in callers
  * (e.g. reporting a TOR error attributes it to the reporter when logged in).
+ * A signed-out or invalid session proceeds as anonymous.
  */
-export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
-  const token = req.cookies?.[COOKIE_NAME] as string | undefined;
-  if (!token) {
-    next();
-    return;
-  }
-
-  try {
-    const payload = verifyToken(token);
-    req.user = { id: payload.sub, role: payload.role };
-  } catch {
-    // invalid/expired cookie on an optional-auth route — proceed as anonymous
-  }
+export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
+  const user = await sessionUser(req.cookies?.[COOKIE_NAME] as string | undefined);
+  if (user) req.user = user;
   next();
 }
 

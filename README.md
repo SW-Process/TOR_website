@@ -121,10 +121,10 @@ Backend checks: `npm test`, `npm run typecheck`. Frontend checks: `npm run lint`
 
 ## Team
 
-- Paranya
+- Paranyu
 - Pakorn
 - Karnpon
 
 ## License
 
-[MIT](LICENSE) © 2026 Paranya, Pakorn, Karnpon
+[MIT](LICENSE) © 2026 Paranyu, Pakorn, Karnpon

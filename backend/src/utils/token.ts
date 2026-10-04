@@ -7,11 +7,14 @@ export const COOKIE_NAME = "token";
 export interface TokenPayload extends JwtPayload {
   sub: string;
   role: UserRole;
+  /** User.tokenVersion at issue time; absent on tokens issued before it existed (read as 0). */
+  tv?: number;
 }
 
 interface TokenUser {
   _id: unknown;
   role: UserRole;
+  tokenVersion?: number;
 }
 
 function getSecret(): string {
@@ -26,7 +29,7 @@ export function signToken(user: TokenUser): string {
     subject: String(user._id),
     expiresIn: JWT_EXPIRES_IN as SignOptions["expiresIn"],
   };
-  return jwt.sign({ role: user.role }, getSecret(), options);
+  return jwt.sign({ role: user.role, tv: user.tokenVersion ?? 0 }, getSecret(), options);
 }
 
 /** Verify a JWT and return its payload, or throw. */

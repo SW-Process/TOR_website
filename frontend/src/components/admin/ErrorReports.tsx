@@ -251,9 +251,15 @@ function ReportCard({ report, onChanged }: { report: Report; onChanged: () => vo
             onChange={(e) => setNote(e.target.value)}
             rows={2}
             maxLength={1000}
-            placeholder="บันทึกสิ่งที่แก้ไข (ไม่บังคับ) เช่น แก้วันปิดรับให้ตรงกับเอกสารแล้ว"
+            placeholder="ข้อความถึงผู้แจ้ง (ไม่บังคับ) เช่น แก้วันปิดรับให้ตรงกับเอกสารแล้ว"
             className="w-full rounded-2xl border border-[var(--color-border)] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[var(--color-ink)]"
           />
+        )}
+        {resolving && (
+          // The note is shown to a signed-in reporter under "รายงานที่ฉันส่ง" in their account settings.
+          <p className="-mt-1 text-[11px] text-[var(--color-text-muted)]">
+            ผู้แจ้งที่เข้าสู่ระบบจะเห็นข้อความนี้ในหน้าบัญชีของตน
+          </p>
         )}
         {error && (
           <p role="alert" className="text-xs text-[var(--color-danger)]">

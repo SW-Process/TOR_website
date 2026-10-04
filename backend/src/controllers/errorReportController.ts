@@ -37,3 +37,45 @@ export async function reportTorError(req: Request, res: Response): Promise<void>
     },
   });
 }
+
+/** How many of their own reports a user sees; plenty for one account. */
+const MY_REPORTS_LIMIT = 200;
+
+/**
+ * GET /api/auth/reports — the caller's own error reports, newest first, with the
+ * TOR they're about and, once resolved, the admin's note. Who resolved it stays
+ * private; a TOR that is no longer public comes back as null.
+ */
+export async function listMyReports(req: Request, res: Response): Promise<void> {
+  const reports = await ErrorReport.find({ reportedBy: req.user!.id })
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(MY_REPORTS_LIMIT)
+    .lean();
+  const tors = await Tor.find({ _id: { $in: reports.map((r) => r.torId) }, pipelineStatus: "enriched" })
+    .select("title agency projectCode category")
+    .lean();
+  const torById = new Map(tors.map((t) => [String(t._id), t]));
+
+  res.status(200).json({
+    data: reports.map((r) => {
+      const tor = torById.get(String(r.torId));
+      return {
+        id: String(r._id),
+        description: r.description,
+        status: r.status,
+        createdAt: r.createdAt,
+        resolution:
+          r.status === "resolved" ? { note: r.resolutionNote ?? null, resolvedAt: r.resolvedAt } : null,
+        tor: tor
+          ? {
+              id: String(tor._id),
+              title: tor.title,
+              agency: tor.agency ?? null,
+              projectCode: tor.projectCode ?? null,
+              category: tor.category ?? null,
+            }
+          : null,
+      };
+    }),
+  });
+}

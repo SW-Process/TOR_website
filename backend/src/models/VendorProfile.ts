@@ -7,6 +7,11 @@ export interface ISavedSearch {
   createdAt: Date;
 }
 
+export interface IHiddenTor {
+  torId: Types.ObjectId;
+  hiddenAt: Date;
+}
+
 export interface IVendorProfile {
   userId: Types.ObjectId;
   companyName?: string;
@@ -21,6 +26,8 @@ export interface IVendorProfile {
   budgetRange?: { min?: number; max?: number };
   serviceArea?: string;
   savedSearches: Types.DocumentArray<ISavedSearch>;
+  // TORs the vendor chose not to see in search and recommendations
+  hiddenTors: IHiddenTor[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +46,18 @@ const savedSearchSchema = new Schema<ISavedSearch>(
     createdAt: { type: Date, default: Date.now },
   },
   { _id: true }
+);
+
+/**
+ * hiddenTors — embedded in vendorProfiles. Per-vendor "don't show me this TOR";
+ * only ever read whole, to exclude ids from that vendor's TOR lists.
+ */
+const hiddenTorSchema = new Schema<IHiddenTor>(
+  {
+    torId: { type: Schema.Types.ObjectId, ref: "Tor", required: true },
+    hiddenAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
 );
 
 /**
@@ -66,6 +85,7 @@ const vendorProfileSchema = new Schema<IVendorProfile>(
     },
     serviceArea: { type: String, trim: true },
     savedSearches: { type: [savedSearchSchema], default: [] },
+    hiddenTors: { type: [hiddenTorSchema], default: [] },
   },
   { timestamps: true }
 );

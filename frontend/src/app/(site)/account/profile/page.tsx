@@ -1,380 +1,241 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  ArrowRight,
-  Award,
-  Building2,
-  CheckCircle2,
-  Cpu,
-  ImagePlus,
-  MapPin,
-  PartyPopper,
-  Sparkles,
-  Tags,
-  UserRound,
-  Wallet,
-} from "lucide-react";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowRight, Check, Sparkles } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
+import SettingsShell from "@/components/account/SettingsShell";
+import { AvatarCard, FieldBlock, SubLabel, SubmitBar, inputClass, useSubmit } from "@/components/account/ui";
 import { categories, type Category } from "@/lib/mockData";
 import { emptyProfile, useProfile, type BusinessProfile } from "@/lib/useProfile";
-import { useAuth } from "@/lib/useAuth";
 
-function SectionHeading({
-  icon: Icon,
-  title,
-  subtitle,
-}: {
-  icon: typeof Building2;
-  title: string;
-  subtitle?: string;
-}) {
+function MatchNote() {
   return (
-    <div className="flex items-center gap-2.5">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-rose-light)] text-[var(--color-rose-dark)]">
-        <Icon size={13} />
+    <div className="flex items-start gap-3 rounded-3xl bg-[var(--color-surface-alt)] p-4 sm:p-5">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[var(--color-rose-dark)] shadow-[var(--shadow-sm)]">
+        <Sparkles size={16} />
       </span>
-      <div>
-        <h3 className="text-[13px] font-bold text-[var(--color-text)]">{title}</h3>
-        {subtitle && <p className="text-[11px] text-[var(--color-text-faint)]">{subtitle}</p>}
-      </div>
+      <p className="text-[13px] leading-relaxed text-[var(--color-ink-soft)]">
+        เปอร์เซ็นต์ความเหมาะสมที่แสดงตอนนี้เป็นการประเมินเบื้องต้นจากหมวดหมู่และงบประมาณที่คุณกรอกเท่านั้น
+        ทีมข้อมูลกำลังออกแบบโมเดล AI เพื่อคำนวณให้แม่นยำขึ้นจากข้อมูลชุดนี้และข้อมูลเพิ่มเติมในอนาคต
+      </p>
     </div>
   );
 }
 
-const inputClass =
-  "rounded-xl border border-[var(--color-border)] bg-white px-3.5 py-2.5 text-sm shadow-[var(--shadow-sm)] transition-colors focus:outline-none focus:border-[var(--color-rose-dark)]";
-
-export default function ProfilePage() {
-  const router = useRouter();
-  const { profile, ready, saveProfile } = useProfile();
-  const { avatarSrc, uploadAvatar } = useAuth();
-  const [form, setForm] = useState<BusinessProfile>(emptyProfile);
-  const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
-  const [isOnboarding, setIsOnboarding] = useState(false);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [avatarError, setAvatarError] = useState("");
-
-  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setAvatarError("");
-    setAvatarUploading(true);
-    const result = await uploadAvatar(file);
-    setAvatarUploading(false);
-    if (!result.ok) setAvatarError(result.error || "อัปโหลดรูปไม่สำเร็จ");
-  }
-
-  const avatarPicker = (
-    <div className="flex items-center gap-4">
-      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-surface-alt)] text-[var(--color-text-faint)]">
-        {avatarSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <UserRound size={26} />
-        )}
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="btn-pill cursor-pointer border border-[var(--color-border-strong)] px-3.5 py-2 text-xs font-semibold">
-          <ImagePlus size={14} />
-          {avatarUploading ? "กำลังอัปโหลด..." : avatarSrc ? "เปลี่ยนรูปโปรไฟล์" : "เพิ่มรูปโปรไฟล์"}
-          <input
-            type="file"
-            accept="image/*"
-            hidden
-            disabled={avatarUploading}
-            onChange={handleAvatarChange}
-          />
-        </label>
-        <span className="text-[11px] text-[var(--color-text-faint)]">ไม่บังคับ ข้ามได้</span>
-        {avatarError && <span className="text-xs font-medium text-[var(--color-rose-dark)]">{avatarError}</span>}
-      </div>
+function NumberInput({
+  value,
+  onChange,
+  suffix,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  suffix: string;
+}) {
+  return (
+    <div className="relative">
+      <input
+        type="number"
+        min={0}
+        inputMode="numeric"
+        value={value || ""}
+        placeholder="0"
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={`${inputClass} pr-14 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+      />
+      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--color-text-faint)]">
+        {suffix}
+      </span>
     </div>
   );
+}
 
-  useEffect(() => {
-    if (ready) setForm(profile ?? emptyProfile);
-  }, [ready, profile]);
-
-  useEffect(() => {
-    setIsOnboarding(new URLSearchParams(window.location.search).get("onboarding") === "1");
-  }, []);
-
-  function toggleCategory(cat: Category) {
-    setForm((prev) => ({
-      ...prev,
-      interestedCategories: prev.interestedCategories.includes(cat)
-        ? prev.interestedCategories.filter((c) => c !== cat)
-        : [...prev.interestedCategories, cat],
-    }));
-  }
+/** The business-profile form; state starts from `initial`, so mount it only once the profile has loaded. */
+function BusinessProfileForm({ initial, onboarding }: { initial: BusinessProfile; onboarding: boolean }) {
+  const router = useRouter();
+  const { saveProfile } = useProfile();
+  const [form, setForm] = useState<BusinessProfile>(initial);
+  const [savedForm, setSavedForm] = useState<BusinessProfile>(initial);
+  const { pending, error, done, setDone, run } = useSubmit();
+  const dirty = JSON.stringify(form) !== JSON.stringify(savedForm);
 
   function field<K extends keyof BusinessProfile>(key: K, value: BusinessProfile[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setDone(false);
   }
 
-  const formEl = !ready ? null : (
+  function toggleCategory(cat: Category) {
+    field(
+      "interestedCategories",
+      form.interestedCategories.includes(cat)
+        ? form.interestedCategories.filter((c) => c !== cat)
+        : [...form.interestedCategories, cat]
+    );
+  }
+
+  async function save() {
+    try {
+      await saveProfile(form);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "บันทึกโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่" };
+    }
+  }
+
+  return (
     <form
-      onSubmit={async (e) => {
+      className="flex flex-col gap-9"
+      onSubmit={(e) => {
         e.preventDefault();
-        setSaveError("");
-        setSaving(true);
-        try {
-          await saveProfile(form);
-        } catch {
-          setSaving(false);
-          setSaveError("บันทึกโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่");
-          return;
-        }
-        setSaving(false);
-        if (isOnboarding) {
-          router.push("/dashboard");
-          return;
-        }
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2500);
+        void run(save, () => (onboarding ? router.push("/dashboard") : setSavedForm(form)));
       }}
-      className={`flex flex-col gap-5 ${
-        isOnboarding
-          ? "rounded-[1.75rem] border border-white/60 bg-white/80 p-5 shadow-[var(--shadow-lg)] backdrop-blur-2xl sm:p-6"
-          : "card p-5 sm:p-6"
-      }`}
     >
-      <section className="flex flex-col gap-3">
-        <SectionHeading icon={Building2} title="ข้อมูลธุรกิจ" />
-        <div className="grid sm:grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-[var(--color-text)]">ชื่อธุรกิจ / บริษัท</span>
-            <input
-              value={form.businessName}
-              onChange={(e) => field("businessName", e.target.value)}
-              placeholder="เช่น บริษัท ดิจิทัล โซลูชัน จำกัด"
-              className={inputClass}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-[var(--color-text)]">ประเภทธุรกิจ / ความเชี่ยวชาญ</span>
-            <input
-              value={form.businessType}
-              onChange={(e) => field("businessType", e.target.value)}
-              placeholder="เช่น พัฒนาซอฟต์แวร์, ที่ปรึกษาไอที"
-              className={inputClass}
-            />
-          </label>
-        </div>
-      </section>
+      <FieldBlock title="ชื่อธุรกิจ / บริษัท">
+        <input
+          value={form.businessName}
+          onChange={(e) => field("businessName", e.target.value)}
+          placeholder="เช่น บริษัท ดิจิทัล โซลูชัน จำกัด"
+          className={inputClass}
+        />
+      </FieldBlock>
 
-      <div className="h-px bg-[var(--color-border)]" />
+      <FieldBlock title="ประเภทธุรกิจ / ความเชี่ยวชาญ">
+        <input
+          value={form.businessType}
+          onChange={(e) => field("businessType", e.target.value)}
+          placeholder="เช่น พัฒนาซอฟต์แวร์, ที่ปรึกษาไอที"
+          className={inputClass}
+        />
+      </FieldBlock>
 
-      <section className="flex flex-col gap-3">
-        <SectionHeading icon={Tags} title="หมวดหมู่ TOR ที่สนใจ" subtitle="เลือกได้มากกว่า 1 หมวด" />
+      <FieldBlock
+        title="หมวดหมู่ TOR ที่สนใจ"
+        aside={form.interestedCategories.length ? `เลือกแล้ว ${form.interestedCategories.length} หมวด` : "เลือกได้หลายหมวด"}
+        help="ใช้จัดอันดับ TOR ที่แนะนำในหน้าแดชบอร์ด"
+      >
         <div className="flex flex-wrap gap-2">
           {categories.map((cat) => {
-            const active = form.interestedCategories.includes(cat);
+            const on = form.interestedCategories.includes(cat);
             return (
               <button
                 key={cat}
                 type="button"
+                aria-pressed={on}
                 onClick={() => toggleCategory(cat)}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                  active
-                    ? "bg-[var(--color-ink)] text-white"
-                    : "bg-[var(--color-surface-alt)] text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+                className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm transition-colors ${
+                  on
+                    ? "border-[var(--color-ink)] bg-[var(--color-ink)] font-medium text-white"
+                    : "border-[var(--color-border)] bg-white text-[var(--color-text)] hover:bg-[var(--color-surface-alt)]"
                 }`}
               >
+                {on && <Check size={14} strokeWidth={2.5} />}
                 {cat}
               </button>
             );
           })}
         </div>
-      </section>
+      </FieldBlock>
 
-      <div className="h-px bg-[var(--color-border)]" />
-
-      <section className="flex flex-col gap-3">
-        <SectionHeading
-          icon={Cpu}
-          title="เทคโนโลยีที่ใช้"
-          subtitle="ใช้จับคู่กับเทคโนโลยีที่ TOR ต้องการ"
-        />
+      <FieldBlock title="เทคโนโลยีที่ใช้" help="คั่นแต่ละรายการด้วยจุลภาค ใช้จับคู่กับเทคโนโลยีที่ TOR ต้องการ">
         <textarea
           value={form.technologyStack}
           onChange={(e) => field("technologyStack", e.target.value)}
-          placeholder="เช่น React, Node.js, PostgreSQL, Docker (คั่นด้วยจุลภาค)"
-          rows={2}
+          placeholder="เช่น React, Node.js, PostgreSQL, Docker"
+          rows={3}
           className={`${inputClass} resize-none`}
         />
-      </section>
+      </FieldBlock>
 
-      <div className="h-px bg-[var(--color-border)]" />
-
-      <section className="flex flex-col gap-3">
-        <SectionHeading icon={Wallet} title="ขนาดธุรกิจและงบประมาณ" subtitle="ใช้ช่วยจับคู่ TOR ที่ขนาดพอดีกับคุณ" />
-        <div className="grid sm:grid-cols-3 gap-3">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-[var(--color-text)]">ทุนจดทะเบียน (บาท)</span>
-            <input
-              type="number"
-              min={0}
-              value={form.registeredCapital || ""}
-              onChange={(e) => field("registeredCapital", Number(e.target.value))}
-              className={inputClass}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-[var(--color-text)]">ปีประสบการณ์</span>
-            <input
-              type="number"
-              min={0}
-              value={form.experienceYears || ""}
-              onChange={(e) => field("experienceYears", Number(e.target.value))}
-              className={inputClass}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-[var(--color-text)]">ขนาดทีม (คน)</span>
-            <input
-              type="number"
-              min={0}
-              value={form.teamSize || ""}
-              onChange={(e) => field("teamSize", Number(e.target.value))}
-              className={inputClass}
-            />
-          </label>
+      <FieldBlock title="ขนาดธุรกิจ">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <SubLabel label="ทุนจดทะเบียน">
+            <NumberInput value={form.registeredCapital} onChange={(n) => field("registeredCapital", n)} suffix="บาท" />
+          </SubLabel>
+          <SubLabel label="ประสบการณ์">
+            <NumberInput value={form.experienceYears} onChange={(n) => field("experienceYears", n)} suffix="ปี" />
+          </SubLabel>
+          <SubLabel label="ขนาดทีม">
+            <NumberInput value={form.teamSize} onChange={(n) => field("teamSize", n)} suffix="คน" />
+          </SubLabel>
         </div>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-[var(--color-text)]">งบประมาณโครงการที่รับได้ (ต่ำสุด)</span>
-            <input
-              type="number"
-              min={0}
-              value={form.budgetMin || ""}
-              onChange={(e) => field("budgetMin", Number(e.target.value))}
-              className={inputClass}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-[var(--color-text)]">งบประมาณโครงการที่รับได้ (สูงสุด)</span>
-            <input
-              type="number"
-              min={0}
-              value={form.budgetMax || ""}
-              onChange={(e) => field("budgetMax", Number(e.target.value))}
-              className={inputClass}
-            />
-          </label>
+      </FieldBlock>
+
+      <FieldBlock title="งบประมาณโครงการที่รับได้" help="ใช้ช่วยจับคู่ TOR ที่ขนาดพอดีกับธุรกิจของคุณ">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <SubLabel label="ต่ำสุด">
+            <NumberInput value={form.budgetMin} onChange={(n) => field("budgetMin", n)} suffix="บาท" />
+          </SubLabel>
+          <SubLabel label="สูงสุด">
+            <NumberInput value={form.budgetMax} onChange={(n) => field("budgetMax", n)} suffix="บาท" />
+          </SubLabel>
         </div>
-      </section>
+      </FieldBlock>
 
-      <div className="h-px bg-[var(--color-border)]" />
-
-      <section className="flex flex-col gap-3">
-        <SectionHeading icon={MapPin} title="พื้นที่ให้บริการ" />
+      <FieldBlock title="พื้นที่ให้บริการ">
         <input
           value={form.serviceArea}
           onChange={(e) => field("serviceArea", e.target.value)}
           placeholder="เช่น กรุงเทพมหานครและปริมณฑล"
           className={inputClass}
         />
-      </section>
+      </FieldBlock>
 
-      <div className="h-px bg-[var(--color-border)]" />
-
-      <section className="flex flex-col gap-3">
-        <SectionHeading icon={Award} title="ใบรับรอง / มาตรฐานที่มี" />
+      <FieldBlock title="ใบรับรอง / มาตรฐานที่มี" help="คั่นแต่ละรายการด้วยจุลภาค">
         <textarea
           value={form.certifications}
           onChange={(e) => field("certifications", e.target.value)}
-          placeholder="เช่น ISO/IEC 27001, PMP, AWS Certified (คั่นด้วยจุลภาค)"
-          rows={2}
+          placeholder="เช่น ISO/IEC 27001, PMP, AWS Certified"
+          rows={3}
           className={`${inputClass} resize-none`}
         />
-      </section>
+      </FieldBlock>
 
-      <div className="flex items-center gap-3 pt-1">
-        <button
-          type="submit"
-          disabled={saving}
-          className="btn-pill btn-pill-primary px-5 py-2.5 text-sm disabled:opacity-70"
-        >
-          {saving ? "กำลังบันทึก..." : isOnboarding ? "บันทึกและไปแดชบอร์ด" : "บันทึกโปรไฟล์"}
-          {isOnboarding && !saving && <ArrowRight size={14} />}
-        </button>
-        {saved && (
-          <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-success)]">
-            <CheckCircle2 size={16} />
-            บันทึกแล้ว
-          </span>
-        )}
-        {saveError && (
-          <span className="text-sm font-medium text-[var(--color-rose-dark)]">{saveError}</span>
-        )}
-      </div>
+      <SubmitBar
+        pending={pending}
+        disabled={!onboarding && !dirty}
+        label={onboarding ? "บันทึกและไปแดชบอร์ด" : "บันทึก"}
+        icon={onboarding ? <ArrowRight size={15} /> : undefined}
+        error={error}
+        done={done}
+        doneText="บันทึกโปรไฟล์ธุรกิจแล้ว"
+      />
     </form>
   );
+}
 
-  const matchNote = (
-    <div
-      className={`flex items-start gap-2.5 p-3.5 sm:p-4 ${
-        isOnboarding
-          ? "rounded-2xl bg-white/60 backdrop-blur"
-          : "card border-none bg-[var(--color-rose-light)]"
-      }`}
-    >
-      <Sparkles size={16} className="mt-0.5 shrink-0 text-[var(--color-rose-dark)]" />
-      <p className="text-xs leading-relaxed text-[var(--color-ink-soft)]">
-        เปอร์เซ็นต์ความเหมาะสมที่แสดงตอนนี้เป็นการประเมินเบื้องต้นจากหมวดหมู่และงบประมาณที่คุณกรอกเท่านั้น
-        ทีมข้อมูลกำลังออกแบบโมเดล AI เพื่อคำนวณให้แม่นยำขึ้นจากข้อมูลชุดนี้และข้อมูลเพิ่มเติมในอนาคต
-      </p>
-    </div>
-  );
+function ProfileContent() {
+  const router = useRouter();
+  const onboarding = useSearchParams().get("onboarding") === "1";
+  const { profile, ready } = useProfile();
+  const formEl = ready && <BusinessProfileForm initial={profile ?? emptyProfile} onboarding={onboarding} />;
 
-  if (isOnboarding) {
+  if (onboarding) {
+    // First visit after sign-up: a focused page without the settings menu.
     return (
       <RequireAuth>
-        <div className="relative flex-1 overflow-hidden bg-[linear-gradient(135deg,_#e9eaec_0%,_#eff0f1_50%,_#f5f5f6_100%)]">
-          <div
-            className="absolute inset-0 opacity-[0.35] [background-image:radial-gradient(rgba(34,26,24,0.1)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,black_10%,transparent_75%)]"
-            aria-hidden
-          />
-          <div className="animate-blob-a pointer-events-none absolute -top-16 -right-10 h-96 w-96 rounded-full bg-white blur-3xl opacity-70" aria-hidden />
-          <div
-            className="animate-blob-b pointer-events-none absolute top-1/3 -left-16 h-80 w-80 rounded-full bg-[var(--color-rose-light)] blur-3xl opacity-40"
-            style={{ animationDelay: "-3s" }}
-            aria-hidden
-          />
-
-          <div className="container-page relative py-8 sm:py-10">
-            <div className="mx-auto max-w-2xl">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[var(--color-rose-dark)] shadow-[var(--shadow-sm)]">
-                    <PartyPopper size={17} />
-                  </span>
-                  <span className="eyebrow mt-2.5 block">ยินดีต้อนรับ</span>
-                  <h1 className="mt-1 font-[family-name:var(--font-heading)] text-xl sm:text-2xl font-extrabold leading-tight text-[var(--color-text)]">
-                    มาตั้งค่าโปรไฟล์ธุรกิจกันก่อน
-                  </h1>
-                  <p className="mt-2 max-w-md text-xs text-[var(--color-ink-soft)] leading-relaxed">
-                    กรอกครั้งเดียว ใช้ประเมินว่า TOR แต่ละงานเหมาะกับธุรกิจคุณแค่ไหนตั้งแต่ครั้งแรกที่เข้าใช้งาน
-                  </p>
-                </div>
-                <button
-                  onClick={() => router.push("/dashboard")}
-                  className="shrink-0 rounded-full bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-[var(--color-ink-soft)] backdrop-blur transition-colors hover:bg-white hover:text-[var(--color-text)] whitespace-nowrap"
-                >
-                  ข้ามไปก่อน
-                </button>
+        <div className="container-page py-10">
+          <div className="mx-auto max-w-[640px]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className="eyebrow">ยินดีต้อนรับ</span>
+                <h1 className="mt-1 font-[family-name:var(--font-heading)] text-2xl font-extrabold text-[var(--color-text)]">
+                  ตั้งค่าโปรไฟล์ธุรกิจ
+                </h1>
+                <p className="mt-1.5 text-sm text-[var(--color-text-muted)]">
+                  กรอกครั้งเดียว ใช้ประเมินว่า TOR แต่ละงานเหมาะกับธุรกิจคุณแค่ไหน
+                </p>
               </div>
-
-              <div className="mt-5">{avatarPicker}</div>
-              <div className="mt-5">{matchNote}</div>
-              <div className="mt-4">{formEl}</div>
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-[var(--color-text-muted)] hover:bg-[var(--color-surface-alt)] hover:text-[var(--color-text)]"
+              >
+                ข้ามไปก่อน
+              </button>
+            </div>
+            <div className="mt-8 flex flex-col gap-9">
+              <AvatarCard />
+              <MatchNote />
+              {formEl}
             </div>
           </div>
         </div>
@@ -383,19 +244,20 @@ export default function ProfilePage() {
   }
 
   return (
-    <RequireAuth>
-      <div className="container-page py-8">
-        <h1 className="font-[family-name:var(--font-heading)] text-2xl sm:text-3xl font-extrabold text-[var(--color-text)]">
-          โปรไฟล์ธุรกิจ
-        </h1>
-        <p className="text-sm text-[var(--color-text-muted)] mt-1.5 max-w-2xl">
-          กรอกข้อมูลธุรกิจของคุณเพื่อให้ระบบช่วยประเมินว่า TOR แต่ละงานเหมาะกับคุณแค่ไหน
-        </p>
-
-        <div className="mt-6 max-w-3xl">{avatarPicker}</div>
-        <div className="mt-6 max-w-3xl">{matchNote}</div>
-        <div className="mt-6 max-w-3xl">{formEl}</div>
+    <SettingsShell active="business" title="โปรไฟล์ธุรกิจ" showDetailOnMobile>
+      <div className="flex flex-col gap-9">
+        <MatchNote />
+        {formEl}
       </div>
-    </RequireAuth>
+    </SettingsShell>
+  );
+}
+
+export default function ProfilePage() {
+  // useSearchParams needs a Suspense boundary in the App Router.
+  return (
+    <Suspense>
+      <ProfileContent />
+    </Suspense>
   );
 }

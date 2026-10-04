@@ -243,10 +243,17 @@ export function mapApiTor(raw: ApiTor): TOR {
   };
 }
 
-/** GET /api/tors — fetches the (currently small) enriched TOR set and maps it. */
-export async function fetchTorList(): Promise<TOR[]> {
+/**
+ * GET /api/tors — fetches the (currently small) enriched TOR set and maps it.
+ * The API leaves out TORs a signed-in vendor hid: in the browser the session
+ * cookie goes along by itself; server components pass the request's `cookie`.
+ */
+export async function fetchTorList(cookie?: string): Promise<TOR[]> {
   try {
-    const res = await fetch(`${resolveApiBase()}/api/tors?pageSize=100`);
+    const res = await fetch(`${resolveApiBase()}/api/tors?pageSize=100`, {
+      credentials: "include",
+      headers: cookie ? { cookie } : undefined,
+    });
     if (!res.ok) return [];
     const body = (await res.json()) as { data: ApiTor[] };
     return body.data.map(mapApiTor);
@@ -269,7 +276,8 @@ export interface TorSearchResult {
  * Throws on network/HTTP failure so the caller can tell "no matches" from "broken".
  */
 export async function searchTors(query: URLSearchParams, signal?: AbortSignal): Promise<TorSearchResult> {
-  const res = await fetch(`${resolveApiBase()}/api/tors?${query.toString()}`, { signal });
+  // credentials: a signed-in vendor's session cookie lets the API leave out the TORs they hid.
+  const res = await fetch(`${resolveApiBase()}/api/tors?${query.toString()}`, { signal, credentials: "include" });
   if (!res.ok) throw new Error(`TOR search failed: HTTP ${res.status}`);
   const body = (await res.json()) as {
     data: ApiTor[];

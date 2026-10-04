@@ -7,11 +7,15 @@ export type UserRole = "vendor" | "admin";
 
 export interface IUser {
   email: string;
+  /** Name shown in the header and greetings; null falls back to the email's local part on the client. */
+  displayName: string | null;
   passwordHash: string | null;
   googleOAuthId?: string;
   role: UserRole;
   avatarKey?: string;
   avatarContentType?: string;
+  /** Bumped to sign out every session issued before (password change, "log out other devices"). */
+  tokenVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,6 +45,7 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
       lowercase: true,
       trim: true,
     },
+    displayName: { type: String, trim: true, maxlength: 60, default: null },
     // bcrypt hash — never selected by default, set via the `password` virtual
     passwordHash: { type: String, default: null, select: false },
     // Left unset (not null) for email/password accounts — a `null` default would
@@ -55,6 +60,9 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     // derived from this in toJSON rather than exposed directly.
     avatarKey: { type: String },
     avatarContentType: { type: String },
+    // Every session token carries the version it was issued under; a token whose
+    // version no longer matches is rejected by the auth middleware.
+    tokenVersion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -91,6 +99,7 @@ userSchema.set("toJSON", {
     delete out.passwordHash;
     delete out.avatarKey;
     delete out.avatarContentType;
+    delete out.tokenVersion;
     delete out.__v;
     return out;
   },

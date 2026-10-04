@@ -5,11 +5,19 @@ import {
   login,
   logout,
   me,
+  updateAccount,
+  changePassword,
+  changeEmail,
+  logoutOthers,
+  deleteAccount,
   uploadAvatar,
   streamAvatar,
   googleStart,
   googleCallback,
+  googleLinkStart,
+  googleUnlink,
 } from "../controllers/authController";
+import { listMyReports } from "../controllers/errorReportController";
 import { requireAuth } from "../middleware/auth";
 
 const avatarUpload = multer({
@@ -23,11 +31,19 @@ router.post("/register", register);
 router.post("/login", login);
 router.post("/logout", logout);
 router.get("/me", requireAuth, me);
+router.patch("/me", requireAuth, updateAccount);
+router.delete("/me", requireAuth, deleteAccount);
+router.put("/password", requireAuth, changePassword);
+router.put("/email", requireAuth, changeEmail);
+router.post("/logout-others", requireAuth, logoutOthers);
+router.get("/reports", requireAuth, listMyReports);
 
 router.post("/avatar", requireAuth, avatarUpload.single("avatar"), uploadAvatar);
 router.get("/avatar/:userId", streamAvatar);
 
 router.get("/google", googleStart);
 router.get("/google/callback", googleCallback);
+router.get("/google/link", requireAuth, googleLinkStart);
+router.delete("/google", requireAuth, googleUnlink);
 
 export default router;
