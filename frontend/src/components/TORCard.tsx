@@ -4,24 +4,31 @@ import { TOR, formatBudget } from "@/lib/mockData";
 import { statusNote } from "@/lib/torStatus";
 import StatusBadge from "./StatusBadge";
 import BookmarkButton from "./BookmarkButton";
+import HideTorButton, { HideableCard } from "./HideTorButton";
 import MatchScoreBadge from "./MatchScoreBadge";
 
 export default function TORCard({
   tor,
   matchScore,
+  hideable = true,
 }: {
   tor: TOR;
   /** Omit to hide the badge; null shows its loading state. */
   matchScore?: number | null;
+  /** false where hiding makes no sense, e.g. the vendor's own saved list. */
+  hideable?: boolean;
 }) {
   const deadlineLabel = statusNote(tor);
 
-  return (
+  const card = (
     <div className="group isolate card overflow-hidden flex flex-col transition-shadow duration-300 hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5">
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
           <StatusBadge status={tor.status} />
-          <BookmarkButton id={tor.id} />
+          <div className="flex items-center gap-1.5">
+            {hideable && <HideTorButton id={tor.id} />}
+            <BookmarkButton id={tor.id} />
+          </div>
         </div>
 
         <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-rose-dark)]">
@@ -70,4 +77,6 @@ export default function TORCard({
       {matchScore !== undefined && <MatchScoreBadge score={matchScore} />}
     </div>
   );
+
+  return hideable ? <HideableCard id={tor.id}>{card}</HideableCard> : card;
 }

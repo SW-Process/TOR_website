@@ -87,7 +87,7 @@ export default function BookmarksPage() {
           {view === "list" && (
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
               {saved.map((tor) => (
-                <TORCard key={tor.id} tor={tor} />
+                <TORCard key={tor.id} tor={tor} hideable={false} />
               ))}
             </div>
           )}

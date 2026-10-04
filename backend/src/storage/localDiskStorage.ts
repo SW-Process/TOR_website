@@ -1,5 +1,5 @@
 import { createReadStream } from "node:fs";
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 import type { BlobPutResult, BlobStorage } from "./storage.types";
 
@@ -30,6 +30,10 @@ export class LocalDiskStorage implements BlobStorage {
     const target = this.pathFor(key);
     await access(target); // throws if missing, so callers get a rejected promise
     return createReadStream(target);
+  }
+
+  async delete(key: string): Promise<void> {
+    await rm(this.pathFor(key), { force: true });
   }
 
   async exists(key: string): Promise<boolean> {

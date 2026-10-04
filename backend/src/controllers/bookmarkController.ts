@@ -8,9 +8,10 @@ import { loadOrCreateProfile } from "./vendorProfileController";
 
 const APPLICATION_STATUSES = ["interested", "preparing", "submitted", "missed"] as const;
 
-// Same public fields the TOR list exposes (torController LIST_PROJECTION).
+// The public TOR list fields (torController LIST_PROJECTION), plus the AI summary line the
+// account settings cards show.
 const TOR_PROJECTION =
-  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt";
+  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt aiSummary.summary viewCount";
 
 const updateSchema = z
   .object({

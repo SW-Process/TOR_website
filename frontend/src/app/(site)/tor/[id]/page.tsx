@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   Building2,
@@ -19,6 +20,8 @@ import { fetchTorById, fetchTorList, isUnknownDeadline } from "@/lib/torApi";
 import { ANNOUNCEMENT_KIND_LABELS, statusNote } from "@/lib/torStatus";
 import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
+import HideTorButton from "@/components/HideTorButton";
+import TorViewCount from "@/components/TorViewCount";
 import ReportIssueButton from "@/components/ReportIssueButton";
 import ShareTorButtons from "@/components/ShareTorButtons";
 import TORCard from "@/components/TORCard";
@@ -50,7 +53,8 @@ export default async function TORDetailPage({
 
   const procurement = tor.procurement ?? null;
   const bidDeadline = procurement?.bidDeadline ?? null;
-  const torList = await fetchTorList();
+  // Forward the session so the vendor's hidden TORs are left out of "similar TORs".
+  const torList = await fetchTorList((await cookies()).toString());
   const related = torList
     .filter((t) => t.category === tor.category && t.id !== tor.id)
     .slice(0, 3);
@@ -59,7 +63,7 @@ export default async function TORDetailPage({
     { icon: Hash, label: "เลขที่โครงการ", value: tor.projectCode },
     { icon: Building2, label: "หน่วยงานย่อย", value: tor.department },
     { icon: MapPin, label: "พื้นที่ดำเนินการ", value: tor.location },
-    { icon: Eye, label: "จำนวนผู้เข้าชม", value: `${tor.views.toLocaleString("th-TH")} ครั้ง` },
+    { icon: Eye, label: "จำนวนผู้เข้าชม", value: <TorViewCount torId={tor.id} initial={tor.views} /> },
   ];
 
   return (
@@ -320,6 +324,7 @@ export default async function TORDetailPage({
                 </a>
               )}
               <BookmarkButton id={tor.id} variant="full" />
+              <HideTorButton id={tor.id} variant="full" />
               <ShareTorButtons torId={tor.id} />
               <ReportIssueButton torId={tor.id} projectCode={tor.projectCode} />
             </div>
