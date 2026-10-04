@@ -40,7 +40,7 @@ export const PAGE_SIZE = 24;
 /** UI sort option → backend `sort` / `order` (FR-2). */
 const SORT_API: Record<SortKey, { sort: string; order: "asc" | "desc" }> = {
   newest: { sort: "announcementDate", order: "desc" },
-  deadline: { sort: "submissionDeadline", order: "asc" },
+  deadline: { sort: "bidDeadline", order: "asc" },
   budgetDesc: { sort: "budget", order: "desc" },
   budgetAsc: { sort: "budget", order: "asc" },
 };

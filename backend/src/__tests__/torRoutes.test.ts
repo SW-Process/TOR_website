@@ -139,25 +139,43 @@ describe("GET /api/tors", () => {
     ]);
   });
 
-  it("deadline sort puts upcoming first (soonest), then passed (most recent), then unknown", async () => {
+  it("bid-deadline sort: upcoming inviting soonest, then passed/finished most recent, then no deadline", async () => {
     const day = 86_400_000;
     const now = Date.now();
-    await Tor.create([
-      { title: "ปิดไปนานแล้ว", pipelineStatus: "enriched", submissionDeadline: new Date(now - 400 * day) },
-      { title: "เพิ่งปิด", pipelineStatus: "enriched", submissionDeadline: new Date(now - 2 * day) },
-      { title: "ไม่ทราบวันปิด", pipelineStatus: "enriched" },
-      { title: "ปิดอีก 10 วัน", pipelineStatus: "enriched", submissionDeadline: new Date(now + 10 * day) },
-      { title: "ปิดพรุ่งนี้", pipelineStatus: "enriched", submissionDeadline: new Date(now + day) },
+    const proc = (stage: string, offsetDays?: number) => ({
+      stage,
+      announcements: [],
+      lastCheckedAt: new Date(),
+      ...(offsetDays === undefined
+        ? {}
+        : { bidDeadline: { date: new Date(now + offsetDays * day), source: "admin", extractedAt: new Date() } }),
+    });
+    await Tor.insertMany([
+      { title: "ปิดไปนานแล้ว", pipelineStatus: "enriched", procurement: proc("inviting", -400) },
+      { title: "เพิ่งปิด", pipelineStatus: "enriched", procurement: proc("inviting", -2) },
+      { title: "ไม่ทราบวันปิด", pipelineStatus: "enriched", procurement: proc("inviting") },
+      { title: "ไม่มี procurement", pipelineStatus: "enriched" },
+      { title: "ปิดอีก 10 วัน", pipelineStatus: "enriched", procurement: proc("inviting", 10) },
+      { title: "ปิดพรุ่งนี้", pipelineStatus: "enriched", procurement: proc("inviting", 1) },
+      { title: "ผู้ชนะแล้ว วันปิดอนาคต", pipelineStatus: "enriched", procurement: proc("awarded", 3) },
+      { title: "แอดมินปิด วันปิดอนาคต", pipelineStatus: "enriched", status: "closed", procurement: proc("inviting", 5) },
     ]);
-    const res = await request(app).get("/api/tors?sort=submissionDeadline");
+    const res = await request(app).get("/api/tors?sort=bidDeadline");
     expect(res.body.order).toBe("asc");
-    expect(res.body.data.map((t: { title: string }) => t.title)).toEqual([
-      "ปิดพรุ่งนี้",
-      "ปิดอีก 10 วัน",
+    const titles = res.body.data.map((t: { title: string }) => t.title);
+    expect(titles.slice(0, 2)).toEqual(["ปิดพรุ่งนี้", "ปิดอีก 10 วัน"]);
+    // Not-upcoming-and-inviting (closed / awarded / passed): most recent deadline first.
+    expect(titles.slice(2, 6)).toEqual([
+      "แอดมินปิด วันปิดอนาคต",
+      "ผู้ชนะแล้ว วันปิดอนาคต",
       "เพิ่งปิด",
       "ปิดไปนานแล้ว",
-      "ไม่ทราบวันปิด",
     ]);
+    expect(titles.slice(6).sort()).toEqual(["ไม่ทราบวันปิด", "ไม่มี procurement"].sort());
+  });
+
+  it("rejects the legacy sort=submissionDeadline", async () => {
+    expect((await request(app).get("/api/tors?sort=submissionDeadline")).status).toBe(400);
   });
 
   it("filters by the six effective statuses, derived from procurement rather than the stored status", async () => {
@@ -253,10 +271,16 @@ describe("GET /api/tors", () => {
     expect((await request(app).get("/api/tors?sort=title")).status).toBe(400);
   });
 
-  it("filters by announcement and deadline date ranges, inclusive (FR-4)", async () => {
-    await Tor.create([
-      { title: "ประกาศ ก.ค. ปิด ส.ค.", pipelineStatus: "enriched", announcementDate: new Date("2026-07-10"), submissionDeadline: new Date("2026-08-20") },
-      { title: "ประกาศ ส.ค. ปิด ก.ย.", pipelineStatus: "enriched", announcementDate: new Date("2026-08-10"), submissionDeadline: new Date("2026-09-05") },
+  it("filters by announcement and bid-deadline date ranges, inclusive; ignores the legacy date (FR-4)", async () => {
+    const bid = (d: string) => ({
+      stage: "inviting",
+      announcements: [],
+      lastCheckedAt: new Date(),
+      bidDeadline: { date: new Date(d), source: "admin", extractedAt: new Date() },
+    });
+    await Tor.insertMany([
+      { title: "ประกาศ ก.ค. ปิด ส.ค.", pipelineStatus: "enriched", announcementDate: new Date("2026-07-10"), submissionDeadline: new Date("2026-12-01"), procurement: bid("2026-08-20") },
+      { title: "ประกาศ ส.ค. ปิด ก.ย.", pipelineStatus: "enriched", announcementDate: new Date("2026-08-10"), submissionDeadline: new Date("2026-01-01"), procurement: bid("2026-09-05") },
       { title: "ไม่ทราบวันปิด", pipelineStatus: "enriched", announcementDate: new Date("2026-08-15") },
     ]);
     const titles = async (qs: string) =>
