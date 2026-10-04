@@ -40,6 +40,7 @@ export default function HelpShell({
           <form action="/help/faq" role="search" className="relative w-full sm:max-w-sm">
             <input
               name="q"
+              data-shortcut-search
               defaultValue={query}
               placeholder="คุณต้องการความช่วยเหลือเรื่องอะไร"
               aria-label="ค้นหาในศูนย์ช่วยเหลือ"
