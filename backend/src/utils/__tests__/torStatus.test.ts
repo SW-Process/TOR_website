@@ -36,6 +36,7 @@ const inviting = (deadline?: Date) => ({
 const cases: { name: string; doc: Record<string, unknown>; expected: TorDisplayStatus }[] = [
   { name: "no procurement yet", doc: {}, expected: "draft" },
   { name: "stored closing_soon but no procurement", doc: { status: "closing_soon" }, expected: "draft" },
+  { name: "procurement explicitly null", doc: { procurement: null }, expected: "draft" },
   { name: "draft stage", doc: { procurement: stage("draft") }, expected: "draft" },
   { name: "awarded", doc: { procurement: stage("awarded") }, expected: "awarded" },
   { name: "cancelled", doc: { procurement: stage("cancelled") }, expected: "cancelled" },
@@ -79,6 +80,19 @@ describe("statusClause agrees with computeTorStatus", () => {
         .map(({ i }) => `case-${i}`)
         .sort();
       expect({ status, found }).toEqual({ status, found: expected });
+    }
+  });
+});
+
+describe("statusClause with an unknown stage", () => {
+  it("treats it as draft in both computeTorStatus and the draft clause only", async () => {
+    // Raw insert: the schema enum would reject this through Mongoose.
+    const doc = { title: "unknown-stage", pipelineStatus: "enriched", procurement: { stage: "bogus", announcements: [], lastCheckedAt: NOW } };
+    await Tor.collection.insertOne({ ...doc });
+    expect(computeTorStatus(doc as StatusInput, NOW)).toBe("draft");
+    for (const status of TOR_STATUSES) {
+      const found = (await Tor.find(statusClause(status, NOW)).lean()).map((t) => t.title);
+      expect({ status, found }).toEqual({ status, found: status === "draft" ? ["unknown-stage"] : [] });
     }
   });
 });

@@ -58,8 +58,11 @@ export function statusClause(status: TorDisplayStatus, now: Date): QueryFilter<I
     case "awarded":
       return { $and: [notManuallyClosed, { "procurement.stage": "awarded" }] } as QueryFilter<ITor>;
     case "draft":
-      // `$in` with null also matches a missing stage (no procurement yet).
-      return { $and: [notManuallyClosed, { "procurement.stage": { $in: ["draft", null] } }] } as QueryFilter<ITor>;
+      // Total complement of the other stages: `$nin` also matches a missing/null stage (no
+      // procurement yet) and any unknown stage, as computeTorStatus's fall-through does.
+      return {
+        $and: [notManuallyClosed, { "procurement.stage": { $nin: ["inviting", "awarded", "cancelled"] } }],
+      } as QueryFilter<ITor>;
     case "closing_soon":
       return {
         $and: [notManuallyClosed, inviting, { "procurement.bidDeadline.date": { $gte: now, $lte: soon } }],
