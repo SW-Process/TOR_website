@@ -217,6 +217,17 @@ describe("GeminiExtractor.extractBidDeadline", () => {
     expect(call.contents.parts.some((p) => p.inlineData?.mimeType === "application/pdf")).toBe(true);
   });
 
+  it("leaves output headroom beyond the thinking budget so the JSON cannot be truncated", async () => {
+    const generate = jest.fn().mockResolvedValue({ text: deadlineJson });
+    const x = new GeminiExtractor({ model: "gemini-2.5-flash", generate });
+    await x.extractBidDeadline(input);
+    const cfg = generate.mock.calls[0][0].config as {
+      maxOutputTokens: number;
+      thinkingConfig: { thinkingBudget: number };
+    };
+    expect(cfg.maxOutputTokens).toBeGreaterThanOrEqual(cfg.thinkingConfig.thinkingBudget + 1024);
+  });
+
   it("returns an empty result without calling the model when the PDF is oversized", async () => {
     const generate = jest.fn();
     const x = new GeminiExtractor({ model: "gemini-2.5-flash", generate });

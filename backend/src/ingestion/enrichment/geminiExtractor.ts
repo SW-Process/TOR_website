@@ -240,10 +240,14 @@ export class GeminiExtractor implements TorExtractor {
       return { date: null, time: null, confidence: 0 };
     }
     const parts: Part[] = [
-      { text: `Project code: ${input.meta.projectCode ?? "(unknown)"}
-Known title: ${input.meta.title}
-
-The attached PDF is the invitation announcement (may be a scan — read it).` },
+      {
+        text: [
+          `Project code: ${input.meta.projectCode ?? "(unknown)"}`,
+          `Known title: ${input.meta.title}`,
+          "",
+          "The attached PDF is the invitation announcement (may be a scan — read it).",
+        ].join("\n"),
+      },
       { inlineData: { mimeType: "application/pdf", data: input.pdf.content.toString("base64") } },
     ];
     return this.callJson(
@@ -252,7 +256,8 @@ The attached PDF is the invitation announcement (may be a scan — read it).` },
         systemInstruction: BID_DEADLINE_INSTRUCTION,
         responseSchema: BID_DEADLINE_RESPONSE_SCHEMA,
         thinkingConfig: { thinkingBudget: 1024 },
-        maxOutputTokens: 1024,
+        // Thinking tokens count against maxOutputTokens, so the cap must leave headroom for the JSON.
+        maxOutputTokens: 4096,
       },
       bidDeadlineResultSchema
     );
