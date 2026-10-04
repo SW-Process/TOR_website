@@ -141,6 +141,15 @@ are excluded from the refresh candidates, so a one-time backfill in `lifecycleFi
 them while `deadlineAttempt` is missing and they have a filed invitation; after the attempt is
 recorded they are no longer re-checked.
 
+**Month-only deadlines (2026-10-04):** when the PDF gives only a month and year, the model returns
+`YYYY-MM` and the deadline is stored as 23:59 Asia/Bangkok on the last day of that month with
+`bidDeadline.precision: "month"` (default/legacy `"day"`). It is displayed as a month only, an
+`inviting` TOR with it is `open` until the month has ended (never `closing_soon`), and it is
+re-checked by every lifecycle run (always a candidate, finished/cancelled included): the invitation
+file is downloaded and its sha256 compared with `deadlineAttempt.fileSha256`; unchanged means no
+Gemini call, a changed file or newer invitation is re-read and overwrites it (a day replaces the
+month). An admin value (`precision: "day"`) always wins.
+
 After refresh writes a TOR that has an invitation, it does one more step in the same run:
 
 1. Pick the latest `invitation` announcement (with or without a file, the same rule stage

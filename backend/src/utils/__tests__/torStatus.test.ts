@@ -33,6 +33,11 @@ const inviting = (deadline?: Date) => ({
   ...(deadline ? { bidDeadline: { date: deadline, source: "admin", extractedAt: NOW } } : {}),
 });
 
+const invitingMonth = (deadline: Date) => ({
+  ...stage("inviting"),
+  bidDeadline: { date: deadline, source: "invitation-pdf", precision: "month", extractedAt: NOW },
+});
+
 const cases: { name: string; doc: Record<string, unknown>; expected: TorDisplayStatus }[] = [
   { name: "no procurement yet", doc: {}, expected: "draft" },
   { name: "stored closing_soon but no procurement", doc: { status: "closing_soon" }, expected: "draft" },
@@ -49,6 +54,12 @@ const cases: { name: string; doc: Record<string, unknown>; expected: TorDisplayS
   { name: "inviting, 3 days away", doc: { procurement: inviting(at(3 * DAY)) }, expected: "closing_soon" },
   { name: "inviting, deadline exactly now", doc: { procurement: inviting(at(0)) }, expected: "closing_soon" },
   { name: "inviting, deadline 1 ms ago", doc: { procurement: inviting(at(-1)) }, expected: "closed" },
+  { name: "month precision, mid-month (20 days left)", doc: { procurement: invitingMonth(at(20 * DAY)) }, expected: "open" },
+  { name: "month precision, last 3 days of the month is still open", doc: { procurement: invitingMonth(at(3 * DAY)) }, expected: "open" },
+  { name: "month precision, end of month exactly now", doc: { procurement: invitingMonth(at(0)) }, expected: "open" },
+  { name: "month precision, after the end of the month", doc: { procurement: invitingMonth(at(-1)) }, expected: "closed" },
+  { name: "month precision on an awarded TOR", doc: { procurement: { ...stage("awarded"), bidDeadline: { date: at(2 * DAY), source: "invitation-pdf", precision: "month", extractedAt: NOW } } }, expected: "awarded" },
+  { name: "day precision stored explicitly, 3 days away", doc: { procurement: { ...stage("inviting"), bidDeadline: { date: at(3 * DAY), source: "admin", precision: "day", extractedAt: NOW } } }, expected: "closing_soon" },
   { name: "manually closed overrides inviting", doc: { status: "closed", procurement: inviting(at(10 * DAY)) }, expected: "closed" },
   { name: "manually closed overrides awarded", doc: { status: "closed", procurement: stage("awarded") }, expected: "closed" },
   { name: "manually closed with no procurement", doc: { status: "closed" }, expected: "closed" },

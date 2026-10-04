@@ -183,7 +183,7 @@ describe("PATCH /api/admin/tors/:id — bidDeadline", () => {
     const res = await admin.patch(`/api/admin/tors/${tor.id}`).send({ bidDeadline: "2026-10-25" });
     expect(res.status).toBe(200);
     const saved = (await Tor.findById(tor.id).lean())?.procurement;
-    expect(saved?.bidDeadline).toMatchObject({ source: "admin", date: new Date("2026-10-25T16:59:00.000Z") });
+    expect(saved?.bidDeadline).toMatchObject({ source: "admin", precision: "day", date: new Date("2026-10-25T16:59:00.000Z") });
     expect(saved?.deadlineAttempt?.announcementId).toBe("inv-1");
     expect(saved?.stage).toBe("inviting");
     expect(res.body.tor.procurement.bidDeadline.date).toBe("2026-10-25T16:59:00.000Z");

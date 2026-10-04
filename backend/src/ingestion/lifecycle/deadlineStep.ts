@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { QueryFilter, Types } from "mongoose";
 import { ZodError } from "zod";
 import { Tor, type ITor, type IProcurement, type IProcurementAnnouncement } from "../../models";
@@ -72,7 +73,9 @@ function latestInvitation(p: IProcurement): IProcurementAnnouncement | null {
  * Read the real bid deadline from the latest invitation PDF of any TOR that has an invitation,
  * whatever its stage (the deadline only affects the computed status of `inviting` TORs; for the
  * others it is stored for consistency). A TOR without an invitation is skipped. Attempted once
- * per invitation id; never overrides an admin value. Gemini/e-GP/storage errors propagate (nothing
+ * per invitation id; never overrides an admin value. A month-only deadline (end of month,
+ * precision "month") is re-checked on every run by the invitation file's sha256: unchanged skips
+ * without Gemini, a changed file or newer invitation is re-read and overwrites it. Gemini/e-GP/storage errors propagate (nothing
  * is recorded, so the next run retries); the caller isolates them per TOR.
  */
 export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStepDeps): Promise<DeadlineStepOutcome> {
@@ -80,9 +83,14 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
   if (p.bidDeadline?.source === "admin") return "skipped";
   const invitation = latestInvitation(p);
   if (!invitation) return "skipped";
-  if (p.deadlineAttempt?.announcementId === invitation.announcementId) return "skipped";
+  const attemptedThis = p.deadlineAttempt?.announcementId === invitation.announcementId;
+  // A month-only AI deadline keeps being re-checked (by file hash) until a day is known: e-GP may
+  // replace the announcement file later.
+  const monthOnly = p.bidDeadline?.source === "invitation-pdf" && p.bidDeadline.precision === "month";
+  if (attemptedThis && !monthOnly) return "skipped";
   const filename = invitation.hasFile ? args.filenames.get(invitation.announcementId) : undefined;
   if (!filename) {
+    if (attemptedThis) return "skipped"; // re-check of a month-only deadline: file gone, keep what we have
     // The current invitation has no readable file (yet). A deadline read from an OLDER invitation
     // is stale, so clear it; no attempt is recorded, so the read happens once the file appears.
     if (p.bidDeadline?.source !== "invitation-pdf") return "skipped";
@@ -99,6 +107,9 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
   }
 
   const content = await deps.client.downloadFile(invitation.announcementId, filename);
+  const fileSha256 = createHash("sha256").update(content).digest("hex");
+  // Unchanged file for the same invitation: nothing new to read, no Gemini call, no write.
+  if (monthOnly && attemptedThis && p.deadlineAttempt?.fileSha256 === fileSha256) return "skipped";
   const key = `tor-pdfs/${args.projectCode ?? String(args.torId)}/${invitation.announcementId}.pdf`;
   await deps.storage.put(key, content, { contentType: "application/pdf" });
 
@@ -117,7 +128,7 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
     if (!isNonRetryable(err)) throw err;
     result = UNREADABLE;
   }
-  const deadline = resolveBidDeadline(result, { notBefore: invitation.publishedAt ?? null });
+  const resolved = resolveBidDeadline(result, { notBefore: invitation.publishedAt ?? null });
 
   const now = deps.now();
   // lastCheckedAt moves with this write so a stale concurrent writer (which preconditions on it)
@@ -132,11 +143,14 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
     {
       $set: {
         "procurement.announcements.$[a].storageKey": key,
-        "procurement.bidDeadline": deadline ? { date: deadline, source: "invitation-pdf", extractedAt: now } : null,
+        "procurement.bidDeadline": resolved
+          ? { date: resolved.date, source: "invitation-pdf", precision: resolved.precision, extractedAt: now }
+          : null,
         "procurement.deadlineAttempt": {
           announcementId: invitation.announcementId,
           at: now,
-          outcome: deadline ? "read" : "unreadable",
+          outcome: resolved ? "read" : "unreadable",
+          fileSha256,
         },
         "procurement.lastCheckedAt": now,
       },
@@ -144,5 +158,5 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
     { arrayFilters: [{ "a.announcementId": invitation.announcementId }], timestamps: false }
   );
   if (res.matchedCount === 0) return "conflict";
-  return deadline ? "read" : "unreadable";
+  return resolved ? "read" : "unreadable";
 }

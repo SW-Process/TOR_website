@@ -94,6 +94,36 @@ describe("lifecycleFilter", () => {
     expect(await countLifecycleCandidates()).toBe(3);
   });
 
+  describe("month-precision deadlines are always re-checked", () => {
+    const base = (stage: string, bid: object | null) => ({
+      stage,
+      contractStatus: stage === "awarded" ? "ส่งงานครบถ้วน" : undefined,
+      announcements: [{ announcementId: "inv", kind: "invitation", hasFile: true }],
+      deadlineAttempt: { announcementId: "inv", at: new Date("2026-09-02T00:00:00Z"), outcome: "read" },
+      ...(bid ? { bidDeadline: bid } : {}),
+      lastCheckedAt: new Date("2026-09-01T00:00:00Z"),
+    });
+    const bid = (precision: string, source = "invitation-pdf") => ({
+      date: new Date("2026-10-31T16:59:00Z"),
+      source,
+      precision,
+      extractedAt: new Date("2026-09-02T00:00:00Z"),
+    });
+
+    it("selects month-precision invitation-pdf deadlines even for finished or cancelled TORs", async () => {
+      await Tor.create([
+        { title: "cancelled month", pipelineStatus: "enriched", sourceListingUrl: url("a"), procurement: base("cancelled", bid("month")) },
+        { title: "finished month", pipelineStatus: "enriched", sourceListingUrl: url("b"), procurement: base("awarded", bid("month")) },
+        { title: "finished day", pipelineStatus: "enriched", sourceListingUrl: url("c"), procurement: base("awarded", bid("day")) },
+        { title: "finished admin", pipelineStatus: "enriched", sourceListingUrl: url("d"), procurement: base("awarded", bid("month", "admin")) },
+        { title: "cancelled legacy no precision", pipelineStatus: "enriched", sourceListingUrl: url("e"), procurement: base("cancelled", { date: new Date(), source: "invitation-pdf", extractedAt: new Date() }) },
+        { title: "month but not enriched", pipelineStatus: "pending", sourceListingUrl: url("f"), procurement: base("awarded", bid("month")) },
+      ] as any);
+      const titles = (await Tor.find(lifecycleFilter() as any).sort({ title: 1 }).lean()).map((t) => t.title);
+      expect(titles).toEqual(["cancelled month", "finished month"]);
+    });
+  });
+
   describe("one-time deadline backfill for finished TORs", () => {
     const filed = [{ announcementId: "inv", kind: "invitation", hasFile: true }];
     const finished = (over: Record<string, unknown>) => ({

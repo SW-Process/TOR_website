@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import mongoose from "mongoose";
 import { ZodError } from "zod";
 import { MongoMemoryServer } from "mongodb-memory-server";
@@ -77,6 +78,9 @@ const args = (p: IProcurement, torId: mongoose.Types.ObjectId) => ({
   filenames,
 });
 
+const PDF_SHA = createHash("sha256").update(Buffer.from("%PDF-1.4 fake")).digest("hex");
+const MONTH: BidDeadlineResult = { date: "2026-10", time: null, confidence: 0.9 };
+
 describe("runDeadlineStep", () => {
   it("downloads, reads and stores the deadline, the attempt and the storage key", async () => {
     const p = procurementOf();
@@ -92,6 +96,131 @@ describe("runDeadlineStep", () => {
     expect(saved?.bidDeadline).toMatchObject({ source: "invitation-pdf", date: new Date("2026-10-20T09:30:00.000Z") });
     expect(saved?.deadlineAttempt).toMatchObject({ announcementId: "inv-1", outcome: "read" });
     expect(saved?.announcements[0]?.storageKey).toBe("tor-pdfs/code-1/inv-1.pdf");
+    expect(saved?.bidDeadline?.precision).toBe("day");
+    expect(saved?.deadlineAttempt?.fileSha256).toBe(PDF_SHA);
+  });
+
+  describe("month-only deadlines", () => {
+    const monthBid = (over: object = {}) => ({
+      date: new Date("2026-10-31T16:59:00Z"),
+      source: "invitation-pdf" as const,
+      precision: "month" as const,
+      extractedAt: PUBLISHED,
+      ...over,
+    });
+    const monthProc = (over: Partial<IProcurement> = {}) =>
+      procurementOf({
+        bidDeadline: monthBid(),
+        deadlineAttempt: { announcementId: "inv-1", at: PUBLISHED, outcome: "read", fileSha256: PDF_SHA },
+        ...over,
+      });
+
+    it("stores the end of the month with month precision and the file hash", async () => {
+      const p = procurementOf();
+      const tor = await seed(p);
+      expect(await runDeadlineStep(args(p, tor._id), harness(MONTH))).toBe("read");
+      const saved = (await Tor.findById(tor._id).lean())?.procurement;
+      expect(saved?.bidDeadline).toMatchObject({
+        source: "invitation-pdf",
+        precision: "month",
+        date: new Date("2026-10-31T16:59:00.000Z"),
+      });
+      expect(saved?.deadlineAttempt).toMatchObject({ announcementId: "inv-1", outcome: "read", fileSha256: PDF_SHA });
+    });
+
+    it("converts a Buddhist-era month", async () => {
+      const p = procurementOf();
+      const tor = await seed(p);
+      await runDeadlineStep(args(p, tor._id), harness({ date: "2569-10", time: null, confidence: 0.9 }));
+      const saved = (await Tor.findById(tor._id).lean())?.procurement;
+      expect(saved?.bidDeadline).toMatchObject({ precision: "month", date: new Date("2026-10-31T16:59:00.000Z") });
+    });
+
+    it("stores nothing for an invalid month", async () => {
+      const p = procurementOf();
+      const tor = await seed(p);
+      expect(await runDeadlineStep(args(p, tor._id), harness({ date: "2026-13", time: null, confidence: 0.9 }))).toBe("unreadable");
+      expect((await Tor.findById(tor._id).lean())?.procurement?.bidDeadline ?? null).toBeNull();
+    });
+
+    it("re-checks the file on later runs but skips Gemini while its hash is unchanged", async () => {
+      const p = monthProc();
+      const tor = await seed(p);
+      const h = harness();
+      expect(await runDeadlineStep(args(p, tor._id), h)).toBe("skipped");
+      expect(h.downloads).toEqual(["inv-1/inv-1.pdf"]);
+      expect(h.extractCalls).toHaveLength(0);
+      expect(h.puts).toEqual([]);
+      const saved = (await Tor.findById(tor._id).lean())?.procurement;
+      expect(saved?.bidDeadline?.precision).toBe("month");
+      expect(saved?.lastCheckedAt).toEqual(T);
+    });
+
+    it("re-reads when the file hash changed and a day replaces the month", async () => {
+      const p = monthProc({ deadlineAttempt: { announcementId: "inv-1", at: PUBLISHED, outcome: "read", fileSha256: "old" } });
+      const tor = await seed(p);
+      const h = harness(READ);
+      expect(await runDeadlineStep(args(p, tor._id), h)).toBe("read");
+      expect(h.extractCalls).toHaveLength(1);
+      const saved = (await Tor.findById(tor._id).lean())?.procurement;
+      expect(saved?.bidDeadline).toMatchObject({ precision: "day", date: new Date("2026-10-20T09:30:00.000Z") });
+      expect(saved?.deadlineAttempt).toMatchObject({ outcome: "read", fileSha256: PDF_SHA });
+    });
+
+    it("re-reads when the attempt has no stored hash", async () => {
+      const p = monthProc({ deadlineAttempt: { announcementId: "inv-1", at: PUBLISHED, outcome: "read" } });
+      const tor = await seed(p);
+      const h = harness(READ);
+      expect(await runDeadlineStep(args(p, tor._id), h)).toBe("read");
+      expect(h.extractCalls).toHaveLength(1);
+    });
+
+    it("re-reads for a newer invitation id even when the bytes are identical", async () => {
+      const p = monthProc({
+        announcements: [
+          { announcementId: "inv-1", kind: "invitation", hasFile: true, publishedAt: PUBLISHED, storageKey: "k1" },
+          { announcementId: "inv-2", kind: "invitation", hasFile: true, publishedAt: new Date("2026-10-02T00:00:00Z"), storageKey: null },
+        ],
+      });
+      const tor = await seed(p);
+      const h = harness(READ);
+      expect(await runDeadlineStep(args(p, tor._id), h)).toBe("read");
+      expect(h.downloads).toEqual(["inv-2/inv-2.pdf"]);
+      expect((await Tor.findById(tor._id).lean())?.procurement?.deadlineAttempt?.announcementId).toBe("inv-2");
+    });
+
+    it("clears the month deadline when the changed file is unreadable", async () => {
+      const p = monthProc({ deadlineAttempt: { announcementId: "inv-1", at: PUBLISHED, outcome: "read", fileSha256: "old" } });
+      const tor = await seed(p);
+      expect(await runDeadlineStep(args(p, tor._id), harness(NOT_READ))).toBe("unreadable");
+      expect((await Tor.findById(tor._id).lean())?.procurement?.bidDeadline ?? null).toBeNull();
+    });
+
+    it("never touches an admin deadline", async () => {
+      const adminBid = { date: new Date("2026-10-25T16:59:00Z"), source: "admin" as const, precision: "day" as const, extractedAt: T };
+      const p = monthProc({ bidDeadline: adminBid, deadlineAttempt: { announcementId: "inv-1", at: PUBLISHED, outcome: "read", fileSha256: "old" } });
+      const tor = await seed(p);
+      const h = harness();
+      expect(await runDeadlineStep(args(p, tor._id), h)).toBe("skipped");
+      expect(h.downloads).toEqual([]);
+    });
+
+    it("a day-precision deadline is still attempted once per invitation id", async () => {
+      const p = monthProc({ bidDeadline: monthBid({ precision: "day" }) });
+      const tor = await seed(p);
+      const h = harness();
+      expect(await runDeadlineStep(args(p, tor._id), h)).toBe("skipped");
+      expect(h.downloads).toEqual([]);
+    });
+
+    it("skips without clearing when the month deadline's invitation has lost its file", async () => {
+      const p = monthProc({
+        announcements: [{ announcementId: "inv-1", kind: "invitation", hasFile: false, publishedAt: PUBLISHED }],
+      });
+      const tor = await seed(p);
+      expect(await runDeadlineStep(args(p, tor._id), harness())).toBe("skipped");
+      expect((await Tor.findById(tor._id).lean())?.procurement?.bidDeadline?.precision).toBe("month");
+    });
   });
 
   it("passes the Bangkok day of the invitation's publish date to the extractor", async () => {
