@@ -178,7 +178,13 @@ Each step is independently shippable and gets its own PR:
 
 ## Open items
 
-- A winner announcement dated after the latest cancellation currently reads as `cancelled` (literal precedence rule); confirm with real data whether a cancelled bidding followed by an award without a new invitation should read as `awarded` before step 3 shows stages to users.
+- A winner announcement dated after the latest cancellation currently reads as `cancelled`
+  (literal precedence rule). Checked against production on 2026-10-04: of the 63 public
+  TORs, 8 are `cancelled` (2 by contract status "ยกเลิกโครงการ", 6 by a cancellation
+  announcement newer than the latest invitation) and none has a winner announcement dated
+  after its latest cancellation, so the rule is kept for now. Re-check when more data
+  arrives; if a cancelled-then-awarded project appears, a winner dated after the latest
+  cancellation should read `awarded`.
 - Meaning of the current `submissionDeadline` (verify on real PDFs).
 - Other cancellation announcement names beyond "ยกเลิกประกาศเชิญชวน"; widen the
   sample before finalising `kind` normalisation.
