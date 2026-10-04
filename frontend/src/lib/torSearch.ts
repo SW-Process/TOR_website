@@ -12,7 +12,14 @@ import { categoryToSlug } from "@/lib/torApi";
 export type SortKey = "newest" | "deadline" | "budgetDesc" | "budgetAsc";
 
 export const SORT_KEYS: readonly SortKey[] = ["newest", "deadline", "budgetDesc", "budgetAsc"];
-export const STATUSES: readonly TORStatus[] = ["เปิดรับ", "ใกล้ปิดรับ", "ปิดรับแล้ว"];
+export const STATUSES: readonly TORStatus[] = [
+  "เปิดรับ",
+  "ใกล้ปิดรับ",
+  "ร่าง TOR",
+  "ปิดรับแล้ว",
+  "ประกาศผู้ชนะแล้ว",
+  "ยกเลิก",
+];
 
 /** FR-6 project types. Keys mirror backend/src/config/projectTypes.ts. */
 export const PROJECT_TYPE_LABELS = {
@@ -42,6 +49,9 @@ export const STATUS_API: Record<TORStatus, string> = {
   เปิดรับ: "open",
   ใกล้ปิดรับ: "closing_soon",
   ปิดรับแล้ว: "closed",
+  "ร่าง TOR": "draft",
+  ประกาศผู้ชนะแล้ว: "awarded",
+  ยกเลิก: "cancelled",
 };
 
 /** Backend caps `tech` at 20 values per query. */

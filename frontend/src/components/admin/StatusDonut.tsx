@@ -10,6 +10,9 @@ const STATUS_COLORS: Record<TORStatus, string> = {
   เปิดรับ: "var(--color-success)",
   ใกล้ปิดรับ: "var(--color-warning)",
   ปิดรับแล้ว: "var(--color-text-faint)",
+  "ร่าง TOR": "var(--color-ink-soft)",
+  ประกาศผู้ชนะแล้ว: "var(--color-rose-dark)",
+  ยกเลิก: "var(--color-danger)",
 };
 
 function buildConicGradient(segments: { color: string; value: number }[]) {
