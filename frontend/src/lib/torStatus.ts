@@ -1,4 +1,4 @@
-import { formatThaiDate, type TOR, type TORStatus } from "@/lib/mockData";
+import { formatThaiDate, formatThaiMonthYear, type TOR, type TORStatus } from "@/lib/mockData";
 
 /** Backend `displayStatus` → the Thai label used throughout the UI. */
 export const STATUS_FROM_API: Record<string, TORStatus> = {
@@ -57,7 +57,9 @@ function daysFromNow(iso: string): number {
 /** Whole days until the real bid deadline, or null when the TOR has none known. Real clock. */
 export function bidDaysLeft(tor: Pick<TOR, "procurement">): number | null {
   const bid = tor.procurement?.bidDeadline ?? null;
-  return bid ? daysFromNow(bid) : null;
+  // A month-only deadline has no day to count down to.
+  if (!bid || tor.procurement?.bidDeadlinePrecision === "month") return null;
+  return daysFromNow(bid);
 }
 
 /**
@@ -66,11 +68,26 @@ export function bidDaysLeft(tor: Pick<TOR, "procurement">): number | null {
  */
 export function statusNote(tor: Pick<TOR, "status" | "procurement">): string {
   const bid = tor.procurement?.bidDeadline ?? null;
+  // Month-only deadline: say the month, never a day or a countdown.
+  if (bid && tor.procurement?.bidDeadlinePrecision === "month") {
+    const month = formatThaiMonthYear(bid);
+    switch (tor.status) {
+      case "ประกาศผู้ชนะแล้ว":
+        return `ปิดรับเมื่อเดือน ${month}`;
+      case "ปิดรับแล้ว":
+        return `ปิดรับแล้ว (เดือน ${month})`;
+      case "ใกล้ปิดรับ":
+      case "เปิดรับ":
+        return `ภายในเดือน ${month}`;
+    }
+  }
   switch (tor.status) {
     case "ร่าง TOR":
       return "ยังไม่ประกาศเชิญชวน";
     case "ประกาศผู้ชนะแล้ว":
-      return "ประกาศผู้ชนะแล้ว";
+      // The bid deadline is stored for every stage; show it like the other cards, or the plain
+      // label when it could not be read.
+      return bid ? `ปิดรับเมื่อ ${formatThaiDate(bid)}` : "ประกาศผู้ชนะแล้ว";
     case "ยกเลิก":
       return "ยกเลิกการจัดซื้อ";
     case "ปิดรับแล้ว":

@@ -121,7 +121,7 @@ export async function updateAdminTor(req: Request, res: Response): Promise<void>
       {
         $set: {
           "procurement.bidDeadline":
-            bidDeadlineValue === null ? null : { date: bidDeadlineValue, source: "admin", extractedAt: new Date() },
+            bidDeadlineValue === null ? null : { date: bidDeadlineValue, source: "admin", precision: "day", extractedAt: new Date() },
         },
       },
       { timestamps: false }

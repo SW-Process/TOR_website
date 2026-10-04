@@ -354,6 +354,23 @@ describe("POST /api/ingestion/lifecycle/runs", () => {
     expect(refreshLifecycleMock.mock.calls[0][0]).toMatchObject({ maxTors: 7 });
   });
 
+  it("passes an explicit maxDeadlineExtractions through, and leaves it undefined when absent", async () => {
+    refreshLifecycleMock.mockResolvedValue(settled);
+    const agent = await adminAgent();
+    expect((await agent.post("/api/ingestion/lifecycle/runs").send({ maxDeadlineExtractions: 40 })).status).toBe(202);
+    expect(refreshLifecycleMock.mock.calls[0][0]).toMatchObject({ maxDeadlineExtractions: 40 });
+    refreshLifecycleMock.mockClear();
+    expect((await agent.post("/api/ingestion/lifecycle/runs").send({})).status).toBe(202);
+    expect(refreshLifecycleMock.mock.calls[0][0].maxDeadlineExtractions).toBeUndefined();
+  });
+
+  it.each([0, -1, 1.5, 201, "abc"])("400 when maxDeadlineExtractions is %p", async (maxDeadlineExtractions) => {
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/lifecycle/runs").send({ maxDeadlineExtractions });
+    expect(res.status).toBe(400);
+    expect(refreshLifecycleMock).not.toHaveBeenCalled();
+  });
+
   it("hands the selected extractor to the refresh", async () => {
     refreshLifecycleMock.mockResolvedValue(settled);
     const extractor = { extractBidDeadline: jest.fn() };
@@ -448,7 +465,7 @@ describe("GET /api/ingestion/lifecycle/pending", () => {
     const res = await agent.get("/api/ingestion/lifecycle/pending");
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ candidates: 3, maxTors: 2, willCheck: 2 });
+    expect(res.body).toEqual({ candidates: 3, maxTors: 2, willCheck: 2, maxDeadlineExtractions: 20 });
   });
 
   it("reports zero when nothing is eligible", async () => {

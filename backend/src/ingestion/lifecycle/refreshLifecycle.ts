@@ -26,7 +26,7 @@ export interface RefreshLifecycleDeps {
   now?: () => Date;
   trigger?: "manual" | "scheduled";
   triggeredBy?: string | null;
-  /** Reads invitation PDFs for `inviting` TORs; the deadline step is off when omitted. */
+  /** Reads invitation PDFs for TORs that have an invitation; the deadline step is off when omitted. */
   deadlineExtractor?: BidDeadlineExtractor;
   storage?: BlobStorage;
   /** Max Gemini deadline reads this run; defaults to MAX_DEADLINE_EXTRACTIONS_PER_RUN. */
@@ -73,8 +73,8 @@ export function procurementChanged(
 /**
  * Re-check existing TORs against e-GP and refresh their `procurement`. Never touches the
  * source hash or pipeline status and never enqueues AI work — a status check itself costs no
- * Gemini call. The one exception is the optional deadline step: for a TOR that is `inviting` it
- * reads the latest invitation PDF with one small, separate Gemini call, once per invitation id and
+ * Gemini call. The one exception is the optional deadline step: for a TOR with an invitation
+ * (any stage) it reads the latest invitation PDF with one small, separate Gemini call, once per invitation id and
  * capped per run by MAX_DEADLINE_EXTRACTIONS_PER_RUN.
  */
 export async function refreshLifecycle(

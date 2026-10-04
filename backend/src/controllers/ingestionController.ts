@@ -5,7 +5,7 @@ import { runIngestion } from "../ingestion/runIngestion";
 import { drainEnrichmentQueue } from "../ingestion/enrichment/drainEnrichmentQueue";
 import { countRunnable, maxCallsPerRun } from "../ingestion/enrichment/enrichmentJobRepo";
 import { refreshLifecycle } from "../ingestion/lifecycle/refreshLifecycle";
-import { countLifecycleCandidates, maxLifecycleRefreshPerRun } from "../ingestion/lifecycle/candidates";
+import { countLifecycleCandidates, maxDeadlineExtractionsPerRun, maxLifecycleRefreshPerRun } from "../ingestion/lifecycle/candidates";
 import { sweepStaleEnrichmentRuns, sweepStaleRuns } from "../ingestion/enrichment/sweepStaleRuns";
 import { chainLifecycleAfterEnrichment } from "../ingestion/lifecycle/afterEnrichment";
 import { selectExtractor } from "../jobs/enrichment";
@@ -14,6 +14,7 @@ const MAX_PROJECTS_CEILING = 500;
 const LOOKBACK_DAYS_CEILING = 6000; // ~200 months
 const ENRICHMENT_MAX_CALLS_CEILING = 200;
 const LIFECYCLE_MAX_TORS_CEILING = 300;
+const LIFECYCLE_MAX_DEADLINE_EXTRACTIONS_CEILING = 200;
 
 function parseMaxProjects(raw: unknown): number {
   const fallback = Number(process.env.INGEST_DEFAULT_MAX_PROJECTS) || 50;
@@ -49,6 +50,18 @@ function parseLifecycleMaxTors(raw: unknown): number | undefined {
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1 || n > LIFECYCLE_MAX_TORS_CEILING) {
     throw httpError(400, `maxTors must be an integer between 1 and ${LIFECYCLE_MAX_TORS_CEILING}`);
+  }
+  return n;
+}
+
+function parseLifecycleMaxDeadlineExtractions(raw: unknown): number | undefined {
+  if (raw === undefined) return undefined; // fall back to MAX_DEADLINE_EXTRACTIONS_PER_RUN
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > LIFECYCLE_MAX_DEADLINE_EXTRACTIONS_CEILING) {
+    throw httpError(
+      400,
+      `maxDeadlineExtractions must be an integer between 1 and ${LIFECYCLE_MAX_DEADLINE_EXTRACTIONS_CEILING}`
+    );
   }
   return n;
 }
@@ -118,6 +131,7 @@ export async function getEnrichmentPending(_req: Request, res: Response): Promis
 export async function createLifecycleRun(req: Request, res: Response): Promise<void> {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const maxTors = parseLifecycleMaxTors(body.maxTors);
+  const maxDeadlineExtractions = parseLifecycleMaxDeadlineExtractions(body.maxDeadlineExtractions);
 
   // A run whose worker died (e.g. backend restart) must not block new runs forever.
   await sweepStaleRuns("lifecycle");
@@ -132,7 +146,13 @@ export async function createLifecycleRun(req: Request, res: Response): Promise<v
     console.error("lifecycle run without deadline extraction:", err);
   }
 
-  void refreshLifecycle({ trigger: "manual", triggeredBy: req.user!.id, maxTors, deadlineExtractor }).catch((err) => {
+  void refreshLifecycle({
+    trigger: "manual",
+    triggeredBy: req.user!.id,
+    maxTors,
+    maxDeadlineExtractions,
+    deadlineExtractor,
+  }).catch((err) => {
     console.error("lifecycle run failed:", err);
   });
 
@@ -143,7 +163,12 @@ export async function createLifecycleRun(req: Request, res: Response): Promise<v
 export async function getLifecyclePending(_req: Request, res: Response): Promise<void> {
   const candidates = await countLifecycleCandidates();
   const maxTors = maxLifecycleRefreshPerRun();
-  res.status(200).json({ candidates, maxTors, willCheck: Math.min(candidates, maxTors) });
+  res.status(200).json({
+    candidates,
+    maxTors,
+    willCheck: Math.min(candidates, maxTors),
+    maxDeadlineExtractions: maxDeadlineExtractionsPerRun(),
+  });
 }
 
 /** GET /api/ingestion/runs — recent run history (FR-34). */

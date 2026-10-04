@@ -98,9 +98,15 @@ fills it for sighted TORs; a separate daily batch (`refreshLifecycle`, entrypoin
 `dist/jobs/lifecycle.js`, admin `POST /api/ingestion/lifecycle/runs`) re-checks existing
 enriched, unfinished TORs oldest-first up to `MAX_LIFECYCLE_REFRESH_PER_RUN`. It writes only
 the refresh-owned `procurement` paths and never touches `sourceContentHash`,
-`pipelineStatus` or the AI queue — a status check costs no Gemini call. After refreshing an
-`inviting` TOR the batch downloads its latest invitation PDF and reads the real bid deadline with
-one small Gemini call (`MAX_DEADLINE_EXTRACTIONS_PER_RUN`), once per invitation id; an admin value
+`pipelineStatus` or the AI queue — a status check costs no Gemini call. After refreshing a
+TOR that has an invitation with a file (any stage) the batch downloads its latest invitation PDF and
+reads the real bid deadline with one small Gemini call (`MAX_DEADLINE_EXTRACTIONS_PER_RUN`), once per
+invitation id (finished/cancelled TORs are picked up once for this, until a deadline attempt is
+recorded; the deadline only affects the status of `inviting` TORs). A PDF that states only a month and
+year is stored as the END of that month with `bidDeadline.precision: "month"` (shown as a month only,
+never "closing soon"); such TORs are always lifecycle candidates and re-checked by invitation-file
+sha256 (`deadlineAttempt.fileSha256`) with no Gemini call until the file changes, until a day is known
+or an admin sets one (admin values are `precision: "day"` and always win); an admin value
 (`source: "admin"`) always wins. Both `procurement` writers go through
 `ingestion/procurementWrite.ts` (optimistic precondition on `lastCheckedAt`). The enrichment batch also ends by running this
 refresh for exactly the TORs it just enriched (`lifecycle/afterEnrichment.ts`), so new TORs get

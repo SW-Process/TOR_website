@@ -48,9 +48,14 @@ export interface IProcurementAnnouncement {
   storageKey?: string | null;
 }
 
+/** "month": the PDF names only a month and year; `date` is then the END of that month (Asia/Bangkok). */
+export type BidDeadlinePrecision = "day" | "month";
+
 export interface IBidDeadline {
   date: Date;
   source: "invitation-pdf" | "admin";
+  /** Missing on values stored before this field existed: treat as "day". */
+  precision?: BidDeadlinePrecision;
   extractedAt: Date;
 }
 
@@ -61,6 +66,8 @@ export interface IDeadlineAttempt {
   announcementId: string;
   at: Date;
   outcome: DeadlineAttemptOutcome;
+  /** sha256 (hex) of the invitation PDF last read; lets a month-only deadline be re-checked without Gemini. Internal. */
+  fileSha256?: string;
 }
 
 export interface IProcurement {
@@ -247,6 +254,7 @@ const bidDeadlineSchema = new Schema<IBidDeadline>(
   {
     date: { type: Date, required: true },
     source: { type: String, enum: ["invitation-pdf", "admin"], required: true },
+    precision: { type: String, enum: ["day", "month"], default: "day" },
     extractedAt: { type: Date, default: Date.now },
   },
   { _id: false }
@@ -257,6 +265,7 @@ const deadlineAttemptSchema = new Schema<IDeadlineAttempt>(
     announcementId: { type: String, required: true },
     at: { type: Date, required: true },
     outcome: { type: String, enum: ["read", "unreadable"], required: true },
+    fileSha256: { type: String },
   },
   { _id: false }
 );

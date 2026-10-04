@@ -235,6 +235,29 @@ describe("GET /api/tors", () => {
     expect(JSON.stringify(res.body)).not.toContain("tor-pdfs/x/a-1.pdf");
   });
 
+  it("exposes bidDeadline.precision on list and detail but never deadlineAttempt or its file hash", async () => {
+    const tor = await Tor.create({
+      title: "เดือน",
+      pipelineStatus: "enriched",
+      procurement: {
+        stage: "inviting",
+        announcements: [],
+        bidDeadline: { date: new Date(Date.now() + 20 * 86_400_000), source: "invitation-pdf", precision: "month", extractedAt: new Date() },
+        deadlineAttempt: { announcementId: "a-1", at: new Date(), outcome: "read", fileSha256: "deadbeefcafe" },
+        lastCheckedAt: new Date(),
+      },
+    });
+    const list = await request(app).get("/api/tors");
+    expect(list.body.data[0].procurement.bidDeadline.precision).toBe("month");
+    expect(list.body.data[0].displayStatus).toBe("open");
+    expect(JSON.stringify(list.body)).not.toContain("deadbeefcafe");
+    expect(list.body.data[0].procurement).not.toHaveProperty("deadlineAttempt");
+    const detail = await request(app).get(`/api/tors/${tor.id}`);
+    expect(detail.body.tor.procurement.bidDeadline.precision).toBe("month");
+    expect(JSON.stringify(detail.body)).not.toContain("deadbeefcafe");
+    expect(detail.body.tor.procurement).not.toHaveProperty("deadlineAttempt");
+  });
+
   it("returns displayStatus and the announcement timeline (never a storageKey) on the detail", async () => {
     const tor = await Tor.create({
       title: "รายละเอียด",

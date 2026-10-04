@@ -214,6 +214,7 @@ describe("GeminiExtractor.extractBidDeadline", () => {
       contents: { parts: { inlineData?: { mimeType: string } }[] };
     };
     expect(call.config.systemInstruction).toContain("กำหนดยื่นข้อเสนอ");
+    expect(call.config.systemInstruction).toContain('"YYYY-MM"');
     expect(call.contents.parts.some((p) => p.inlineData?.mimeType === "application/pdf")).toBe(true);
   });
 

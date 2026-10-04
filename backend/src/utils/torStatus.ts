@@ -19,13 +19,15 @@ export interface StatusInput {
   status?: string | null;
   procurement?: {
     stage?: string | null;
-    bidDeadline?: { date?: Date | string | null } | null;
+    bidDeadline?: { date?: Date | string | null; precision?: string | null } | null;
   } | null;
 }
 
 /**
  * Precedence (first match wins): manual close → cancelled → awarded → inviting (by bid
  * deadline: passed = closed, within CLOSING_SOON_DAYS = closing_soon, later or unknown = open)
+ * Month-only deadlines (`precision: "month"`, date = end of that month) are never "closing_soon":
+ * open until the end of the month has passed, then closed.
  * → draft (also for a TOR with no procurement yet). Keep `statusClause` in step with this.
  */
 export function computeTorStatus(tor: StatusInput, now: Date = new Date()): TorDisplayStatus {
@@ -38,6 +40,7 @@ export function computeTorStatus(tor: StatusInput, now: Date = new Date()): TorD
     const deadline = raw ? new Date(raw).getTime() : Number.NaN;
     if (Number.isNaN(deadline)) return "open";
     if (deadline < now.getTime()) return "closed";
+    if (tor.procurement?.bidDeadline?.precision === "month") return "open";
     return deadline <= now.getTime() + CLOSING_SOON_DAYS * DAY_MS ? "closing_soon" : "open";
   }
   return "draft";
@@ -65,14 +68,25 @@ export function statusClause(status: TorDisplayStatus, now: Date): QueryFilter<I
       } as QueryFilter<ITor>;
     case "closing_soon":
       return {
-        $and: [notManuallyClosed, inviting, { "procurement.bidDeadline.date": { $gte: now, $lte: soon } }],
+        $and: [
+          notManuallyClosed,
+          inviting,
+          { "procurement.bidDeadline.date": { $gte: now, $lte: soon } },
+          { "procurement.bidDeadline.precision": { $ne: "month" } },
+        ],
       } as QueryFilter<ITor>;
     case "open":
       return {
         $and: [
           notManuallyClosed,
           inviting,
-          { $or: [{ "procurement.bidDeadline.date": { $gt: soon } }, { "procurement.bidDeadline.date": null }] },
+          {
+            $or: [
+              { "procurement.bidDeadline.date": { $gt: soon } },
+              { "procurement.bidDeadline.date": null },
+              { "procurement.bidDeadline.precision": "month", "procurement.bidDeadline.date": { $gte: now } },
+            ],
+          },
         ],
       } as QueryFilter<ITor>;
   }
