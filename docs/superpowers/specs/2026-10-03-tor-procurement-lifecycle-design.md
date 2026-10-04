@@ -140,14 +140,19 @@ are not fetched because the UI never uses their deadline.
 
 After refresh writes a TOR whose stage is `inviting`, it does one more step in the same run:
 
-1. Pick the latest `invitation` announcement with `hasFile`. Skip when
-   `procurement.deadlineAttempt.announcementId` already equals its id, or when
-   `bidDeadline.source` is `"admin"`.
+1. Pick the latest `invitation` announcement (with or without a file, the same rule stage
+   derivation uses). Skip when `procurement.deadlineAttempt.announcementId` already equals its id,
+   or when `bidDeadline.source` is `"admin"`. If that latest invitation has no file (or no e-GP
+   file name), do not call Gemini: clear a stale `bidDeadline` of source `"invitation-pdf"` (it
+   came from an older invitation), record no attempt, so the read happens once the file appears.
 2. Download via `EgpClient.downloadFile` into `BlobStorage`
    (`tor-pdfs/<projectCode>/<announcementId>.pdf`) and record `storageKey` on that announcement.
 3. `TorExtractor` gains `extractBidDeadline(pdf)` (one Gemini call; returns date + confidence;
-   reuses the Buddhist-era year fix in `torExtractor.ts`). Low confidence or unreadable →
-   write nothing; the UI shows an unknown deadline ("เปิดรับ" without a date).
+   the Buddhist-era year fix lives in `backend/src/utils/bidDeadline.ts`). Unreadable (or low
+   confidence) writes `bidDeadline: null` and records `deadlineAttempt.outcome = "unreadable"`, so a
+   stale deadline from an older invitation is cleared; the UI shows an unknown deadline ("เปิดรับ"
+   without a date). Non-retryable extractor errors (invalid JSON, 4xx other than 429) count as
+   unreadable; retryable ones (429, 5xx, network) record nothing and are retried next run.
 4. Record `procurement.deadlineAttempt = { announcementId, at, outcome }` so the same
    announcement is never retried; a new invitation id re-opens extraction.
 5. Cap: `MAX_DEADLINE_EXTRACTIONS_PER_RUN` (default 20), separate from `MAX_AI_CALLS_PER_RUN`.
@@ -214,6 +219,12 @@ Each step is independently shippable and gets its own PR:
   `submissionDeadline` keeps its meaning "date stated in the TOR document" and is not used for status.
 - Step 4 residual issues: a TOR with an admin deadline keeps it after a re-invitation; an unreadable
   scan is simply "open, no date".
+- Candidate ordering can starve fresh `inviting` TORs once candidates exceed
+  `MAX_LIFECYCLE_REFRESH_PER_RUN` (discovery also advances `lastCheckedAt`). Follow-up: prefer
+  inviting TORs whose current invitation has no `deadlineAttempt`, or add `lastAttemptAt`.
+- Overlapping scheduled lifecycle runs can double-spend a Gemini call (the write guard prevents
+  corruption, not the call).
+- An admin cannot make a correct AI deadline "sticky" without changing it.
 - Other cancellation announcement names beyond "ยกเลิกประกาศเชิญชวน"; widen the
   sample before finalising `kind` normalisation.
 - Whether the e-GP sample (unfiltered by announce type) matches the TOR-draft

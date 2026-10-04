@@ -118,7 +118,10 @@ gcloud run jobs deploy tor-lifecycle \
 > (one small Gemini call each, capped by `MAX_DEADLINE_EXTRACTIONS_PER_RUN`), so `tor-jobs-sa`
 > needs the same Vertex AI and bucket-write roles for this job as for `tor-enrichment`. The
 > admin-triggered refresh (`POST /api/ingestion/lifecycle/runs`) runs inside the backend service
-> and uses that service's own env, which needs the same variables there.
+> and uses that service's own env, which needs the same variables there. Set the `tor-lifecycle`
+> env (`STORAGE_DRIVER=gcs`, `GCS_BUCKET`, the Vertex vars) before or together with the image
+> update; otherwise storage defaults to local disk on an ephemeral container and the stored keys
+> point to blobs that do not exist.
 
 > All the job commands use gcloud's alternate-delimiter form `--set-env-vars "^::^k=v::k=v..."`
 > because `INGEST_AGENCIES` is itself a comma-separated list: with the default separator
