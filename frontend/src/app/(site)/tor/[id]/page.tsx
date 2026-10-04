@@ -14,7 +14,7 @@ import {
   ShieldAlert,
   Sparkles,
 } from "lucide-react";
-import { formatBudget, formatThaiDate, type FairnessField, type FairnessFlag } from "@/lib/mockData";
+import { formatBudget, formatThaiDate, formatThaiMonthYear, type FairnessField, type FairnessFlag } from "@/lib/mockData";
 import { fetchTorById, fetchTorList, isUnknownDeadline } from "@/lib/torApi";
 import { ANNOUNCEMENT_KIND_LABELS, statusNote } from "@/lib/torStatus";
 import StatusBadge from "@/components/StatusBadge";
@@ -266,7 +266,11 @@ export default async function TORDetailPage({
             <div className="mt-4 rounded-2xl bg-[var(--color-surface-alt)] px-3.5 py-3">
               <p className="text-xs text-[var(--color-text-muted)]">กำหนดยื่นข้อเสนอ</p>
               <p className="text-sm font-medium text-[var(--color-text)] mt-0.5">
-                {bidDeadline ? formatThaiDate(bidDeadline) : "ไม่ระบุ"}
+                {bidDeadline
+                  ? procurement?.bidDeadlinePrecision === "month"
+                    ? `เดือน ${formatThaiMonthYear(bidDeadline)}`
+                    : formatThaiDate(bidDeadline)
+                  : "ไม่ระบุ"}
               </p>
               <p
                 className={`text-xs mt-1 font-medium ${

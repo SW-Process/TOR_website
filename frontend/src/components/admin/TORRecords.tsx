@@ -15,7 +15,7 @@ import {
 import AdminPageHeader from "./AdminPageHeader";
 import HideTorDialog from "./HideTorDialog";
 import StatusBadge from "@/components/StatusBadge";
-import { categories, formatBudget, formatThaiDate, type TOR, type TORStatus } from "@/lib/mockData";
+import { categories, formatBudget, formatThaiDate, formatThaiMonthYear, type TOR, type TORStatus } from "@/lib/mockData";
 import { apiFetch } from "@/lib/api";
 import { categoryToSlug, fetchAgencies, isUnknownDeadline, mapApiTor, type ApiTor } from "@/lib/torApi";
 import { STATUS_API, STATUSES } from "@/lib/torSearch";
@@ -84,6 +84,8 @@ interface Draft {
   originalBidDeadline: string;
   /** The field is shown only while the TOR is in the invitation stage. */
   canSetBidDeadline: boolean;
+  /** Month-only deadline read from the PDF (e.g. "ตุลาคม 2569"); the date input stays empty. */
+  bidDeadlineMonthHint: string;
   openFlags: AdminTor["openFlags"];
 }
 
@@ -103,6 +105,7 @@ function bangkokDay(iso: string | null | undefined): string {
 }
 
 function toDraft(tor: AdminTor): Draft {
+  const monthOnly = tor.procurement?.bidDeadlinePrecision === "month";
   return {
     id: tor.id,
     projectCode: tor.projectCode,
@@ -112,8 +115,11 @@ function toDraft(tor: AdminTor): Draft {
     budget: tor.budget ? String(tor.budget) : "",
     deadline: isUnknownDeadline(tor.deadline) ? "" : tor.deadline.slice(0, 10),
     manualClosed: tor.manualClosed ?? false,
-    bidDeadline: bangkokDay(tor.procurement?.bidDeadline),
-    originalBidDeadline: bangkokDay(tor.procurement?.bidDeadline),
+    // An end-of-month placeholder must not be shown (or re-sent) as if it were a real day.
+    bidDeadline: monthOnly ? "" : bangkokDay(tor.procurement?.bidDeadline),
+    originalBidDeadline: monthOnly ? "" : bangkokDay(tor.procurement?.bidDeadline),
+    bidDeadlineMonthHint:
+      monthOnly && tor.procurement?.bidDeadline ? formatThaiMonthYear(tor.procurement.bidDeadline) : "",
     canSetBidDeadline: tor.procurement?.stage === "inviting",
     openFlags: tor.openFlags,
   };
@@ -581,6 +587,11 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                     onChange={(e) => setDraft({ ...draft, bidDeadline: e.target.value })}
                     className="rounded-full border border-[var(--color-border)] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[var(--color-ink)]"
                   />
+                  {draft.bidDeadlineMonthHint && (
+                    <span className="text-xs text-[var(--color-text-muted)]">
+                      ระบบทราบเฉพาะเดือน {draft.bidDeadlineMonthHint}
+                    </span>
+                  )}
                   <span className="text-xs text-[var(--color-text-muted)]">
                     ระบบอ่านจากประกาศเชิญชวนให้อัตโนมัติ — ค่าที่กรอกเองจะใช้แทนและไม่ถูกเขียนทับ
                   </span>

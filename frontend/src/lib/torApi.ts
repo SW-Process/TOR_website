@@ -119,7 +119,7 @@ interface ApiAnnouncement {
 interface ApiProcurement {
   stage?: string;
   contractStatus?: string;
-  bidDeadline?: { date?: string } | null;
+  bidDeadline?: { date?: string; precision?: string } | null;
   lastCheckedAt?: string;
   /** Detail responses only. */
   announcements?: ApiAnnouncement[];
@@ -133,6 +133,7 @@ function mapProcurement(raw: ApiProcurement | null | undefined): TorProcurementV
     stage: PROCUREMENT_STAGES.find((s) => s === raw.stage) ?? "draft",
     contractStatus: raw.contractStatus ?? null,
     bidDeadline: raw.bidDeadline?.date ?? null,
+    bidDeadlinePrecision: raw.bidDeadline?.precision === "month" ? "month" : "day",
     lastCheckedAt: raw.lastCheckedAt ?? null,
     announcements: (raw.announcements ?? []).map((a) => ({
       id: a.announcementId,

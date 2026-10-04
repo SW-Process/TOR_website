@@ -22,6 +22,8 @@ export interface TorProcurementView {
   contractStatus: string | null;
   /** Real bid-submission deadline (ISO) when known; null until it has been read. */
   bidDeadline: string | null;
+  /** "month": the invitation names only a month and year; `bidDeadline` is then the end of that month. */
+  bidDeadlinePrecision: "day" | "month";
   lastCheckedAt: string | null;
   /** Dated timeline; only the detail response includes it. */
   announcements: TorAnnouncementView[];
@@ -473,6 +475,15 @@ export function formatThaiDate(iso: string): string {
     year: "numeric",
     month: "long",
     day: "numeric",
+  });
+}
+
+/** Month and (Buddhist-era) year in Asia/Bangkok, e.g. "ตุลาคม 2569"; never a day. */
+export function formatThaiMonthYear(iso: string): string {
+  return new Date(iso).toLocaleDateString("th-TH", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "long",
   });
 }
 
