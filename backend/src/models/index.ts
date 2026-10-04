@@ -25,6 +25,8 @@ export { EnrichmentJob } from "./EnrichmentJob";
 export { ChatConversation } from "./ChatConversation";
 export { ChatMessage } from "./ChatMessage";
 export { Session } from "./Session";
+export { Announcement } from "./Announcement";
+export { Faq } from "./Faq";
 
 export type { IUser, UserRole, UserDocument } from "./User";
 export type { ITor, IAiSummary, IFairnessFlag, ISourceDocument, SourceTextLayer, TorPipelineStatus, IClassification, ProcurementStage, AnnouncementKind, IProcurementAnnouncement, IBidDeadline, BidDeadlinePrecision, DeadlineAttemptOutcome, IDeadlineAttempt, IProcurement } from "./Tor";
@@ -38,3 +40,5 @@ export type { IEnrichmentJob, EnrichmentJobStatus } from "./EnrichmentJob";
 export type { IChatConversation, ChatConversationStatus, ChatSender } from "./ChatConversation";
 export type { IChatMessage } from "./ChatMessage";
 export type { ISession, SessionMethod } from "./Session";
+export type { IAnnouncement, AnnouncementKind as HelpAnnouncementKind, HelpStatus } from "./Announcement";
+export type { IFaq } from "./Faq";
