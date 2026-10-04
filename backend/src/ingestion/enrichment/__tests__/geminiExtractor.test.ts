@@ -197,3 +197,47 @@ describe("buildPrompt", () => {
     expect(p).toContain("2026-08-01T00:00:00.000Z");
   });
 });
+
+describe("GeminiExtractor.extractBidDeadline", () => {
+  const input = {
+    pdf: { fileName: "inv.pdf", content: Buffer.from("%PDF-1.4 fake") },
+    meta: { projectCode: "69010000001", title: "จ้างพัฒนาระบบ" },
+  };
+  const deadlineJson = JSON.stringify({ date: "2026-10-20", time: "16:30", confidence: 0.9 });
+
+  it("returns the parsed result and sends the PDF with the deadline instruction", async () => {
+    const generate = jest.fn().mockResolvedValue({ text: deadlineJson });
+    const x = new GeminiExtractor({ model: "gemini-2.5-flash", generate });
+    await expect(x.extractBidDeadline(input)).resolves.toEqual({ date: "2026-10-20", time: "16:30", confidence: 0.9 });
+    const call = generate.mock.calls[0][0] as {
+      config: { systemInstruction: string };
+      contents: { parts: { inlineData?: { mimeType: string } }[] };
+    };
+    expect(call.config.systemInstruction).toContain("กำหนดยื่นข้อเสนอ");
+    expect(call.contents.parts.some((p) => p.inlineData?.mimeType === "application/pdf")).toBe(true);
+  });
+
+  it("returns an empty result without calling the model when the PDF is oversized", async () => {
+    const generate = jest.fn();
+    const x = new GeminiExtractor({ model: "gemini-2.5-flash", generate });
+    const big = { ...input, pdf: { fileName: "big.pdf", content: Buffer.alloc(MAX_INLINE_PDF_BYTES + 1) } };
+    await expect(x.extractBidDeadline(big)).resolves.toEqual({ date: null, time: null, confidence: 0 });
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("retries a 429 like extract() does", async () => {
+    const generate = jest
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("rate"), { status: 429 }))
+      .mockResolvedValueOnce({ text: deadlineJson });
+    const x = new GeminiExtractor({ model: "gemini-2.5-flash", generate, maxRetries: 2, sleep: async () => {} });
+    await x.extractBidDeadline(input);
+    expect(generate).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a response that does not match the schema", async () => {
+    const generate = jest.fn().mockResolvedValue({ text: JSON.stringify({ date: 5 }) });
+    const x = new GeminiExtractor({ model: "gemini-2.5-flash", generate });
+    await expect(x.extractBidDeadline(input)).rejects.toThrow();
+  });
+});

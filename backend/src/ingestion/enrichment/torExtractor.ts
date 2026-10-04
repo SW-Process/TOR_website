@@ -46,7 +46,22 @@ export interface ExtractInput {
   };
 }
 
-export interface TorExtractor {
+export const bidDeadlineResultSchema = z.object({
+  date: z.string().nullable(),
+  time: z.string().nullable(),
+  confidence: z.number().min(0).max(1),
+});
+
+export type BidDeadlineResult = z.infer<typeof bidDeadlineResultSchema>;
+
+export interface BidDeadlineExtractor {
+  extractBidDeadline(input: {
+    pdf: { fileName: string; content: Buffer };
+    meta: { projectCode?: string; title: string };
+  }): Promise<BidDeadlineResult>;
+}
+
+export interface TorExtractor extends BidDeadlineExtractor {
   readonly id: string;
   extract(input: ExtractInput): Promise<TorExtractionResult>;
 }

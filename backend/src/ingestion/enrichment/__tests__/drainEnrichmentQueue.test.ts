@@ -43,6 +43,7 @@ function extractorReturning(...results: (TorExtractionResult | Error)[]): TorExt
   let i = 0;
   return {
     id: "fake-extractor",
+    extractBidDeadline: async () => ({ date: null, time: null, confidence: 0 }),
     extract: async () => {
       const r = results[Math.min(i++, results.length - 1)] as TorExtractionResult | Error;
       if (r instanceof Error) throw r;
@@ -213,6 +214,7 @@ describe("drainEnrichmentQueue", () => {
     let call = 0;
     const extractor: TorExtractor = {
       id: "fake",
+      extractBidDeadline: async () => ({ date: null, time: null, confidence: 0 }),
       extract: async () => {
         // On the 2nd call the 1st job has finished — its progress must be in Mongo already,
     // and the job in flight is not yet counted as processed.
@@ -246,7 +248,7 @@ describe("drainEnrichmentQueue", () => {
     const announcementDate = new Date("2026-08-01T00:00:00.000Z");
     await seedTorWithJob({ announcementDate });
     const extract = jest.fn().mockResolvedValue(result());
-    await drainEnrichmentQueue({ extractor: { id: "fake", extract } });
+    await drainEnrichmentQueue({ extractor: { id: "fake", extract, extractBidDeadline: async () => ({ date: null, time: null, confidence: 0 }) } });
     expect(extract).toHaveBeenCalledWith(
       expect.objectContaining({
         meta: expect.objectContaining({ announcementDate: announcementDate.toISOString() }),
