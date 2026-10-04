@@ -14,6 +14,7 @@ import {
   updateBookmark,
   deleteBookmark,
 } from "../controllers/bookmarkController";
+import { listHiddenTors, hideTor, unhideTor } from "../controllers/hiddenTorController";
 import { requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
@@ -34,5 +35,9 @@ router.get("/bookmarks", listBookmarks);
 router.put("/bookmarks/:torId", putBookmark);
 router.patch("/bookmarks/:torId", updateBookmark);
 router.delete("/bookmarks/:torId", deleteBookmark);
+
+router.get("/hidden-tors", listHiddenTors);
+router.put("/hidden-tors/:torId", hideTor);
+router.delete("/hidden-tors/:torId", unhideTor);
 
 export default router;

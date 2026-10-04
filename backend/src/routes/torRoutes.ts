@@ -7,7 +7,8 @@ import { optionalAuth } from "../middleware/auth";
 const router = Router();
 
 // /price-stats, /agencies and /technologies are declared before /:id so they are not captured as an id.
-router.get("/", listTors);
+// optionalAuth: a signed-in vendor's hidden TORs are left out of their search results.
+router.get("/", optionalAuth, listTors);
 router.get("/price-stats", priceStats);
 router.get("/agencies", listAgencies);
 router.get("/technologies", listTechnologies);

@@ -32,6 +32,7 @@ export async function listMatches(req: Request, res: Response): Promise<void> {
   const now = new Date();
   const openTors = await Tor.find({
     pipelineStatus: "enriched",
+    _id: { $nin: profile!.hiddenTors.map((h) => h.torId) },
     $or: (["draft", "open", "closing_soon"] as const).map((s) => statusClause(s, now)),
   })
     .select(OPEN_TOR_PROJECTION)

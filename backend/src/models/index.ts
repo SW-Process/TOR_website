@@ -26,7 +26,7 @@ export { ChatConversation } from "./ChatConversation";
 export { ChatMessage } from "./ChatMessage";
 
 export type { IUser, UserRole, UserDocument } from "./User";
-export type { IVendorProfile, ISavedSearch } from "./VendorProfile";
+export type { IVendorProfile, ISavedSearch, IHiddenTor } from "./VendorProfile";
 export type { ITor, IAiSummary, IFairnessFlag, ISourceDocument, SourceTextLayer, TorPipelineStatus, IClassification, ProcurementStage, AnnouncementKind, IProcurementAnnouncement, IBidDeadline, DeadlineAttemptOutcome, IDeadlineAttempt, IProcurement } from "./Tor";
 export type { IBookmark, ApplicationStatus } from "./Bookmark";
 export type { INotification, NotificationType } from "./Notification";

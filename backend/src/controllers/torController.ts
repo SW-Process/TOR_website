@@ -5,6 +5,7 @@ import type { PipelineStage, QueryFilter } from "mongoose";
 import { Tor } from "../models";
 import type { ITor } from "../models";
 import { httpError } from "../utils/httpError";
+import { hiddenTorIdsOf } from "./hiddenTorController";
 import { PROJECT_TYPES } from "../config/projectTypes";
 import { TOR_STATUSES, statusClause, withDisplayStatus, type StatusInput } from "../utils/torStatus";
 
@@ -191,11 +192,16 @@ export function parseQuery(req: Request): ListQuery {
 export async function listTors(req: Request, res: Response): Promise<void> {
   const q = parseQuery(req);
   const order = q.order ?? DEFAULT_ORDER[q.sort];
+  const filter = buildFilter(q);
+  if (req.user?.role === "vendor") {
+    const hidden = await hiddenTorIdsOf(req.user.id);
+    if (hidden.length) filter._id = { $nin: hidden };
+  }
   const [result] = await Tor.aggregate<{
     data: unknown[];
     meta: { totalCount: number; totalBudget: number }[];
   }>([
-    { $match: buildFilter(q) },
+    { $match: filter },
     {
       $facet: {
         data: [
