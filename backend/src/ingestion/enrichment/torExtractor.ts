@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { HydratedDocument } from "mongoose";
 import type { ITor } from "../../models";
 import { TAXONOMY_VERSION, isTaxonomyCategory, fallbackCategory } from "../../config/taxonomy";
+import { PROJECT_TYPES, type ProjectType } from "../../config/projectTypes";
 
 const strArray = z.preprocess((v) => (v == null ? [] : v), z.array(z.string()));
 
@@ -19,6 +20,8 @@ export const torExtractionResultSchema = z.object({
   confidence: z.number().min(0).max(1),
   category: z.string(),
   categoryTags: strArray,
+  // Optional: older responses and unclear TORs omit it; unknown values are dropped in applyExtractionToTor.
+  projectType: z.string().nullable().optional(),
   summary: z.string().nullable(),
   keyPoints: strArray,
   qualifications: strArray,
@@ -137,6 +140,10 @@ export function applyExtractionToTor(
     : fallbackCategory(`${opts.fallbackText} ${result.categoryTags.join(" ")}`);
   tor.category = category;
   tor.categoryTags = result.categoryTags;
+  const projectType = (PROJECT_TYPES as readonly string[]).includes(result.projectType ?? "")
+    ? (result.projectType as ProjectType)
+    : undefined;
+  tor.projectType = projectType;
   tor.taxonomyVersion = TAXONOMY_VERSION;
 
   const deadline = parseDeadline(result.submissionDeadline);
