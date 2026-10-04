@@ -2,13 +2,26 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bookmark, Briefcase, ChevronLeft, ChevronRight, EyeOff, Flag, KeyRound, LogOut, Mail, Trash2, UserRound } from "lucide-react";
+import {
+  Bookmark,
+  Briefcase,
+  ChevronLeft,
+  ChevronRight,
+  EyeOff,
+  Flag,
+  KeyRound,
+  LogOut,
+  Mail,
+  MonitorSmartphone,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import { useAuth } from "@/lib/useAuth";
 import { Avatar } from "./ui";
 
 /** Every page reachable from the settings sidebar; `/account/settings?section=<id>` unless noted. */
-export type SettingsPageId = "profile" | "email" | "password" | "saved" | "hidden" | "reports" | "delete" | "business";
+export type SettingsPageId = "profile" | "email" | "password" | "sessions" | "saved" | "hidden" | "reports" | "delete" | "business";
 
 export const SETTINGS_ROOT = "/account/settings";
 
@@ -124,6 +137,12 @@ export default function SettingsShell({
                 label="รหัสผ่านและความปลอดภัย"
                 href={settingsHref("password")}
                 active={active === "password"}
+              />
+              <NavItem
+                icon={MonitorSmartphone}
+                label="อุปกรณ์ที่เข้าสู่ระบบ"
+                href={settingsHref("sessions")}
+                active={active === "sessions"}
               />
             </NavGroup>
 

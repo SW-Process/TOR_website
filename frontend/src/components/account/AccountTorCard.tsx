@@ -35,7 +35,7 @@ export default function AccountTorCard({
         </div>
         <span className="flex shrink-0 items-center gap-1 text-xs text-[var(--color-text-faint)]">
           <Clock size={12} />
-          {timeLabel} {formatThaiDate(at.slice(0, 10))}
+          {timeLabel} {formatThaiDate(at)}
         </span>
       </div>
 
