@@ -4,11 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FileSearch, Mail, Phone, ShieldCheck } from "lucide-react";
 
-const HIDDEN_ON = ["/login", "/signup", "/account/profile"];
+const HIDDEN_ON = ["/login", "/signup"];
+// Account pages are a full-height settings layout (Instagram-style), with no footer under it.
+const HIDDEN_UNDER = "/account/";
 
 export default function Footer() {
   const pathname = usePathname();
-  if (HIDDEN_ON.includes(pathname)) return null;
+  if (HIDDEN_ON.includes(pathname) || pathname.startsWith(HIDDEN_UNDER)) return null;
 
   return (
     <footer className="rounded-t-[2rem] bg-[var(--color-ink)] text-white">

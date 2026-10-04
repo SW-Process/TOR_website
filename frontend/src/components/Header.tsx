@@ -12,7 +12,7 @@ import {
   LogOut,
   FileSearch,
   UserRound,
-  LayoutDashboard,
+  Settings,
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
@@ -133,25 +133,23 @@ export default function Header() {
                       </Link>
                     )}
                     {isVendor && (
-                      <>
-                        <Link
-                          href="/dashboard"
-                          onClick={() => setMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
-                        >
-                          <LayoutDashboard size={15} />
-                          แดชบอร์ด
-                        </Link>
-                        <Link
-                          href="/account/profile"
-                          onClick={() => setMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
-                        >
-                          <UserRound size={15} />
-                          โปรไฟล์ธุรกิจ
-                        </Link>
-                      </>
+                      <Link
+                        href="/account/profile"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                      >
+                        <UserRound size={15} />
+                        โปรไฟล์ธุรกิจ
+                      </Link>
                     )}
+                    <Link
+                      href="/account/settings"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                    >
+                      <Settings size={15} />
+                      ตั้งค่าบัญชี
+                    </Link>
                     <button
                       onClick={handleLogout}
                       className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-rose-dark)] hover:bg-[var(--color-blush-soft)]"
@@ -214,6 +212,14 @@ export default function Header() {
                   โปรไฟล์ธุรกิจ · {displayName}
                 </Link>
               )}
+              <Link
+                href="/account/settings"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+              >
+                <Settings size={15} />
+                ตั้งค่าบัญชี
+              </Link>
               <button
                 onClick={handleLogout}
                 className="btn-pill mt-1 border border-[var(--color-border-strong)] py-2.5 text-sm text-[var(--color-rose-dark)]"
