@@ -8,6 +8,7 @@ import {
   updateAccount,
   changePassword,
   changeEmail,
+  logoutOthers,
   deleteAccount,
   uploadAvatar,
   streamAvatar,
@@ -32,6 +33,7 @@ router.patch("/me", requireAuth, updateAccount);
 router.delete("/me", requireAuth, deleteAccount);
 router.put("/password", requireAuth, changePassword);
 router.put("/email", requireAuth, changeEmail);
+router.post("/logout-others", requireAuth, logoutOthers);
 router.get("/reports", requireAuth, listMyReports);
 
 router.post("/avatar", requireAuth, avatarUpload.single("avatar"), uploadAvatar);

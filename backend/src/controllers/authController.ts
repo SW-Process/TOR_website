@@ -124,8 +124,21 @@ export async function updateAccount(req: Request, res: Response): Promise<void> 
 }
 
 /**
+ * Save `user` with a bumped token version — which signs out every existing session —
+ * then re-issue this device's cookie under the new version. The cookie goes out only
+ * after the save, so a failed write can't strand this device on a version the
+ * database never reached.
+ */
+async function saveAndRevokeOtherSessions(res: Response, user: UserDocument): Promise<void> {
+  user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+  await user.save();
+  issueSession(res, user);
+}
+
+/**
  * PUT /api/auth/password — change the password (current one required), or set a
- * first one on a Google-only account.
+ * first one on a Google-only account. Every other device is signed out; this one
+ * stays signed in.
  */
 export async function changePassword(req: Request, res: Response): Promise<void> {
   const { currentPassword, newPassword } = (req.body ?? {}) as Record<string, unknown>;
@@ -136,7 +149,14 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   const user = await loadAccount(req);
   await confirmPassword(user, currentPassword);
   user.set("password", newPassword);
-  await user.save();
+  await saveAndRevokeOtherSessions(res, user);
+  res.status(200).json({ user: accountView(user) });
+}
+
+/** POST /api/auth/logout-others — sign out every device except this one. */
+export async function logoutOthers(req: Request, res: Response): Promise<void> {
+  const user = await loadAccount(req);
+  await saveAndRevokeOtherSessions(res, user);
   res.status(200).json({ user: accountView(user) });
 }
 
