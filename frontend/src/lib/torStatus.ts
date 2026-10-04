@@ -34,9 +34,24 @@ export function isActiveOpportunity(status: TORStatus): boolean {
 
 const DAY_MS = 86_400_000;
 
-/** Whole days until `iso` on the real clock (negative = passed). Not the mock TODAY_ISO clock. */
+const bangkokDay = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok" }); // YYYY-MM-DD
+
+/** Days since the epoch of the Asia/Bangkok calendar date of `ms`. */
+function bangkokDayNumber(ms: number): number {
+  const [y, m, d] = bangkokDay.format(new Date(ms)).split("-").map(Number);
+  return Date.UTC(y, m - 1, d) / DAY_MS;
+}
+
+/**
+ * Bangkok calendar days until `iso` on the real clock (not the mock TODAY_ISO clock): 0 on the
+ * deadline day while it has not yet passed, so "closes today" shows before the deadline, not after.
+ * A passed deadline keeps the plain elapsed-time ceiling (<= 0).
+ */
 function daysFromNow(iso: string): number {
-  return Math.ceil((Date.parse(iso) - Date.now()) / DAY_MS);
+  const target = Date.parse(iso);
+  const now = Date.now();
+  if (target <= now) return Math.ceil((target - now) / DAY_MS);
+  return bangkokDayNumber(target) - bangkokDayNumber(now);
 }
 
 /** Whole days until the real bid deadline, or null when the TOR has none known. Real clock. */
