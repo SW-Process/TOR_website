@@ -43,6 +43,7 @@ export default function Footer() {
             <li><Link href="/" className="hover:text-white transition-colors">หน้าแรก</Link></li>
             <li><Link href="/tor" className="hover:text-white transition-colors">ค้นหา TOR</Link></li>
             <li><Link href="/bookmarks" className="hover:text-white transition-colors">รายการที่บันทึก</Link></li>
+            <li><Link href="/help" className="hover:text-white transition-colors">ศูนย์ช่วยเหลือ</Link></li>
           </ul>
         </div>
 
