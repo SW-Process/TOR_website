@@ -12,7 +12,7 @@ import { STATUS_FROM_API } from "@/lib/torStatus";
  * service DNS name) there instead; outside Docker, server and browser share
  * a host, so API_BASE already resolves correctly and this is unset.
  */
-function resolveApiBase(): string {
+export function resolveApiBase(): string {
   if (typeof window !== "undefined") return API_BASE;
   return process.env.INTERNAL_API_BASE_URL || API_BASE;
 }

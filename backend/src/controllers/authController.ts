@@ -1,8 +1,11 @@
 import crypto from "crypto";
+import { isValidObjectId } from "mongoose";
 import type { Request, Response } from "express";
-import { Bookmark, ChatConversation, ChatMessage, ErrorReport, Notification, User, VendorProfile } from "../models";
+import { Bookmark, ChatConversation, ChatMessage, ErrorReport, Notification, Session, User, VendorProfile } from "../models";
 import type { UserDocument } from "../models/User";
-import { signToken, cookieOptions, COOKIE_NAME } from "../utils/token";
+import { cookieOptions, COOKIE_NAME } from "../utils/token";
+import { setSessionCookie, startSession } from "../services/sessions";
+import { parseUserAgent } from "../utils/userAgent";
 import { httpError } from "../utils/httpError";
 import { getStorage } from "../storage";
 import { sessionUser } from "../middleware/auth";
@@ -42,13 +45,9 @@ function validateCredentials(body: unknown): Credentials {
   return { email, password };
 }
 
-/** Set the session cookie for `user`. */
-function issueSession(res: Response, user: UserDocument): void {
-  res.cookie(COOKIE_NAME, signToken(user), cookieOptions());
-}
-
-function sendSession(res: Response, user: UserDocument, status: number): void {
-  issueSession(res, user);
+/** Start a password session for `user` on this device and respond with the user. */
+async function sendSession(req: Request, res: Response, user: UserDocument, status: number): Promise<void> {
+  await startSession(req, res, user, "password");
   res.status(status).json({ user });
 }
 
@@ -68,7 +67,7 @@ export async function register(req: Request, res: Response): Promise<void> {
   user.set("password", password);
   await user.save();
 
-  sendSession(res, user, 201);
+  await sendSession(req, res, user, 201);
 }
 
 /** POST /api/auth/login — verify credentials and start a session. */
@@ -80,11 +79,14 @@ export async function login(req: Request, res: Response): Promise<void> {
     throw httpError(401, "Invalid email or password");
   }
 
-  sendSession(res, user, 200);
+  await sendSession(req, res, user, 200);
 }
 
 /** POST /api/auth/logout — clear the session cookie. */
-export async function logout(_req: Request, res: Response): Promise<void> {
+export async function logout(req: Request, res: Response): Promise<void> {
+  // Drop this device's session row too, so it leaves the session list at once.
+  const current = await sessionUser(req.cookies?.[COOKIE_NAME] as string | undefined);
+  if (current?.sessionId) await Session.deleteOne({ _id: current.sessionId });
   res.clearCookie(COOKIE_NAME, cookieOptions());
   res.status(200).json({ message: "Logged out" });
 }
@@ -117,6 +119,47 @@ export async function me(req: Request, res: Response): Promise<void> {
 
 const MAX_DISPLAY_NAME_LENGTH = 60;
 
+/** "Active" in the session list: used within this window. */
+const SESSION_ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * GET /api/auth/sessions — the caller's signed-in devices, most recently used first,
+ * with the current one flagged. The raw User-Agent stays server-side; the client
+ * gets the parsed device, browser and OS.
+ */
+export async function listSessions(req: Request, res: Response): Promise<void> {
+  const sessions = await Session.find({ userId: req.user!.id, expiresAt: { $gt: new Date() } })
+    .sort({ lastSeenAt: -1 })
+    .lean();
+  const now = Date.now();
+  res.status(200).json({
+    data: sessions.map((s) => ({
+      id: String(s._id),
+      current: String(s._id) === req.user!.sessionId,
+      active: now - s.lastSeenAt.getTime() < SESSION_ACTIVE_WINDOW_MS,
+      device: parseUserAgent(s.userAgent),
+      ip: s.ip,
+      method: s.method,
+      createdAt: s.createdAt,
+      lastSeenAt: s.lastSeenAt,
+    })),
+  });
+}
+
+/**
+ * DELETE /api/auth/sessions/:id — sign out one of the caller's devices. Revoking the
+ * current one is a logout, so its cookie is cleared too. Someone else's session id
+ * is reported as not found.
+ */
+export async function revokeSession(req: Request, res: Response): Promise<void> {
+  const id = String(req.params.id);
+  if (!isValidObjectId(id)) throw httpError(400, "Invalid session id");
+  const { deletedCount } = await Session.deleteOne({ _id: id, userId: req.user!.id });
+  if (!deletedCount) throw httpError(404, "Session not found");
+  if (id === req.user!.sessionId) res.clearCookie(COOKIE_NAME, cookieOptions());
+  res.status(204).end();
+}
+
 /** PATCH /api/auth/me — update the display name; blank resets it to the email-derived default. */
 export async function updateAccount(req: Request, res: Response): Promise<void> {
   const { displayName } = (req.body ?? {}) as { displayName?: unknown };
@@ -138,10 +181,12 @@ export async function updateAccount(req: Request, res: Response): Promise<void> 
  * after the save, so a failed write can't strand this device on a version the
  * database never reached.
  */
-async function saveAndRevokeOtherSessions(res: Response, user: UserDocument): Promise<void> {
+async function saveAndRevokeOtherSessions(req: Request, res: Response, user: UserDocument): Promise<void> {
   user.tokenVersion = (user.tokenVersion ?? 0) + 1;
   await user.save();
-  issueSession(res, user);
+  const current = req.user!.sessionId!; // requireAuth guarantees a session row
+  await Session.deleteMany({ userId: user._id, _id: { $ne: current } });
+  setSessionCookie(res, user, current);
 }
 
 /**
@@ -158,14 +203,14 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   const user = await loadAccount(req);
   await confirmPassword(user, currentPassword);
   user.set("password", newPassword);
-  await saveAndRevokeOtherSessions(res, user);
+  await saveAndRevokeOtherSessions(req, res, user);
   res.status(200).json({ user: accountView(user) });
 }
 
 /** POST /api/auth/logout-others — sign out every device except this one. */
 export async function logoutOthers(req: Request, res: Response): Promise<void> {
   const user = await loadAccount(req);
-  await saveAndRevokeOtherSessions(res, user);
+  await saveAndRevokeOtherSessions(req, res, user);
   res.status(200).json({ user: accountView(user) });
 }
 
@@ -223,6 +268,7 @@ export async function deleteAccount(req: Request, res: Response): Promise<void> 
   await ChatMessage.deleteMany({ conversation: { $in: conversations } });
   await ChatConversation.deleteMany({ _id: { $in: conversations } });
   await ErrorReport.updateMany({ reportedBy: user._id }, { $set: { reportedBy: null } });
+  await Session.deleteMany({ userId: user._id });
 
   if (user.avatarKey) {
     await getStorage().delete?.(user.avatarKey).catch(() => {}); // an orphaned blob is harmless
@@ -375,6 +421,6 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
     }
   }
 
-  issueSession(res, user);
+  await startSession(req, res, user, "google");
   res.redirect(clientUrl(isNew ? "/account/profile?onboarding=1" : "/dashboard"));
 }

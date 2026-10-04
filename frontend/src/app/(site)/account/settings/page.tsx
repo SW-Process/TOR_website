@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Bookmark, BookmarkX, Building2, CheckCircle2, ChevronDown, Clock, ExternalLink, Eye, EyeOff, Flag, Hash, KanbanSquare, Loader2, MonitorSmartphone } from "lucide-react";
+import { AlertTriangle, Bookmark, BookmarkX, Building2, CheckCircle2, ChevronDown, ChevronRight, Clock, ExternalLink, Eye, EyeOff, Flag, Hash, KanbanSquare, Loader2, Monitor, MonitorSmartphone, Smartphone, Tablet } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
 import AccountTorCard, { CardAction } from "@/components/account/AccountTorCard";
 import SettingsShell from "@/components/account/SettingsShell";
@@ -13,16 +13,20 @@ import { useAuth } from "@/lib/useAuth";
 import { useMyReports, type MyReport } from "@/lib/useMyReports";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, useBookmarks, type ApplicationStatus } from "@/lib/useBookmarks";
 import { useHiddenTors } from "@/lib/useHiddenTors";
+import { useSessions, type AccountSession } from "@/lib/useSessions";
+import { ShortcutKeys, ShortcutTable } from "@/components/KeyboardShortcuts";
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_NAME_LENGTH = 60;
 
-type SectionId = "profile" | "email" | "password" | "saved" | "hidden" | "reports" | "delete";
+type SectionId = "profile" | "email" | "password" | "sessions" | "shortcuts" | "saved" | "hidden" | "reports" | "delete";
 
 const SECTION_TITLES: Record<SectionId, string> = {
   profile: "แก้ไขโปรไฟล์",
   email: "อีเมล",
   password: "รหัสผ่านและความปลอดภัย",
+  sessions: "อุปกรณ์ที่เข้าสู่ระบบ",
+  shortcuts: "ปุ่มลัดบนคีย์บอร์ด",
   saved: "รายการที่บันทึก",
   hidden: "TOR ที่ซ่อนไว้",
   reports: "รายงานที่ฉันส่ง",
@@ -228,7 +232,20 @@ function PasswordSection() {
         />
       </form>
 
-      <SessionsBlock />
+      <Link
+        href="/account/settings?section=sessions"
+        scroll={false}
+        className="flex items-center gap-4 rounded-3xl border border-[var(--color-border)] p-4 transition-colors hover:bg-[var(--color-surface-alt)] sm:p-5"
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-alt)] text-[var(--color-ink)]">
+          <MonitorSmartphone size={20} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold text-[var(--color-text)]">อุปกรณ์ที่เข้าสู่ระบบ</span>
+          <span className="block text-xs text-[var(--color-text-muted)]">ดูว่าบัญชีนี้เข้าสู่ระบบอยู่ที่ไหนบ้าง และออกจากระบบอุปกรณ์ที่ไม่รู้จัก</span>
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-[var(--color-text-faint)]" />
+      </Link>
 
       <GoogleConnection />
     </div>
@@ -346,7 +363,7 @@ function ReportCard({ report }: { report: MyReport }) {
         </span>
         <span className="flex shrink-0 items-center gap-1 text-xs text-[var(--color-text-faint)]">
           <Clock size={12} />
-          ส่งเมื่อ {formatThaiDate(report.createdAt.slice(0, 10))}
+          ส่งเมื่อ {formatThaiDate(report.createdAt)}
         </span>
       </div>
 
@@ -404,7 +421,7 @@ function ReportCard({ report }: { report: MyReport }) {
             <CheckCircle2 size={14} />
             ทีมงานแก้ไขแล้ว
             {report.resolution.resolvedAt && (
-              <span className="font-normal opacity-80">· {formatThaiDate(report.resolution.resolvedAt.slice(0, 10))}</span>
+              <span className="font-normal opacity-80">· {formatThaiDate(report.resolution.resolvedAt)}</span>
             )}
           </p>
           <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-ink-soft)]">
@@ -639,20 +656,186 @@ function GoogleConnection() {
   );
 }
 
+const DEVICE_ICONS = { desktop: Monitor, mobile: Smartphone, tablet: Tablet } as const;
+
+const relativeTime = new Intl.RelativeTimeFormat("th", { numeric: "auto" });
+
+/** "เมื่อสักครู่" / "5 นาทีที่แล้ว" / "เมื่อวาน", falling back to a date after a week. */
+function timeAgo(iso: string): string {
+  const seconds = Math.round((Date.parse(iso) - Date.now()) / 1000);
+  if (seconds > -60) return "เมื่อสักครู่";
+  const minutes = Math.round(seconds / 60);
+  if (minutes > -60) return relativeTime.format(minutes, "minute");
+  const hours = Math.round(minutes / 60);
+  if (hours > -24) return relativeTime.format(hours, "hour");
+  const days = Math.round(hours / 24);
+  if (days > -7) return relativeTime.format(days, "day");
+  return formatThaiDate(iso);
+}
+
+function deviceName(s: AccountSession): string {
+  const { browser, os, type } = s.device;
+  if (browser && os) return `${browser} บน ${os}`;
+  if (browser || os) return (browser ?? os)!;
+  return type === "desktop" ? "คอมพิวเตอร์" : type === "tablet" ? "แท็บเล็ต" : "โทรศัพท์มือถือ";
+}
+
+/** One device row, GitHub "Web sessions"-style: icon, name, status, when, and a sign-out action. */
+function SessionRow({ session, onRevoke }: { session: AccountSession; onRevoke: () => Promise<boolean> }) {
+  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const Icon = DEVICE_ICONS[session.device.type];
+  const revokeButton = (
+    <button
+      type="button"
+      onClick={() => setConfirming(true)}
+      className="shrink-0 rounded-xl bg-[var(--color-surface-alt)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-border)]"
+    >
+      ออกจากระบบ
+    </button>
+  );
+
+  async function revoke() {
+    setPending(true);
+    setFailed(false);
+    const ok = await onRevoke();
+    setPending(false);
+    if (!ok) setFailed(true);
+  }
+
+  return (
+    <li className="flex flex-col gap-3 p-4 sm:p-5">
+      <div className="flex items-start gap-4">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-alt)] text-[var(--color-ink)]">
+          <Icon size={20} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-[var(--color-text)]">
+            {deviceName(session)}
+            {session.current && (
+              <span className="badge bg-[var(--color-ink)] text-white">อุปกรณ์นี้</span>
+            )}
+          </p>
+          <p className="mt-1 flex items-center gap-1.5 text-xs">
+            <span
+              className={`h-2 w-2 rounded-full ${session.active ? "bg-[var(--color-success)]" : "bg-[var(--color-text-faint)]"}`}
+            />
+            <span className={session.active ? "text-[var(--color-success)]" : "text-[var(--color-text-muted)]"}>
+              {session.current ? "กำลังใช้งาน" : session.active ? "ใช้งานอยู่" : "ไม่ได้ใช้งานช่วงนี้"}
+            </span>
+            {!session.current && (
+              <span className="text-[var(--color-text-muted)]">· ใช้งานล่าสุด {timeAgo(session.lastSeenAt)}</span>
+            )}
+          </p>
+          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+            เข้าสู่ระบบ{session.method === "google" ? "ด้วย Google" : "ด้วยรหัสผ่าน"} เมื่อ{" "}
+            {formatThaiDate(session.createdAt)}
+            {session.ip && <> · IP {session.ip.replace(/^::ffff:/, "")}</>}
+          </p>
+        </div>
+        {!session.current && !confirming && <span className="hidden sm:block">{revokeButton}</span>}
+      </div>
+      {/* On phones the button gets its own line under the details instead of squeezing them. */}
+      {!session.current && !confirming && <div className="ml-15 sm:hidden">{revokeButton}</div>}
+
+      {confirming && (
+        <div className="flex flex-col gap-3 rounded-2xl bg-[var(--color-surface-alt)] p-4 sm:ml-15 sm:flex-row sm:items-center">
+          <p className="flex-1 text-sm text-[var(--color-text)]">ออกจากระบบ {deviceName(session)}?</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={pending}
+              className="rounded-xl px-4 py-2 text-sm font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              onClick={() => void revoke()}
+              disabled={pending}
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
+            >
+              {pending && <Loader2 size={14} className="animate-spin" />}
+              ออกจากระบบ
+            </button>
+          </div>
+        </div>
+      )}
+      {failed && (
+        <p className="flex items-center gap-1.5 text-sm text-[var(--color-rose-dark)] sm:ml-15">
+          <AlertTriangle size={14} />
+          ออกจากระบบไม่สำเร็จ กรุณาลองใหม่
+        </p>
+      )}
+    </li>
+  );
+}
+
+/** Every signed-in device, like GitHub's "Web sessions", plus "log out all other devices". */
+function SessionsSection() {
+  const { sessions, ready, error, revoke, reload } = useSessions();
+  const others = sessions.filter((s) => !s.current).length;
+
+  return (
+    <div className="flex flex-col gap-9">
+      <div className="flex flex-col gap-4">
+        <p className="text-sm leading-relaxed text-[var(--color-text-muted)]">
+          รายการอุปกรณ์ที่เข้าสู่ระบบบัญชีนี้อยู่ ถ้าพบอุปกรณ์ที่ไม่รู้จัก ให้กดออกจากระบบ แล้วเปลี่ยนรหัสผ่าน
+        </p>
+        {error && (
+          <p className="flex items-center gap-1.5 text-sm text-[var(--color-rose-dark)]">
+            <AlertTriangle size={14} />
+            {error}
+          </p>
+        )}
+        {ready && sessions.length > 0 && (
+          <ul className="divide-y divide-[var(--color-border)] overflow-hidden rounded-3xl border border-[var(--color-border)] bg-white">
+            {sessions.map((s) => (
+              <SessionRow key={s.id} session={s} onRevoke={() => revoke(s)} />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {ready && others > 0 && <SessionsBlock onDone={reload} />}
+    </div>
+  );
+}
+
+/** "ปุ่มลัดบนคีย์บอร์ด", like LINE's: every shortcut this account can use, by group. */
+function ShortcutsSection() {
+  const { user } = useAuth();
+  return (
+    <div className="flex flex-col gap-8">
+      <p className="text-sm leading-relaxed text-[var(--color-text-muted)]">
+        ใช้ปุ่มลัดเพื่อไปหน้าต่าง ๆ และจัดการ TOR ได้เร็วขึ้น ปุ่มลัดใช้ได้เมื่อไม่ได้พิมพ์อยู่ในช่องข้อความ
+        และใช้ได้ทั้งตอนตั้งคีย์บอร์ดเป็นภาษาไทยหรืออังกฤษ
+      </p>
+      <ShortcutTable role={user?.role ?? null} />
+      <p className="flex flex-wrap items-center gap-2 rounded-2xl bg-[var(--color-surface-alt)] px-4 py-3 text-xs text-[var(--color-text-muted)]">
+        กด <ShortcutKeys keys={["?"]} /> ที่หน้าไหนก็ได้ เพื่อเปิดรายการปุ่มลัดนี้
+      </p>
+    </div>
+  );
+}
+
 /** "ออกจากระบบอุปกรณ์อื่นทั้งหมด": a confirm step, then every other session is signed out. */
-function SessionsBlock() {
+function SessionsBlock({ onDone }: { onDone: () => void }) {
   const { logoutOthers } = useAuth();
   const [confirming, setConfirming] = useState(false);
   const { pending, error, done, setDone, run } = useSubmit();
 
   return (
-    <FieldBlock title="อุปกรณ์ที่เข้าสู่ระบบ">
+    <FieldBlock title="ออกจากระบบทุกอุปกรณ์">
       <div className="flex flex-col gap-4 rounded-3xl border border-[var(--color-border)] p-4 sm:p-5">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-alt)] text-[var(--color-ink)]">
             <MonitorSmartphone size={20} />
           </span>
-          <div className="min-w-0 flex-1">
+          {/* basis-0 + min width: the text keeps the row on wide screens, wraps the button below on phones */}
+          <div className="min-w-[14rem] flex-1 basis-0">
             <p className="text-[15px] font-semibold text-[var(--color-text)]">ออกจากระบบอุปกรณ์อื่นทั้งหมด</p>
             <p className="text-xs text-[var(--color-text-muted)]">
               ใช้เมื่อลืมออกจากระบบบนเครื่องอื่น หรือสงสัยว่ามีคนอื่นเข้าบัญชีของคุณ อุปกรณ์นี้จะยังเข้าสู่ระบบอยู่
@@ -665,7 +848,7 @@ function SessionsBlock() {
                 setDone(false);
                 setConfirming(true);
               }}
-              className="shrink-0 rounded-xl bg-[var(--color-surface-alt)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-border)]"
+              className="ml-15 shrink-0 rounded-xl sm:ml-0 bg-[var(--color-surface-alt)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-border)]"
             >
               ออกจากระบบ
             </button>
@@ -687,7 +870,12 @@ function SessionsBlock() {
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => void run(logoutOthers, () => setConfirming(false))}
+                onClick={() =>
+                  void run(logoutOthers, () => {
+                    setConfirming(false);
+                    onDone();
+                  })
+                }
                 className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
               >
                 {pending && <Loader2 size={14} className="animate-spin" />}
@@ -781,6 +969,8 @@ function SettingsContent() {
         {section === "profile" && <ProfileSection />}
         {section === "email" && <EmailSection />}
         {section === "password" && <PasswordSection />}
+        {section === "sessions" && <SessionsSection />}
+        {section === "shortcuts" && <ShortcutsSection />}
         {section === "saved" && <SavedSection />}
         {section === "hidden" && <HiddenSection />}
         {section === "reports" && <ReportsSection />}

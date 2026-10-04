@@ -13,6 +13,7 @@ import {
   FileSearch,
   UserRound,
   Settings,
+  CircleHelp,
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
@@ -151,6 +152,15 @@ export default function Header() {
                       <Settings size={15} />
                       ตั้งค่าบัญชี
                     </Link>
+                    <Link
+                      href="/help"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                    >
+                      <CircleHelp size={15} />
+                      ช่วยเหลือ
+                    </Link>
+                    <div className="my-1 h-px bg-[var(--color-border)]" />
                     <button
                       onClick={handleLogout}
                       className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-rose-dark)] hover:bg-[var(--color-blush-soft)]"
@@ -221,6 +231,14 @@ export default function Header() {
                 <Settings size={15} />
                 ตั้งค่าบัญชี
               </Link>
+              <Link
+                href="/help"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+              >
+                <CircleHelp size={15} />
+                ช่วยเหลือ
+              </Link>
               <button
                 onClick={handleLogout}
                 className="btn-pill mt-1 border border-[var(--color-border-strong)] py-2.5 text-sm text-[var(--color-rose-dark)]"
@@ -230,14 +248,24 @@ export default function Header() {
               </button>
             </>
           ) : (
-            <Link
-              href="/login"
-              onClick={() => setOpen(false)}
-              className="btn-pill btn-pill-primary mt-1 py-2.5 text-sm"
-            >
-              <LogIn size={15} />
-              เข้าสู่ระบบ
-            </Link>
+            <>
+              <Link
+                href="/help"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+              >
+                <CircleHelp size={15} />
+                ช่วยเหลือ
+              </Link>
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="btn-pill btn-pill-primary mt-1 py-2.5 text-sm"
+              >
+                <LogIn size={15} />
+                เข้าสู่ระบบ
+              </Link>
+            </>
           )}
         </nav>
       )}

@@ -9,6 +9,8 @@ export interface TokenPayload extends JwtPayload {
   role: UserRole;
   /** User.tokenVersion at issue time; absent on tokens issued before it existed (read as 0). */
   tv?: number;
+  /** Session row id; absent on tokens issued before sessions were tracked. */
+  sid?: string;
 }
 
 interface TokenUser {
@@ -23,13 +25,14 @@ function getSecret(): string {
   return secret;
 }
 
-/** Sign a JWT carrying the user id and role. */
-export function signToken(user: TokenUser): string {
+/** Sign a JWT carrying the user id, role, token version and (when known) session id. */
+export function signToken(user: TokenUser, sessionId?: string): string {
   const options: SignOptions = {
     subject: String(user._id),
     expiresIn: JWT_EXPIRES_IN as SignOptions["expiresIn"],
   };
-  return jwt.sign({ role: user.role, tv: user.tokenVersion ?? 0 }, getSecret(), options);
+  const claims = { role: user.role, tv: user.tokenVersion ?? 0, ...(sessionId ? { sid: sessionId } : {}) };
+  return jwt.sign(claims, getSecret(), options);
 }
 
 /** Verify a JWT and return its payload, or throw. */
@@ -44,13 +47,17 @@ export interface CookieOptions {
   maxAge: number;
 }
 
+/** How long a session (token and its row) lasts, in milliseconds. */
+export function sessionLifetimeMs(): number {
+  return (Number.parseInt(JWT_EXPIRES_IN, 10) || 7) * 24 * 60 * 60 * 1000;
+}
+
 /** Cookie options for the auth token — HttpOnly + Secure in production. */
 export function cookieOptions(): CookieOptions {
-  const days = Number.parseInt(JWT_EXPIRES_IN, 10) || 7;
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: days * 24 * 60 * 60 * 1000,
+    maxAge: sessionLifetimeMs(),
   };
 }

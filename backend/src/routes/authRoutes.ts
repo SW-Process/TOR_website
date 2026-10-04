@@ -9,6 +9,8 @@ import {
   changePassword,
   changeEmail,
   logoutOthers,
+  listSessions,
+  revokeSession,
   deleteAccount,
   uploadAvatar,
   streamAvatar,
@@ -36,6 +38,8 @@ router.delete("/me", requireAuth, deleteAccount);
 router.put("/password", requireAuth, changePassword);
 router.put("/email", requireAuth, changeEmail);
 router.post("/logout-others", requireAuth, logoutOthers);
+router.get("/sessions", requireAuth, listSessions);
+router.delete("/sessions/:id", requireAuth, revokeSession);
 router.get("/reports", requireAuth, listMyReports);
 
 router.post("/avatar", requireAuth, avatarUpload.single("avatar"), uploadAvatar);

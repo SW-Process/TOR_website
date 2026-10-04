@@ -470,8 +470,14 @@ export function formatBudget(amount: number): string {
   }).format(amount);
 }
 
+/**
+ * Thai long date. Pinned to Asia/Bangkok so a full timestamp shows its Bangkok
+ * calendar day (a session created at 06:00 Bangkok is still "today", not the UTC
+ * yesterday); a bare YYYY-MM-DD parses as UTC midnight, the same day in Bangkok.
+ */
 export function formatThaiDate(iso: string): string {
   return new Date(iso).toLocaleDateString("th-TH", {
+    timeZone: "Asia/Bangkok",
     year: "numeric",
     month: "long",
     day: "numeric",

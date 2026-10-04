@@ -9,6 +9,7 @@ import ingestionRoutes from "./routes/ingestionRoutes";
 import torRoutes from "./routes/torRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import chatRoutes from "./routes/chatRoutes";
+import helpRoutes from "./routes/helpRoutes";
 import { notFound, errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -29,6 +30,7 @@ app.use("/api/ingestion", ingestionRoutes);
 app.use("/api/tors", torRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/help", helpRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

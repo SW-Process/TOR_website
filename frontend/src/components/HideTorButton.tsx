@@ -15,6 +15,7 @@ export default function HideTorButton({ id, variant = "icon" }: { id: string; va
   if (variant === "full") {
     return (
       <button
+        data-shortcut="hide"
         onClick={() => void (hidden ? unhide(id) : hide(id))}
         disabled={!ready}
         className="btn-pill w-full border border-[var(--color-border-strong)] bg-white px-4 py-2.5 text-sm text-[var(--color-text)] transition-colors hover:border-[var(--color-ink)]"

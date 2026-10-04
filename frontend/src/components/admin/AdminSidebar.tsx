@@ -9,6 +9,7 @@ import {
   Database,
   FileSearch,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   MessageSquareWarning,
   MessagesSquare,
@@ -40,6 +41,7 @@ export const adminNavItems = [
   { href: "/admin/records", label: "ตรวจสอบ TOR", icon: Database },
   { href: "/admin/reports", label: "รายงานจากผู้ใช้", icon: MessageSquareWarning },
   { href: "/admin/chats", label: "แชทจากผู้ใช้", icon: MessagesSquare },
+  { href: "/admin/help", label: "ศูนย์ช่วยเหลือ", icon: LifeBuoy },
   { href: "/admin/logs", label: "System Logs", icon: Terminal },
 ];
 

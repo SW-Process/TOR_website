@@ -43,6 +43,7 @@ export default function Footer() {
             <li><Link href="/" className="hover:text-white transition-colors">หน้าแรก</Link></li>
             <li><Link href="/tor" className="hover:text-white transition-colors">ค้นหา TOR</Link></li>
             <li><Link href="/bookmarks" className="hover:text-white transition-colors">รายการที่บันทึก</Link></li>
+            <li><Link href="/help" className="hover:text-white transition-colors">ศูนย์ช่วยเหลือ</Link></li>
           </ul>
         </div>
 
@@ -66,7 +67,6 @@ export default function Footer() {
       <div className="border-t border-white/10">
         <div className="container-page py-4 text-xs text-white/40 flex flex-col sm:flex-row gap-2 sm:justify-between">
           <span>© 2569 TOR Checker — โครงการต้นแบบ (Mock Frontend) ไม่ใช่บริการทางราชการอย่างเป็นทางการ</span>
-          <span>ข้อมูลทั้งหมดในหน้านี้เป็นข้อมูลจำลองเพื่อการนำเสนอต้นแบบ</span>
         </div>
       </div>
     </footer>
