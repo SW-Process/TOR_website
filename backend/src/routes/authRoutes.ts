@@ -14,6 +14,8 @@ import {
   streamAvatar,
   googleStart,
   googleCallback,
+  googleLinkStart,
+  googleUnlink,
 } from "../controllers/authController";
 import { listMyReports } from "../controllers/errorReportController";
 import { requireAuth } from "../middleware/auth";
@@ -41,5 +43,7 @@ router.get("/avatar/:userId", streamAvatar);
 
 router.get("/google", googleStart);
 router.get("/google/callback", googleCallback);
+router.get("/google/link", requireAuth, googleLinkStart);
+router.delete("/google", requireAuth, googleUnlink);
 
 export default router;

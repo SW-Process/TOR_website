@@ -102,6 +102,7 @@ function readAccountError(status: number, body: { message?: string }): string {
   if (msg.startsWith("A valid email")) return "รูปแบบอีเมลไม่ถูกต้อง";
   if (msg.startsWith("Set a password")) return "กรุณาตั้งรหัสผ่านก่อนเปลี่ยนอีเมล";
   if (msg.startsWith("Type your account email")) return "อีเมลที่พิมพ์ไม่ตรงกับบัญชีนี้";
+  if (msg.startsWith("Set a password before disconnecting")) return "กรุณาตั้งรหัสผ่านก่อนยกเลิกการเชื่อมต่อ Google";
   return "เกิดข้อผิดพลาด กรุณาลองใหม่";
 }
 
@@ -221,6 +222,14 @@ export function useAuth() {
     []
   );
 
+  /** Full-page trip to Google to link it to this account; lands back on the security settings. */
+  const linkGoogle = useCallback(() => {
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = `${API_BASE}/api/auth/google/link`;
+  }, []);
+
+  const unlinkGoogle = useCallback(() => sendAccount("DELETE", "/api/auth/google", {}), []);
+
   /** Signs out every other device; this one gets a fresh cookie and stays signed in. */
   const logoutOthers = useCallback(() => sendAccount("POST", "/api/auth/logout-others", {}), []);
 
@@ -245,6 +254,8 @@ export function useAuth() {
     changePassword,
     changeEmail,
     logoutOthers,
+    linkGoogle,
+    unlinkGoogle,
     deleteAccount,
     refresh: refreshSession,
   };

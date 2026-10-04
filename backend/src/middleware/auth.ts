@@ -11,7 +11,7 @@ import type { AuthUser } from "../types/http";
  * is behind the user's — see User.tokenVersion). The role comes from the database,
  * not the token, so a role change applies at once.
  */
-async function sessionUser(token: string | undefined): Promise<AuthUser | null> {
+export async function sessionUser(token: string | undefined): Promise<AuthUser | null> {
   if (!token) return null;
   let payload;
   try {

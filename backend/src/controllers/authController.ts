@@ -5,6 +5,7 @@ import type { UserDocument } from "../models/User";
 import { signToken, cookieOptions, COOKIE_NAME } from "../utils/token";
 import { httpError } from "../utils/httpError";
 import { getStorage } from "../storage";
+import { sessionUser } from "../middleware/auth";
 import {
   isGoogleOAuthConfigured,
   buildGoogleAuthUrl,
@@ -15,6 +16,14 @@ import {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 const OAUTH_STATE_COOKIE = "oauth_state";
+/**
+ * Marks an OAuth round trip that links Google to the signed-in account rather than
+ * signing in. It rides in `state` (echoed back by Google, checked against the state
+ * cookie), so linking reuses the one callback URL registered with Google.
+ */
+const LINK_STATE_PREFIX = "link.";
+/** Where the link flow lands: the security page, with `google=<outcome>` for the banner. */
+const LINK_RETURN_PATH = "/account/settings?section=password&google=";
 const ALLOWED_AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 interface Credentials {
@@ -277,16 +286,64 @@ export async function googleStart(_req: Request, res: Response): Promise<void> {
 }
 
 /**
+ * GET /api/auth/google/link — start linking Google to the signed-in account. Same
+ * consent screen as sign-in; the callback tells the two apart by the state prefix.
+ */
+export async function googleLinkStart(_req: Request, res: Response): Promise<void> {
+  if (!isGoogleOAuthConfigured()) throw httpError(503, "Google sign-in is not available");
+
+  const state = LINK_STATE_PREFIX + crypto.randomBytes(16).toString("hex");
+  res.cookie(OAUTH_STATE_COOKIE, state, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
+  res.redirect(buildGoogleAuthUrl(state));
+}
+
+/**
+ * Link flow, after the callback verified state and identity: attach the Google
+ * account to whoever the session cookie belongs to. Any Google email is fine — the
+ * user proved they own both — but one Google account can back only one user.
+ */
+async function linkGoogleToSession(req: Request, res: Response, identity: GoogleIdentity): Promise<void> {
+  const done = (outcome: string) => res.redirect(clientUrl(LINK_RETURN_PATH + outcome));
+
+  const session = await sessionUser(req.cookies?.[COOKIE_NAME] as string | undefined);
+  if (!session) return done("session");
+  const user = await User.findById(session.id);
+  if (!user) return done("session");
+
+  const owner = await User.findOne({ googleOAuthId: identity.googleId }).select("_id").lean();
+  if (owner && String(owner._id) !== user.id) return done("taken");
+
+  user.googleOAuthId = identity.googleId;
+  await user.save();
+  done("linked");
+}
+
+/**
+ * DELETE /api/auth/google — disconnect Google. Only for accounts with a password,
+ * or the user would have no way left to sign in.
+ */
+export async function googleUnlink(req: Request, res: Response): Promise<void> {
+  const user = await loadAccount(req);
+  if (!user.passwordHash) throw httpError(400, "Set a password before disconnecting Google");
+  user.googleOAuthId = undefined; // unset, not null — see the sparse unique index on User
+  await user.save();
+  res.status(200).json({ user: accountView(user) });
+}
+
+/**
  * GET /api/auth/google/callback — Google redirects here with `code` + `state`.
  * Verifies the identity, upserts the User, starts a session, and bounces the
  * browser back to the frontend.
  */
 export async function googleCallback(req: Request, res: Response): Promise<void> {
-  const fail = (reason: string) => res.redirect(clientUrl(`/login?error=${reason}`));
+  const { code, state } = req.query;
+  // A link round trip reports back to the security settings page, a sign-in to /login.
+  const linking = typeof state === "string" && state.startsWith(LINK_STATE_PREFIX);
+  const fail = (reason: string) =>
+    res.redirect(clientUrl(linking ? `${LINK_RETURN_PATH}error` : `/login?error=${reason}`));
 
   if (!isGoogleOAuthConfigured()) return fail("google_unavailable");
 
-  const { code, state } = req.query;
   const expectedState = req.cookies?.[OAUTH_STATE_COOKIE] as string | undefined;
   res.clearCookie(OAUTH_STATE_COOKIE, cookieOptions());
 
@@ -301,6 +358,7 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
     return fail("google_exchange");
   }
   if (!identity.emailVerified) return fail("google_unverified_email");
+  if (linking) return linkGoogleToSession(req, res, identity);
 
   const email = identity.email.toLowerCase();
   let user = await User.findOne({ googleOAuthId: identity.googleId });

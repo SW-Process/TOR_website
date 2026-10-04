@@ -230,30 +230,7 @@ function PasswordSection() {
 
       <SessionsBlock />
 
-      <FieldBlock title="การเชื่อมต่อบัญชี">
-        <div className="flex items-center gap-4 rounded-3xl border border-[var(--color-border)] p-4 sm:p-5">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-alt)]">
-            <GoogleIcon size={20} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-semibold text-[var(--color-text)]">Google</p>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              {user?.googleLinked
-                ? "เข้าสู่ระบบด้วยบัญชี Google ได้"
-                : "เข้าสู่ระบบด้วย Google ที่ใช้อีเมลเดียวกัน เพื่อเชื่อมต่ออัตโนมัติ"}
-            </p>
-          </div>
-          <span
-            className={`badge shrink-0 ${
-              user?.googleLinked
-                ? "bg-[var(--color-success-bg)] text-[var(--color-success)]"
-                : "bg-[var(--color-surface-alt)] text-[var(--color-text-muted)]"
-            }`}
-          >
-            {user?.googleLinked ? "เชื่อมต่อแล้ว" : "ยังไม่เชื่อมต่อ"}
-          </span>
-        </div>
-      </FieldBlock>
+      <GoogleConnection />
     </div>
   );
 }
@@ -547,6 +524,118 @@ function HiddenSection() {
         </div>
       )}
     </div>
+  );
+}
+
+/** What the link round trip reported back in `?google=` (see authController LINK_RETURN_PATH). */
+const GOOGLE_LINK_OUTCOMES: Record<string, { ok: boolean; text: string }> = {
+  linked: { ok: true, text: "เชื่อมต่อ Google แล้ว ครั้งหน้าเข้าสู่ระบบด้วย Google ได้เลย" },
+  taken: { ok: false, text: "บัญชี Google นี้เชื่อมต่อกับบัญชี TOR Checker อื่นอยู่แล้ว" },
+  session: { ok: false, text: "เซสชันหมดอายุระหว่างเชื่อมต่อ กรุณาเข้าสู่ระบบแล้วลองใหม่" },
+  error: { ok: false, text: "เชื่อมต่อ Google ไม่สำเร็จ กรุณาลองใหม่" },
+};
+
+/** Google sign-in: connect (any Google account) or disconnect (only with a password set). */
+function GoogleConnection() {
+  const { user, linkGoogle, unlinkGoogle } = useAuth();
+  const outcome = GOOGLE_LINK_OUTCOMES[useSearchParams().get("google") ?? ""];
+  const [confirming, setConfirming] = useState(false);
+  const { pending, error, run } = useSubmit();
+  const linked = user?.googleLinked ?? false;
+  const canUnlink = user?.hasPassword ?? false;
+
+  return (
+    <FieldBlock title="การเชื่อมต่อบัญชี">
+      <div className="flex flex-col gap-4 rounded-3xl border border-[var(--color-border)] p-4 sm:p-5">
+        <div className="flex items-center gap-4">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-alt)]">
+            <GoogleIcon size={20} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-2 text-[15px] font-semibold text-[var(--color-text)]">
+              Google
+              {linked && (
+                <span className="badge bg-[var(--color-success-bg)] text-[var(--color-success)]">เชื่อมต่อแล้ว</span>
+              )}
+            </p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {!linked
+                ? "เชื่อมต่อเพื่อเข้าสู่ระบบด้วยบัญชี Google ได้ ใช้อีเมล Google ต่างจากบัญชีนี้ก็ได้"
+                : canUnlink
+                  ? "เข้าสู่ระบบด้วยบัญชี Google ได้"
+                  : "ตั้งรหัสผ่านด้านบนก่อน จึงจะยกเลิกการเชื่อมต่อได้ — ตอนนี้ Google เป็นทางเดียวที่ใช้เข้าสู่ระบบ"}
+            </p>
+          </div>
+          {!linked ? (
+            <button
+              type="button"
+              onClick={linkGoogle}
+              className="shrink-0 rounded-xl bg-[var(--color-ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-black"
+            >
+              เชื่อมต่อ
+            </button>
+          ) : (
+            canUnlink &&
+            !confirming && (
+              <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                className="shrink-0 rounded-xl bg-[var(--color-surface-alt)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] hover:bg-[var(--color-border)]"
+              >
+                ยกเลิกการเชื่อมต่อ
+              </button>
+            )
+          )}
+        </div>
+
+        {confirming && linked && (
+          <div className="flex flex-col gap-3 rounded-2xl bg-[var(--color-surface-alt)] p-4 sm:flex-row sm:items-center">
+            <p className="flex-1 text-sm text-[var(--color-text)]">
+              ยกเลิกการเชื่อมต่อ Google? หลังจากนี้ต้องเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirming(false)}
+                disabled={pending}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+              >
+                ไม่ใช่ตอนนี้
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => void run(unlinkGoogle, () => setConfirming(false))}
+                className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-rose-dark)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-rose)] disabled:opacity-50"
+              >
+                {pending && <Loader2 size={14} className="animate-spin" />}
+                ยกเลิกการเชื่อมต่อ
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error ? (
+          <p className="flex items-center gap-1.5 text-sm text-[var(--color-rose-dark)]">
+            <AlertTriangle size={14} />
+            {error}
+          </p>
+        ) : (
+          outcome &&
+          // The banner matches the current state, so a stale ?google=linked after unlinking stays hidden.
+          (outcome.ok ? linked : true) && (
+            <p
+              className={`flex items-center gap-1.5 text-sm ${
+                outcome.ok ? "text-[var(--color-success)]" : "text-[var(--color-rose-dark)]"
+              }`}
+            >
+              {outcome.ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+              {outcome.text}
+            </p>
+          )
+        )}
+      </div>
+    </FieldBlock>
   );
 }
 
