@@ -269,7 +269,7 @@ export interface TorSearchResult {
  * Throws on network/HTTP failure so the caller can tell "no matches" from "broken".
  */
 export async function searchTors(query: URLSearchParams, signal?: AbortSignal): Promise<TorSearchResult> {
-  const res = await fetch(`${API_BASE}/api/tors?${query.toString()}`, { signal });
+  const res = await fetch(`${resolveApiBase()}/api/tors?${query.toString()}`, { signal });
   if (!res.ok) throw new Error(`TOR search failed: HTTP ${res.status}`);
   const body = (await res.json()) as {
     data: ApiTor[];
@@ -306,6 +306,23 @@ export async function fetchStatusCounts(statuses: readonly string[]): Promise<Re
   return Object.fromEntries(counts);
 }
 
+export interface OpenTorStats {
+  /** Public TORs still taking bids (open + closing_soon), across the whole collection. */
+  count: number;
+  budget: number;
+}
+
+/** Collection-wide count and budget of biddable TORs; zeros if the backend is unreachable. */
+export async function fetchOpenTorStats(): Promise<OpenTorStats> {
+  try {
+    const query = new URLSearchParams([["status", "open"], ["status", "closing_soon"], ["pageSize", "1"]]);
+    const { totalCount, totalBudget } = await searchTors(query);
+    return { count: totalCount, budget: totalBudget };
+  } catch {
+    return { count: 0, budget: 0 };
+  }
+}
+
 export interface AgencyOptions {
   agencies: string[];
   /** Every public TOR, regardless of filters. */
@@ -315,7 +332,7 @@ export interface AgencyOptions {
 /** GET /api/tors/agencies — agency filter options across the whole collection (FR-5). */
 export async function fetchAgencies(): Promise<AgencyOptions> {
   try {
-    const res = await fetch(`${API_BASE}/api/tors/agencies`);
+    const res = await fetch(`${resolveApiBase()}/api/tors/agencies`);
     if (!res.ok) return { agencies: [], totalCount: 0 };
     const body = (await res.json()) as { data: string[]; totalCount: number };
     return { agencies: body.data, totalCount: body.totalCount };

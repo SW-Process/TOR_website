@@ -22,7 +22,7 @@ import mascotPeek from "@/components/picture/bottom.png";
 import mascotSign from "@/components/picture/circle.png";
 import mascotHug from "@/components/picture/hug.png";
 import { formatBudget } from "@/lib/mockData";
-import { fetchTorList } from "@/lib/torApi";
+import { fetchAgencies, fetchOpenTorStats, fetchTorList } from "@/lib/torApi";
 import { isBiddable } from "@/lib/torStatus";
 
 /** "฿8.5M"-style budget for the compact hero card. */
@@ -32,10 +32,13 @@ function formatCompactBaht(amount: number): string {
 }
 
 export default async function Home() {
-  const torList = await fetchTorList();
-  const openTOR = torList.filter((t) => isBiddable(t.status));
-  const totalOpenBudget = openTOR.reduce((sum, t) => sum + t.budget, 0);
-  const agencyCount = new Set(torList.map((t) => t.agency)).size;
+  // torList is only the newest page (pageSize=100); headline numbers come from collection-wide totals.
+  const [torList, openStats, { agencies, totalCount }] = await Promise.all([
+    fetchTorList(),
+    fetchOpenTorStats(),
+    fetchAgencies(),
+  ]);
+  const agencyCount = agencies.length;
   const latest = [...torList]
     .sort((a, b) => (a.announceDate < b.announceDate ? 1 : -1))
     .slice(0, 6);
@@ -202,7 +205,7 @@ export default async function Home() {
                 <p className="mt-3 text-sm font-bold text-[var(--color-text)]">สรุปด้วย AI แล้ว</p>
                 {/* /api/tors only serves enriched TORs, so every one listed has a summary. */}
                 <p className="text-xs text-[var(--color-text-muted)]">
-                  {torList.length.toLocaleString("th-TH")} ประกาศ
+                  {totalCount.toLocaleString("th-TH")} ประกาศ
                 </p>
               </div>
             </div>
@@ -224,7 +227,7 @@ export default async function Home() {
                 style={{ left: 86, top: 0, boxShadow: "0 20px 40px -12px rgba(34,26,24,0.45)" }}
               >
                 <span className="font-[family-name:var(--font-heading)] text-base font-extrabold">
-                  {openTOR.length}
+                  {openStats.count.toLocaleString("th-TH")}
                 </span>
                 <span className="text-[10px] leading-tight px-2">TOR เปิดรับ</span>
               </div>
@@ -279,7 +282,7 @@ export default async function Home() {
               <div>
                 <Wallet size={18} className="text-[var(--color-rose-dark)]" />
                 <p className="mt-2 font-[family-name:var(--font-heading)] text-xl sm:text-2xl font-extrabold text-[var(--color-text)]">
-                  {formatBudget(totalOpenBudget)}
+                  {formatBudget(openStats.budget)}
                 </p>
                 <p className="text-xs text-[var(--color-text-muted)] mt-0.5">งบประมาณเปิดรับ</p>
               </div>
@@ -293,14 +296,14 @@ export default async function Home() {
               <div>
                 <Sparkles size={18} className="text-[var(--color-rose-dark)]" />
                 <p className="mt-2 font-[family-name:var(--font-heading)] text-xl sm:text-2xl font-extrabold text-[var(--color-text)]">
-                  {torList.length.toLocaleString("th-TH")} ประกาศ
+                  {totalCount.toLocaleString("th-TH")} ประกาศ
                 </p>
                 <p className="text-xs text-[var(--color-text-muted)] mt-0.5">สรุปด้วย AI แล้ว</p>
               </div>
               <div>
                 <Building2 size={18} className="text-[var(--color-rose-dark)]" />
                 <p className="mt-2 font-[family-name:var(--font-heading)] text-xl sm:text-2xl font-extrabold text-[var(--color-text)]">
-                  {openTOR.length} โครงการ
+                  {openStats.count.toLocaleString("th-TH")} โครงการ
                 </p>
                 <p className="text-xs text-[var(--color-text-muted)] mt-0.5">เปิดรับขณะนี้</p>
               </div>
