@@ -35,6 +35,7 @@ export interface LifecycleQueueInfo {
   candidates: number;
   maxTors: number;
   willCheck: number;
+  maxDeadlineExtractions: number;
 }
 
 export interface IngestionRun {
@@ -232,7 +233,7 @@ export function useIngestionRuns() {
     }
   }, [pollUntilSettled]);
 
-  const triggerLifecycle = useCallback(async (params?: { maxTors?: number }) => {
+  const triggerLifecycle = useCallback(async (params?: { maxTors?: number; maxDeadlineExtractions?: number }) => {
     setError(null);
     setLifecyclePending(true);
     try {

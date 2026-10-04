@@ -24,6 +24,8 @@ const DAYS_PER_MONTH = 30;
 const ENRICHMENT_MAX_CALLS_CEILING = 200;
 // Mirrors LIFECYCLE_MAX_TORS_CEILING (the max accepted by createLifecycleRun) in backend ingestionController.
 const LIFECYCLE_MAX_TORS_CEILING = 300;
+// Mirrors LIFECYCLE_MAX_DEADLINE_EXTRACTIONS_CEILING in backend ingestionController.
+const LIFECYCLE_MAX_DEADLINE_EXTRACTIONS_CEILING = 200;
 
 const SEARCH_SUGGESTIONS = [
   "ซอฟต์แวร์",
@@ -199,6 +201,8 @@ export default function ScraperHealth() {
   // null = untouched, follow the backend default
   const [lifecycleMaxTors, setLifecycleMaxTors] = useState<number | null>(null);
   const effectiveMaxTors = lifecycleMaxTors ?? lifecycleQueue?.maxTors ?? null;
+  const [lifecycleMaxDeadlines, setLifecycleMaxDeadlines] = useState<number | null>(null);
+  const effectiveMaxDeadlines = lifecycleMaxDeadlines ?? lifecycleQueue?.maxDeadlineExtractions ?? null;
 
   function runIngestion() {
     triggerIngestion({
@@ -246,7 +250,14 @@ export default function ScraperHealth() {
                 pending: lifecyclePending,
                 onTrigger: () =>
                   triggerLifecycle(
-                    lifecycleMaxTors === null ? undefined : { maxTors: lifecycleMaxTors }
+                    lifecycleMaxTors === null && lifecycleMaxDeadlines === null
+                      ? undefined
+                      : {
+                          ...(lifecycleMaxTors === null ? {} : { maxTors: lifecycleMaxTors }),
+                          ...(lifecycleMaxDeadlines === null
+                            ? {}
+                            : { maxDeadlineExtractions: lifecycleMaxDeadlines }),
+                        }
                   ),
               },
             ]
@@ -410,6 +421,25 @@ export default function ScraperHealth() {
                           max={Math.max(LIFECYCLE_MAX_TORS_CEILING, effectiveMaxTors)}
                           value={effectiveMaxTors}
                           onChange={(e) => setLifecycleMaxTors(Number(e.target.value))}
+                          disabled={pending}
+                          className="mt-1 w-full accent-[var(--color-ink)] disabled:opacity-60"
+                        />
+                      </div>
+                    )}
+                    {effectiveMaxDeadlines !== null && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-xs text-[var(--color-text-faint)]">
+                          <span>อ่านวันปิดสูงสุดต่อรอบ</span>
+                          <span className="font-medium text-[var(--color-text)]">
+                            {effectiveMaxDeadlines}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={1}
+                          max={Math.max(LIFECYCLE_MAX_DEADLINE_EXTRACTIONS_CEILING, effectiveMaxDeadlines)}
+                          value={effectiveMaxDeadlines}
+                          onChange={(e) => setLifecycleMaxDeadlines(Number(e.target.value))}
                           disabled={pending}
                           className="mt-1 w-full accent-[var(--color-ink)] disabled:opacity-60"
                         />
