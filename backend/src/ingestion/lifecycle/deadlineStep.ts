@@ -62,7 +62,12 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
   // lastCheckedAt moves with this write so a stale concurrent writer (which preconditions on it)
   // is detected and cannot drop the storage key / deadline written here.
   const res = await Tor.updateOne(
-    { _id: args.torId, "procurement.lastCheckedAt": p.lastCheckedAt } as QueryFilter<ITor>,
+    {
+      _id: args.torId,
+      "procurement.lastCheckedAt": p.lastCheckedAt,
+      // an admin edit made while the PDF was being read must never be overwritten
+      "procurement.bidDeadline.source": { $ne: "admin" },
+    } as QueryFilter<ITor>,
     {
       $set: {
         "procurement.announcements.$[a].storageKey": key,

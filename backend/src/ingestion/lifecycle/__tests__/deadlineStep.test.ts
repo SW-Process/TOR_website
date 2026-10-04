@@ -184,6 +184,29 @@ describe("runDeadlineStep", () => {
     expect(saved?.deadlineAttempt ?? null).toBeNull(); // retried next run
   });
 
+  it("reports a conflict and keeps an admin deadline set while the PDF was being read", async () => {
+    const p = procurementOf();
+    const tor = await seed(p);
+    const adminDate = new Date("2026-10-25T16:59:00Z");
+    const h = harness();
+    const slow: BidDeadlineExtractor = {
+      async extractBidDeadline(input) {
+        await Tor.updateOne(
+          { _id: tor._id },
+          { $set: { "procurement.bidDeadline": { date: adminDate, source: "admin", extractedAt: T } } },
+          { timestamps: false }
+        );
+        return h.extractor.extractBidDeadline(input);
+      },
+    };
+
+    expect(await runDeadlineStep(args(p, tor._id), { ...h, extractor: slow })).toBe("conflict");
+
+    const saved = (await Tor.findById(tor._id).lean())?.procurement;
+    expect(saved?.bidDeadline).toMatchObject({ source: "admin", date: adminDate });
+    expect(saved?.deadlineAttempt ?? null).toBeNull();
+  });
+
   it("propagates an extractor error without recording an attempt", async () => {
     const p = procurementOf();
     const tor = await seed(p);

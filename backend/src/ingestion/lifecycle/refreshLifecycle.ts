@@ -78,9 +78,20 @@ export async function refreshLifecycle(
   const client = deps.client ?? new EgpClient(egpConfigFromEnv());
   const now = deps.now ?? (() => new Date());
   const cap = deps.maxTors ?? maxLifecycleRefreshPerRun();
-  const extractor = deps.deadlineExtractor;
+  let extractor = deps.deadlineExtractor;
   const deadlineCap = deps.maxDeadlineExtractions ?? maxDeadlineExtractionsPerRun();
-  const storage = extractor ? (deps.storage ?? getStorage()) : null;
+  let storage: BlobStorage | null = null;
+  let storageError: Error | null = null;
+  if (extractor) {
+    try {
+      storage = deps.storage ?? getStorage();
+    } catch (err) {
+      // A storage misconfiguration must not stop the status refresh: run without the deadline step.
+      storageError = err as Error;
+      extractor = undefined;
+      console.error("lifecycle refresh without deadline extraction:", err);
+    }
+  }
   let deadlinesRead = 0;
   let deadlinesUnreadable = 0;
   let deadlinesFailed = 0;
@@ -105,6 +116,15 @@ export async function refreshLifecycle(
     stats: { torsFound: tors.length },
   });
   const runId = run._id as Types.ObjectId;
+
+  if (storageError) {
+    await logIngestionEvent({
+      severity: "warning",
+      message: `bid deadline step disabled for this run: storage unavailable (${storageError.message})`,
+      component: COMPONENT,
+      ingestionRunId: runId,
+    });
+  }
 
   let changed = 0;
   let unchanged = 0;

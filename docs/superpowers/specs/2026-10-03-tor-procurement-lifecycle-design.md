@@ -207,7 +207,13 @@ Each step is independently shippable and gets its own PR:
   after its latest cancellation, so the rule is kept for now. Re-check when more data
   arrives; if a cancelled-then-awarded project appears, a winner dated after the latest
   cancellation should read `awarded`.
-- Meaning of the current `submissionDeadline` (verify on real PDFs).
+- `submissionDeadline` vs the invitation deadline (checked 2026-10-04): all 8 inviting TORs had
+  `submissionDeadline` = null, so it could not be compared against the invitation PDFs. The real
+  invitation deadline is the e-bidding price-offer day printed as "ผู้ยื่นข้อเสนอต้องเสนอราคา…ในวันที่ …
+  ระหว่างเวลา … ถึง … น." (Thai numerals, พ.ศ. years; the closing time is the end of the window).
+  `submissionDeadline` keeps its meaning "date stated in the TOR document" and is not used for status.
+- Step 4 residual issues: a TOR with an admin deadline keeps it after a re-invitation; an unreadable
+  scan is simply "open, no date".
 - Other cancellation announcement names beyond "ยกเลิกประกาศเชิญชวน"; widen the
   sample before finalising `kind` normalisation.
 - Whether the e-GP sample (unfiltered by announce type) matches the TOR-draft
@@ -217,7 +223,7 @@ Each step is independently shippable and gets its own PR:
   the queue and takes one slot of the daily cap (and, for skips, writes a warning every
   day). Harmless for a few permanent cases; if many accumulate, order by a separate
   `procurement.lastAttemptAt`.
-- **Before step 4 (must):** both writers of `procurement` — the lifecycle refresh
+- **Before step 4 (must) — DONE** (see `backend/src/ingestion/procurementWrite.ts`): both writers of `procurement` — the lifecycle refresh
   (targeted `$set` of `procurement.stage|announcements|lastCheckedAt|contractStatus`) and
   discovery (`runIngestion` saves the whole subdocument via `mergeProcurement`) — work from
   a read taken before slow e-GP calls, with no precondition on the write. That is harmless

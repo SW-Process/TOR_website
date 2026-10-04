@@ -98,7 +98,11 @@ fills it for sighted TORs; a separate daily batch (`refreshLifecycle`, entrypoin
 `dist/jobs/lifecycle.js`, admin `POST /api/ingestion/lifecycle/runs`) re-checks existing
 enriched, unfinished TORs oldest-first up to `MAX_LIFECYCLE_REFRESH_PER_RUN`. It writes only
 the refresh-owned `procurement` paths and never touches `sourceContentHash`,
-`pipelineStatus` or the AI queue — a status check costs no Gemini call.
+`pipelineStatus` or the AI queue — a status check costs no Gemini call. After refreshing an
+`inviting` TOR the batch downloads its latest invitation PDF and reads the real bid deadline with
+one small Gemini call (`MAX_DEADLINE_EXTRACTIONS_PER_RUN`), once per invitation id; an admin value
+(`source: "admin"`) always wins. Both `procurement` writers go through
+`ingestion/procurementWrite.ts` (optimistic precondition on `lastCheckedAt`).
 
 ## Environment
 

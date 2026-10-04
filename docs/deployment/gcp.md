@@ -110,9 +110,15 @@ gcloud run jobs deploy tor-enrichment \
 gcloud run jobs deploy tor-lifecycle \
   --image <IMG> --region asia-southeast1 --service-account tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com \
   --set-secrets MONGODB_URI=MONGODB_URI:latest \
-  --set-env-vars "^::^MAX_LIFECYCLE_REFRESH_PER_RUN=100" \
-  --command node --args dist/jobs/lifecycle.js --max-retries 0 --task-timeout 1800s --memory 512Mi
+  --set-env-vars "^::^STORAGE_DRIVER=gcs::GCS_BUCKET=<BUCKET>::GOOGLE_CLOUD_PROJECT=<PROJECT>::GOOGLE_CLOUD_LOCATION=us-central1::VERTEX_MODEL=gemini-2.5-flash::MAX_LIFECYCLE_REFRESH_PER_RUN=100::MAX_DEADLINE_EXTRACTIONS_PER_RUN=20" \
+  --command node --args dist/jobs/lifecycle.js --max-retries 0 --task-timeout 1800s --memory 1Gi
 ```
+
+> `tor-lifecycle` now also reads the bid deadline of `inviting` TORs from their invitation PDF
+> (one small Gemini call each, capped by `MAX_DEADLINE_EXTRACTIONS_PER_RUN`), so `tor-jobs-sa`
+> needs the same Vertex AI and bucket-write roles for this job as for `tor-enrichment`. The
+> admin-triggered refresh (`POST /api/ingestion/lifecycle/runs`) runs inside the backend service
+> and uses that service's own env, which needs the same variables there.
 
 > All the job commands use gcloud's alternate-delimiter form `--set-env-vars "^::^k=v::k=v..."`
 > because `INGEST_AGENCIES` is itself a comma-separated list: with the default separator

@@ -162,6 +162,13 @@ describe("mergeProcurement", () => {
     expect(merged.announcements.find((x) => x.announcementId === "tor")?.storageKey).toBeNull();
   });
 
+  it("keeps the existing deadlineAttempt across a refresh", () => {
+    const attempt = { announcementId: "inv", at: NOW, outcome: "unreadable" as const };
+    const merged = mergeProcurement({ ...fresh(), deadlineAttempt: attempt }, fresh());
+    expect(merged.deadlineAttempt).toEqual(attempt);
+    expect(mergeProcurement(null, fresh()).deadlineAttempt ?? null).toBeNull();
+  });
+
   it("drops a storageKey whose announcement no longer exists", () => {
     const existing: IProcurement = {
       ...fresh(),

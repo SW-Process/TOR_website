@@ -118,5 +118,6 @@ export function mergeProcurement(
       storageKey: storedKeys.get(a.announcementId) ?? null,
     })),
     bidDeadline: existing?.bidDeadline ?? null,
+    ...(existing?.deadlineAttempt ? { deadlineAttempt: existing.deadlineAttempt } : {}),
   };
 }

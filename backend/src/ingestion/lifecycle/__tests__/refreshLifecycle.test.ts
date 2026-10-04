@@ -386,21 +386,89 @@ describe("refreshLifecycle", () => {
     it("a Gemini error is logged and does not undo the stage write or stop other TORs", async () => {
       await seedTor("p1", { procurement: oldProcurement("2026-09-01") });
       await seedTor("p2", { procurement: oldProcurement("2026-09-02") });
-      const d = deadlineDeps({ result: new Error("Gemini 500") });
+      const d = deadlineDeps();
+      let calls = 0;
+      const extractor: BidDeadlineExtractor = {
+        async extractBidDeadline(input) {
+          calls += 1;
+          if (calls === 1) throw new Error("Gemini 500");
+          return d.extractor.extractBidDeadline(input);
+        },
+      };
       const client = withDownload(
-        fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")], p2: [TOR_DRAFT("p2")] } })
+        fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")], p2: [TOR_DRAFT("p2"), INV("p2")] } })
       );
-      const out = await refreshLifecycle(deps(client, { deadlineExtractor: d.extractor, storage: d.storage }));
+      const out = await refreshLifecycle(deps(client, { deadlineExtractor: extractor, storage: d.storage }));
 
       expect(out).toMatchObject({ selected: 2, changed: 2, failed: 0 });
       const p1 = await Tor.findOne({ projectCode: "code-p1" }).lean();
       expect(p1?.procurement?.stage).toBe("inviting");
       expect(p1?.procurement?.deadlineAttempt ?? null).toBeNull();
+      const p2 = await Tor.findOne({ projectCode: "code-p2" }).lean();
+      expect(p2?.procurement?.bidDeadline?.source).toBe("invitation-pdf");
       const run = await IngestionRun.findById(out.runId).lean();
       expect(run?.outcomeSummary).toContain("errors 1");
+      expect(run?.outcomeSummary).toContain("read 1");
       const log = await SystemLog.findOne({ severity: "error", ingestionRunId: out.runId }).lean();
       expect(log?.message).toContain("code-p1");
       expect(log?.message).toContain("Gemini 500");
+    });
+
+    it("reads once per invitation: a second refresh keeps the stored deadline and does not call Gemini again", async () => {
+      await seedTor("p1");
+      const d = deadlineDeps();
+      const client = withDownload(fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")] } }));
+      const opts = { deadlineExtractor: d.extractor, storage: d.storage };
+      await refreshLifecycle(deps(client, opts));
+      await refreshLifecycle(deps(client, opts));
+      expect(d.extractCalls).toHaveLength(1);
+      const saved = await Tor.findOne({ projectCode: "code-p1" }).lean();
+      expect(saved?.procurement?.bidDeadline?.date).toEqual(new Date("2026-10-20T16:59:00.000Z"));
+      expect(saved?.procurement?.deadlineAttempt).toMatchObject({ announcementId: "p1-inv", outcome: "read" });
+    });
+
+    it("never overrides an admin deadline", async () => {
+      const adminDate = new Date("2026-12-01T09:00:00Z");
+      await seedTor("p1", {
+        procurement: {
+          ...oldProcurement("2026-09-01"),
+          stage: "inviting",
+          bidDeadline: { date: adminDate, source: "admin", extractedAt: NOW },
+        },
+      });
+      const d = deadlineDeps();
+      await refreshLifecycle(
+        deps(withDownload(fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")] } })), {
+          deadlineExtractor: d.extractor,
+          storage: d.storage,
+        })
+      );
+      expect(d.extractCalls).toHaveLength(0);
+      const saved = await Tor.findOne({ projectCode: "code-p1" }).lean();
+      expect(saved?.procurement?.bidDeadline).toMatchObject({ source: "admin", date: adminDate });
+    });
+
+    it("runs without the deadline step when the storage cannot be created", async () => {
+      await seedTor("p1");
+      const d = deadlineDeps();
+      const original = process.env.STORAGE_DRIVER;
+      process.env.STORAGE_DRIVER = "bogus-driver";
+      try {
+        const out = await refreshLifecycle(
+          deps(withDownload(fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")] } })), {
+            deadlineExtractor: d.extractor,
+          })
+        );
+        expect(out).toMatchObject({ selected: 1, changed: 1, failed: 0 });
+        expect(d.extractCalls).toHaveLength(0);
+        const saved = await Tor.findOne({ projectCode: "code-p1" }).lean();
+        expect(saved?.procurement?.stage).toBe("inviting");
+        const log = await SystemLog.findOne({ severity: "warning", ingestionRunId: out.runId }).lean();
+        expect(log?.message).toContain("deadline");
+      } finally {
+        if (original === undefined) delete process.env.STORAGE_DRIVER;
+        else process.env.STORAGE_DRIVER = original;
+      }
     });
 
     it("does not touch the hash, pipelineStatus or the enrichment queue", async () => {
