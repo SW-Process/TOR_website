@@ -19,6 +19,7 @@ import { fetchTorById, fetchTorList, isUnknownDeadline } from "@/lib/torApi";
 import { ANNOUNCEMENT_KIND_LABELS, statusNote } from "@/lib/torStatus";
 import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
+import HideTorButton from "@/components/HideTorButton";
 import ReportIssueButton from "@/components/ReportIssueButton";
 import ShareTorButtons from "@/components/ShareTorButtons";
 import TORCard from "@/components/TORCard";
@@ -316,6 +317,7 @@ export default async function TORDetailPage({
                 </a>
               )}
               <BookmarkButton id={tor.id} variant="full" />
+              <HideTorButton id={tor.id} variant="full" />
               <ShareTorButtons torId={tor.id} />
               <ReportIssueButton torId={tor.id} projectCode={tor.projectCode} />
             </div>

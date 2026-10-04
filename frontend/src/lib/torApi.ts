@@ -269,7 +269,8 @@ export interface TorSearchResult {
  * Throws on network/HTTP failure so the caller can tell "no matches" from "broken".
  */
 export async function searchTors(query: URLSearchParams, signal?: AbortSignal): Promise<TorSearchResult> {
-  const res = await fetch(`${resolveApiBase()}/api/tors?${query.toString()}`, { signal });
+  // credentials: a signed-in vendor's session cookie lets the API leave out the TORs they hid.
+  const res = await fetch(`${resolveApiBase()}/api/tors?${query.toString()}`, { signal, credentials: "include" });
   if (!res.ok) throw new Error(`TOR search failed: HTTP ${res.status}`);
   const body = (await res.json()) as {
     data: ApiTor[];

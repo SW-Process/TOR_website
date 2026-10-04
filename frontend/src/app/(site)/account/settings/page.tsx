@@ -1,22 +1,26 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Building2, EyeOff } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
 import SettingsShell from "@/components/account/SettingsShell";
 import { AvatarCard, FieldBlock, SubmitBar, inputClass, useSubmit } from "@/components/account/ui";
+import { formatThaiDate } from "@/lib/mockData";
 import { useAuth } from "@/lib/useAuth";
+import { useHiddenTors } from "@/lib/useHiddenTors";
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_NAME_LENGTH = 60;
 
-type SectionId = "profile" | "email" | "password" | "delete";
+type SectionId = "profile" | "email" | "password" | "hidden" | "delete";
 
 const SECTION_TITLES: Record<SectionId, string> = {
   profile: "แก้ไขโปรไฟล์",
   email: "อีเมล",
   password: "รหัสผ่านและความปลอดภัย",
+  hidden: "TOR ที่ซ่อนไว้",
   delete: "ลบบัญชี",
 };
 
@@ -247,6 +251,65 @@ function PasswordSection() {
   );
 }
 
+/** Instagram "restricted accounts"-style list of hidden TORs, each with an unhide button. */
+function HiddenSection() {
+  const { items, ready, error, unhide } = useHiddenTors();
+
+  return (
+    <div className="flex flex-col gap-6">
+      <p className="text-sm leading-relaxed text-[var(--color-text-muted)]">
+        TOR ที่คุณซ่อนไว้จะไม่แสดงในผลการค้นหาและ TOR ที่แนะนำสำหรับคุณ หน่วยงานเจ้าของโครงการจะไม่รู้ว่าคุณซ่อน
+      </p>
+
+      {error && (
+        <p className="flex items-center gap-1.5 text-sm text-[var(--color-rose-dark)]">
+          <AlertTriangle size={14} />
+          {error}
+        </p>
+      )}
+
+      {!ready ? null : items.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-center">
+          <span className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-[var(--color-ink)] text-[var(--color-ink)]">
+            <EyeOff size={34} strokeWidth={1.6} />
+          </span>
+          <p className="mt-2 text-lg font-bold text-[var(--color-text)]">ยังไม่มี TOR ที่ซ่อนไว้</p>
+          <p className="max-w-sm text-sm text-[var(--color-text-muted)]">
+            กดไอคอนรูปตาขีดฆ่าบนการ์ด TOR ที่ไม่สนใจ เพื่อซ่อนจากผลการค้นหาและคำแนะนำ
+          </p>
+        </div>
+      ) : (
+        <ul className="flex flex-col">
+          {items.map(({ tor, hiddenAt }) => (
+            <li key={tor.id} className="flex items-center gap-4 py-3">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-alt)] text-[var(--color-text-muted)]">
+                <Building2 size={20} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={`/tor/${tor.id}`}
+                  className="line-clamp-1 text-[15px] font-semibold text-[var(--color-text)] hover:underline"
+                >
+                  {tor.title}
+                </Link>
+                <p className="truncate text-xs text-[var(--color-text-muted)]">
+                  {tor.agency} · ซ่อนเมื่อ {formatThaiDate(hiddenAt.slice(0, 10))}
+                </p>
+              </div>
+              <button
+                onClick={() => void unhide(tor.id)}
+                className="shrink-0 rounded-xl bg-[var(--color-surface-alt)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-border)]"
+              >
+                เลิกซ่อน
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function DeleteSection() {
   const { user, deleteAccount } = useAuth();
   const router = useRouter();
@@ -302,7 +365,8 @@ function SettingsContent() {
   const { user } = useAuth();
   const param = useSearchParams().get("section");
   // Desktop opens on แก้ไขโปรไฟล์; phones show the menu until a section is picked.
-  const picked = isSectionId(param) && (param !== "delete" || user?.role === "vendor");
+  const vendorOnly = param === "delete" || param === "hidden";
+  const picked = isSectionId(param) && (!vendorOnly || user?.role === "vendor");
   const section: SectionId = picked ? param : "profile";
 
   return (
@@ -312,6 +376,7 @@ function SettingsContent() {
         {section === "profile" && <ProfileSection />}
         {section === "email" && <EmailSection />}
         {section === "password" && <PasswordSection />}
+        {section === "hidden" && <HiddenSection />}
         {section === "delete" && <DeleteSection />}
       </div>
     </SettingsShell>

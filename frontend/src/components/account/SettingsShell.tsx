@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bookmark, Briefcase, ChevronLeft, ChevronRight, KeyRound, LogOut, Mail, Trash2, UserRound } from "lucide-react";
+import { Bookmark, Briefcase, ChevronLeft, ChevronRight, EyeOff, KeyRound, LogOut, Mail, Trash2, UserRound } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import { useAuth } from "@/lib/useAuth";
 import { Avatar } from "./ui";
 
 /** Every page reachable from the settings sidebar; `/account/settings?section=<id>` unless noted. */
-export type SettingsPageId = "profile" | "email" | "password" | "delete" | "business";
+export type SettingsPageId = "profile" | "email" | "password" | "hidden" | "delete" | "business";
 
 export const SETTINGS_ROOT = "/account/settings";
 
@@ -128,6 +128,7 @@ export default function SettingsShell({
               <NavGroup title="การใช้งาน TOR Checker">
                 <NavItem icon={Briefcase} label="โปรไฟล์ธุรกิจ" href="/account/profile" active={active === "business"} />
                 <NavItem icon={Bookmark} label="รายการที่บันทึก" href="/bookmarks" />
+                <NavItem icon={EyeOff} label="TOR ที่ซ่อนไว้" href={settingsHref("hidden")} active={active === "hidden"} />
               </NavGroup>
             )}
 
