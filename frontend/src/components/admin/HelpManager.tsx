@@ -12,8 +12,10 @@ import {
   MessageCircleQuestion,
   Pencil,
   Pin,
+  PinOff,
   Plus,
   Star,
+  StarOff,
   Trash2,
   X,
 } from "lucide-react";
@@ -208,13 +210,25 @@ function StatusPicker({ value, onChange }: { value: HelpStatus; onChange: (s: He
 }
 
 /** "Delete?" confirm in place of the row's buttons. */
+/** A one-click on/off action shown first in a row, e.g. ปักหมุด / แสดงหน้าแรก. */
+interface QuickToggle {
+  on: boolean;
+  onLabel: string;
+  offLabel: string;
+  onIcon: typeof Pin;
+  offIcon: typeof Pin;
+  run: () => Promise<void>;
+}
+
 function RowActions({
   status,
+  quick,
   onEdit,
   onToggle,
   onDelete,
 }: {
   status: HelpStatus;
+  quick?: QuickToggle;
   onEdit: () => void;
   onToggle: () => Promise<void>;
   onDelete: () => Promise<void>;
@@ -248,6 +262,20 @@ function RowActions({
   }
   return (
     <div className="flex flex-wrap items-center gap-1.5">
+      {quick && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void run(quick.run)}
+          aria-pressed={quick.on}
+          className={`btn-pill px-3 py-1.5 text-xs font-semibold disabled:opacity-60 ${
+            quick.on ? "bg-[var(--color-ink)] text-white" : "border border-[var(--color-border)] bg-white"
+          }`}
+        >
+          {busy ? <Loader2 size={12} className="animate-spin" /> : quick.on ? <quick.offIcon size={12} /> : <quick.onIcon size={12} />}
+          {quick.on ? quick.offLabel : quick.onLabel}
+        </button>
+      )}
       <button type="button" onClick={onEdit} className="btn-pill border border-[var(--color-border)] bg-white px-3 py-1.5 text-xs font-semibold">
         <Pencil size={12} />
         แก้ไข
@@ -404,6 +432,14 @@ function AnnouncementsTab({ rows, reload }: { rows: AdminAnnouncement[]; reload:
               </div>
               <RowActions
                 status={a.status}
+                quick={{
+                  on: a.pinned,
+                  onLabel: "ปักหมุด",
+                  offLabel: "เลิกปักหมุด",
+                  onIcon: Pin,
+                  offIcon: PinOff,
+                  run: () => act(adminHelp.updateAnnouncement(a.id, { pinned: !a.pinned })),
+                }}
                 onEdit={() => setEditing(a)}
                 onToggle={() => act(adminHelp.updateAnnouncement(a.id, { status: a.status === "published" ? "draft" : "published" }))}
                 onDelete={() => act(adminHelp.deleteAnnouncement(a.id))}
@@ -567,6 +603,14 @@ function FaqsTab({ rows, categories, reload }: { rows: AdminFaq[]; categories: H
                   </div>
                   <RowActions
                     status={f.status}
+                    quick={{
+                      on: f.featured,
+                      onLabel: "แสดงหน้าแรก",
+                      offLabel: "เอาออกจากหน้าแรก",
+                      onIcon: Star,
+                      offIcon: StarOff,
+                      run: () => act(adminHelp.updateFaq(f.id, { featured: !f.featured })),
+                    }}
                     onEdit={() => setEditing(f)}
                     onToggle={() => act(adminHelp.updateFaq(f.id, { status: f.status === "published" ? "draft" : "published" }))}
                     onDelete={() => act(adminHelp.deleteFaq(f.id))}
