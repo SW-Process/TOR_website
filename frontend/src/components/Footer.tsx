@@ -66,7 +66,6 @@ export default function Footer() {
       <div className="border-t border-white/10">
         <div className="container-page py-4 text-xs text-white/40 flex flex-col sm:flex-row gap-2 sm:justify-between">
           <span>© 2569 TOR Checker — โครงการต้นแบบ (Mock Frontend) ไม่ใช่บริการทางราชการอย่างเป็นทางการ</span>
-          <span>ข้อมูลทั้งหมดในหน้านี้เป็นข้อมูลจำลองเพื่อการนำเสนอต้นแบบ</span>
         </div>
       </div>
     </footer>
