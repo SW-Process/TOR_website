@@ -469,6 +469,32 @@ describe("refreshLifecycle", () => {
       expect(saved?.procurement?.deadlineAttempt).toMatchObject({ announcementId: "p1-inv", outcome: "read" });
     });
 
+    it("reads the deadline of a finished-contract TOR once, then stops selecting it", async () => {
+      await seedTor("p1", {
+        procurement: {
+          stage: "awarded",
+          contractStatus: "ส่งงานครบถ้วน",
+          announcements: [{ announcementId: "p1-inv", kind: "invitation", hasFile: true, publishedAt: new Date("2026-10-01T00:00:00Z") }],
+          lastCheckedAt: new Date("2026-09-01T00:00:00Z"),
+        },
+      });
+      const d = deadlineDeps();
+      const client = withDownload(
+        fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")] }, contract: { p1: "ส่งงานครบถ้วน" } })
+      );
+      const opts = { deadlineExtractor: d.extractor, storage: d.storage };
+      const first = await refreshLifecycle(deps(client, opts));
+      expect(first.selected).toBe(1);
+      expect(d.extractCalls).toHaveLength(1);
+      const saved = await Tor.findOne({ projectCode: "code-p1" }).lean();
+      expect(saved?.procurement?.bidDeadline?.date).toEqual(new Date("2026-10-20T16:59:00.000Z"));
+      expect(saved?.procurement?.deadlineAttempt).toMatchObject({ announcementId: "p1-inv", outcome: "read" });
+
+      await refreshLifecycle(deps(client, opts));
+      expect(client.detailCalls).toHaveLength(1);
+      expect(d.extractCalls).toHaveLength(1);
+    });
+
     it("never overrides an admin deadline", async () => {
       const adminDate = new Date("2026-12-01T09:00:00Z");
       await seedTor("p1", {

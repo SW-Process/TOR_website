@@ -40,6 +40,8 @@ const cases: { name: string; doc: Record<string, unknown>; expected: TorDisplayS
   { name: "draft stage", doc: { procurement: stage("draft") }, expected: "draft" },
   { name: "awarded", doc: { procurement: stage("awarded") }, expected: "awarded" },
   { name: "cancelled", doc: { procurement: stage("cancelled") }, expected: "cancelled" },
+  { name: "awarded with a stored bid deadline (past)", doc: { procurement: { ...stage("awarded"), bidDeadline: { date: at(-5 * DAY), source: "invitation-pdf", extractedAt: NOW } } }, expected: "awarded" },
+  { name: "awarded with a stored bid deadline (soon)", doc: { procurement: { ...stage("awarded"), bidDeadline: { date: at(2 * DAY), source: "invitation-pdf", extractedAt: NOW } } }, expected: "awarded" },
   { name: "inviting, deadline unknown", doc: { procurement: inviting() }, expected: "open" },
   { name: "inviting, 10 days away", doc: { procurement: inviting(at(10 * DAY)) }, expected: "open" },
   { name: "inviting, 1 ms beyond the closing-soon window", doc: { procurement: inviting(at(CLOSING_SOON_DAYS * DAY + 1)) }, expected: "open" },

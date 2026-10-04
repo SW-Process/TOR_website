@@ -133,15 +133,24 @@ describe("runDeadlineStep", () => {
     expect(((await Tor.findById(tor._id).lean())?.procurement?.bidDeadline ?? null)).toBeNull();
   });
 
-  it("does nothing for a stage other than inviting", async () => {
-    for (const stage of ["draft", "awarded", "cancelled"] as const) {
-      const p = procurementOf({ stage });
-      const tor = await seed(p);
-      const h = harness();
-      expect(await runDeadlineStep(args(p, tor._id), h)).toBe("skipped");
-      expect(h.downloads).toEqual([]);
-      await Tor.deleteMany({});
-    }
+  it.each(["awarded", "cancelled"] as const)("reads and stores the deadline of a %s TOR with a filed invitation", async (stage) => {
+    const p = procurementOf({ stage });
+    const tor = await seed(p);
+    const h = harness();
+    expect(await runDeadlineStep(args(p, tor._id), h)).toBe("read");
+    expect(h.downloads).toEqual(["inv-1/inv-1.pdf"]);
+    const saved = (await Tor.findById(tor._id).lean())?.procurement;
+    expect(saved?.bidDeadline).toMatchObject({ source: "invitation-pdf", date: new Date("2026-10-20T09:30:00.000Z") });
+    expect(saved?.deadlineAttempt).toMatchObject({ announcementId: "inv-1", outcome: "read" });
+  });
+
+  it("does nothing for a draft TOR that has no invitation", async () => {
+    const p = procurementOf({ stage: "draft", announcements: [] });
+    const tor = await seed(p);
+    const h = harness();
+    expect(await runDeadlineStep(args(p, tor._id), h)).toBe("skipped");
+    expect(h.downloads).toEqual([]);
+    expect(h.extractCalls).toHaveLength(0);
   });
 
   it("does nothing when there is no invitation with a file", async () => {

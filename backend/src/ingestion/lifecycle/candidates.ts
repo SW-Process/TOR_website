@@ -28,13 +28,26 @@ export function maxDeadlineExtractionsPerRun(env: NodeJS.ProcessEnv = process.en
  * TORs worth re-checking: publicly visible (enriched), reachable (has a listing URL) and not
  * finished (not cancelled, work not yet delivered). `$ne` / `$nin` also match a missing field, so
  * TORs that have never been checked are included.
+ *
+ * One-time backfill: finished/cancelled TORs are still selected while their bid deadline has never
+ * been attempted (`deadlineAttempt` missing) and they have an invitation with a file, so the
+ * deadline is read for every TOR whatever its stage. Once an attempt is recorded they drop out of
+ * that branch and are no longer re-checked.
  */
 export function lifecycleFilter(): QueryFilter<ITor> {
   return {
     pipelineStatus: "enriched",
     sourceListingUrl: { $type: "string", $ne: "" },
-    "procurement.stage": { $ne: "cancelled" },
-    "procurement.contractStatus": { $nin: FINISHED_CONTRACT_STATUSES },
+    $or: [
+      {
+        "procurement.stage": { $ne: "cancelled" },
+        "procurement.contractStatus": { $nin: FINISHED_CONTRACT_STATUSES },
+      },
+      {
+        "procurement.deadlineAttempt": null,
+        "procurement.announcements": { $elemMatch: { kind: "invitation", hasFile: true } },
+      },
+    ],
   };
 }
 

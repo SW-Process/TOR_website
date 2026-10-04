@@ -93,4 +93,32 @@ describe("lifecycleFilter", () => {
     expect(titles).toEqual(["awarded but contract open", "inviting", "never checked"]);
     expect(await countLifecycleCandidates()).toBe(3);
   });
+
+  describe("one-time deadline backfill for finished TORs", () => {
+    const filed = [{ announcementId: "inv", kind: "invitation", hasFile: true }];
+    const finished = (over: Record<string, unknown>) => ({
+      stage: "awarded",
+      contractStatus: "ส่งงานครบถ้วน",
+      announcements: filed,
+      lastCheckedAt: new Date("2026-09-01T00:00:00Z"),
+      ...over,
+    });
+    const attempt = { announcementId: "inv", at: new Date("2026-09-02T00:00:00Z"), outcome: "read" };
+
+    it("selects cancelled / finished-contract TORs with a filed invitation until a deadline attempt exists", async () => {
+      await Tor.create([
+        { title: "cancelled, never attempted", pipelineStatus: "enriched", sourceListingUrl: url("a"), procurement: finished({ stage: "cancelled", contractStatus: undefined }) },
+        { title: "finished, never attempted", pipelineStatus: "enriched", sourceListingUrl: url("b"), procurement: finished({}) },
+        { title: "cancelled, attempted", pipelineStatus: "enriched", sourceListingUrl: url("c"), procurement: finished({ stage: "cancelled", contractStatus: undefined, deadlineAttempt: attempt }) },
+        { title: "finished, attempted", pipelineStatus: "enriched", sourceListingUrl: url("d"), procurement: finished({ deadlineAttempt: attempt }) },
+        { title: "cancelled, no invitation file", pipelineStatus: "enriched", sourceListingUrl: url("e"), procurement: finished({ stage: "cancelled", contractStatus: undefined, announcements: [{ announcementId: "inv", kind: "invitation", hasFile: false }] }) },
+        { title: "finished, no invitation", pipelineStatus: "enriched", sourceListingUrl: url("f"), procurement: finished({ announcements: [] }) },
+        { title: "cancelled, not enriched", pipelineStatus: "pending", sourceListingUrl: url("g"), procurement: finished({ stage: "cancelled", contractStatus: undefined }) },
+        { title: "cancelled, no listing url", pipelineStatus: "enriched", procurement: finished({ stage: "cancelled", contractStatus: undefined }) },
+      ] as any);
+      const titles = (await Tor.find(lifecycleFilter() as any).sort({ title: 1 }).lean()).map((t) => t.title);
+      expect(titles).toEqual(["cancelled, never attempted", "finished, never attempted"]);
+      expect(await countLifecycleCandidates()).toBe(2);
+    });
+  });
 });

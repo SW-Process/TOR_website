@@ -134,11 +134,14 @@ meaning or retired in favour of `bidDeadline`.
 **Decision (2026-10-04, replaces the earlier "reuse `EnrichmentJob`" idea):** extraction runs
 inline in the lifecycle refresh, with no queue. `enrichmentjobs.torId` is unique, so a second
 job kind per TOR would mean reworking the index, lease and progress counters, and the scope
-below is only a handful of files. Scope is **`inviting` TORs only**: on 2026-10-04 production
-had 8 `inviting` TORs (6 with an invitation file); invitations of awarded or cancelled TORs
-are not fetched because the UI never uses their deadline.
+below is only a handful of files. ~~Scope is `inviting` TORs only~~ (superseded on 2026-10-04: scope is
+**every stage with an invitation file**, for data consistency; the deadline is still only used
+for the status of `inviting` TORs, so an awarded TOR stays "awarded"). Finished/cancelled TORs
+are excluded from the refresh candidates, so a one-time backfill in `lifecycleFilter()` selects
+them while `deadlineAttempt` is missing and they have a filed invitation; after the attempt is
+recorded they are no longer re-checked.
 
-After refresh writes a TOR whose stage is `inviting`, it does one more step in the same run:
+After refresh writes a TOR that has an invitation, it does one more step in the same run:
 
 1. Pick the latest `invitation` announcement (with or without a file, the same rule stage
    derivation uses). Skip when `procurement.deadlineAttempt.announcementId` already equals its id,
