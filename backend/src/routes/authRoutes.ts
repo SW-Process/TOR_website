@@ -14,6 +14,7 @@ import {
   googleStart,
   googleCallback,
 } from "../controllers/authController";
+import { listMyReports } from "../controllers/errorReportController";
 import { requireAuth } from "../middleware/auth";
 
 const avatarUpload = multer({
@@ -31,6 +32,7 @@ router.patch("/me", requireAuth, updateAccount);
 router.delete("/me", requireAuth, deleteAccount);
 router.put("/password", requireAuth, changePassword);
 router.put("/email", requireAuth, changeEmail);
+router.get("/reports", requireAuth, listMyReports);
 
 router.post("/avatar", requireAuth, avatarUpload.single("avatar"), uploadAvatar);
 router.get("/avatar/:userId", streamAvatar);
