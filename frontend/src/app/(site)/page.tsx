@@ -14,7 +14,6 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import HeroSearch from "@/components/HeroSearch";
 import TORCard from "@/components/TORCard";
 import AlertSignup from "@/components/AlertSignup";
 import CategoryGrid from "@/components/CategoryGrid";

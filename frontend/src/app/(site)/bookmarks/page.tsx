@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Bookmark, ArrowRight, KanbanSquare, CalendarClock } from "lucide-react";
 import TORCard from "@/components/TORCard";
 import TrackingBoard from "@/components/TrackingBoard";
@@ -17,15 +18,15 @@ const views = [
 
 type ViewKey = (typeof views)[number]["key"];
 
-export default function BookmarksPage() {
+function BookmarksContent() {
   const { items, ready, error, setStatus } = useBookmarks();
-  const [view, setView] = useState<ViewKey>("list");
+  const searchParams = useSearchParams();
+  // ?view= picks the starting tab only; the tabs take over after that.
+  const [view, setView] = useState<ViewKey>(() => {
+    const requested = searchParams.get("view");
+    return requested === "tracking" || requested === "calendar" ? requested : "list";
+  });
   const saved = items.map((i) => i.tor);
-
-  useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("view");
-    if (requested === "tracking" || requested === "calendar") setView(requested);
-  }, []);
 
   return (
     <RequireAuth>
@@ -97,5 +98,13 @@ export default function BookmarksPage() {
       )}
     </div>
     </RequireAuth>
+  );
+}
+
+export default function BookmarksPage() {
+  return (
+    <Suspense fallback={null}>
+      <BookmarksContent />
+    </Suspense>
   );
 }
