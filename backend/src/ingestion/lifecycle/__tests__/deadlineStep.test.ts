@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ZodError } from "zod";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { Tor } from "../../../models";
 import type { IProcurement } from "../../../models";
@@ -205,6 +206,85 @@ describe("runDeadlineStep", () => {
     const saved = (await Tor.findById(tor._id).lean())?.procurement;
     expect(saved?.bidDeadline).toMatchObject({ source: "admin", date: adminDate });
     expect(saved?.deadlineAttempt ?? null).toBeNull();
+  });
+
+  describe("latest invitation without a usable file", () => {
+    const staleBid = { date: new Date("2026-10-10T16:59:00Z"), source: "invitation-pdf" as const, extractedAt: PUBLISHED };
+    const twoInvitations = (over: Partial<IProcurement> = {}, newHasFile = false) =>
+      procurementOf({
+        bidDeadline: staleBid,
+        deadlineAttempt: { announcementId: "inv-1", at: PUBLISHED, outcome: "read" },
+        announcements: [
+          { announcementId: "inv-1", kind: "invitation", hasFile: true, publishedAt: PUBLISHED, storageKey: "k1" },
+          { announcementId: "inv-2", kind: "invitation", hasFile: newHasFile, publishedAt: new Date("2026-10-02T00:00:00Z") },
+        ],
+        ...over,
+      });
+
+    it("clears a stale AI deadline without calling Gemini or recording an attempt", async () => {
+      const p = twoInvitations();
+      const tor = await seed(p);
+      const h = harness();
+      expect(await runDeadlineStep(args(p, tor._id), h)).toBe("cleared");
+      expect(h.extractCalls).toHaveLength(0);
+      expect(h.downloads).toEqual([]);
+      const saved = (await Tor.findById(tor._id).lean())?.procurement;
+      expect(saved?.bidDeadline ?? null).toBeNull();
+      expect(saved?.deadlineAttempt?.announcementId).toBe("inv-1"); // no attempt for inv-2
+      expect(saved?.lastCheckedAt).toEqual(T);
+    });
+
+    it("leaves an admin deadline untouched", async () => {
+      const adminBid = { date: new Date("2026-10-25T16:59:00Z"), source: "admin" as const, extractedAt: T };
+      const p = twoInvitations({ bidDeadline: adminBid });
+      const tor = await seed(p);
+      const h = harness();
+      expect(await runDeadlineStep(args(p, tor._id), h)).toBe("skipped");
+      expect((await Tor.findById(tor._id).lean())?.procurement?.bidDeadline?.source).toBe("admin");
+    });
+
+    it("clears the same way when the latest invitation has a file but no e-GP file name", async () => {
+      const p = twoInvitations({}, true);
+      const tor = await seed(p);
+      const h = harness();
+      const noName = new Map([["inv-1", "inv-1.pdf"]]);
+      expect(await runDeadlineStep({ ...args(p, tor._id), filenames: noName }, h)).toBe("cleared");
+      expect(h.extractCalls).toHaveLength(0);
+      expect(((await Tor.findById(tor._id).lean())?.procurement?.bidDeadline ?? null)).toBeNull();
+    });
+
+    it("skips when there is nothing stale to clear", async () => {
+      const p = twoInvitations({ bidDeadline: undefined });
+      const tor = await seed(p);
+      expect(await runDeadlineStep(args(p, tor._id), harness())).toBe("skipped");
+    });
+  });
+
+  describe("extractor errors", () => {
+    it.each([
+      ["a ZodError", () => new ZodError([])],
+      ["invalid JSON", () => new Error("Gemini returned invalid JSON: {")],
+      ["a 400", () => Object.assign(new Error("bad request"), { status: 400 })],
+      ["a 4xx code", () => Object.assign(new Error("forbidden"), { code: 403 })],
+    ])("treats %s as unreadable and records the attempt", async (_n, make) => {
+      const p = procurementOf();
+      const tor = await seed(p);
+      expect(await runDeadlineStep(args(p, tor._id), harness(make()))).toBe("unreadable");
+      const saved = (await Tor.findById(tor._id).lean())?.procurement;
+      expect(saved?.deadlineAttempt).toMatchObject({ announcementId: "inv-1", outcome: "unreadable" });
+      expect(saved?.announcements[0]?.storageKey).toBe("tor-pdfs/code-1/inv-1.pdf");
+    });
+
+    it.each([
+      ["a 429", () => Object.assign(new Error("rate"), { status: 429 })],
+      ["a 503", () => Object.assign(new Error("down"), { code: 503 })],
+      ["a network error", () => new Error("ECONNRESET")],
+    ])("rethrows %s and records nothing", async (_n, make) => {
+      const p = procurementOf();
+      const tor = await seed(p);
+      await expect(runDeadlineStep(args(p, tor._id), harness(make()))).rejects.toThrow();
+      expect(((await Tor.findById(tor._id).lean())?.procurement?.deadlineAttempt ?? null)).toBeNull();
+    });
   });
 
   it("propagates an extractor error without recording an attempt", async () => {

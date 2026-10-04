@@ -112,6 +112,19 @@ describe("job entrypoints", () => {
     expect(process.exitCode).toBe(0);
   });
 
+  it("runLifecycleJob still refreshes, without the deadline step, when EXTRACTOR is invalid", async () => {
+    process.env.EXTRACTOR = "bogus";
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { runLifecycleJob } = await import("../lifecycle");
+    await runLifecycleJob();
+    spy.mockRestore();
+    expect(refreshLifecycle).toHaveBeenCalledTimes(1);
+    expect(refreshLifecycle.mock.calls[0] as unknown[]).toEqual([
+      expect.objectContaining({ trigger: "scheduled", deadlineExtractor: undefined }),
+    ]);
+    expect(process.exitCode).toBe(0);
+  });
+
   it("runLifecycleJob sets exitCode 1 when the refresh throws", async () => {
     refreshLifecycle.mockRejectedValueOnce(new Error("boom"));
     const { runLifecycleJob } = await import("../lifecycle");

@@ -13,7 +13,14 @@ import { selectExtractor } from "./enrichment";
 export async function runLifecycleJob(): Promise<void> {
   try {
     await connectDB();
-    const out = await refreshLifecycle({ trigger: "scheduled", deadlineExtractor: selectExtractor() });
+    // A bad EXTRACTOR must not fail the status refresh itself — run without the deadline step.
+    let deadlineExtractor: ReturnType<typeof selectExtractor> | undefined;
+    try {
+      deadlineExtractor = selectExtractor();
+    } catch (err) {
+      console.error("lifecycle run without deadline extraction:", err);
+    }
+    const out = await refreshLifecycle({ trigger: "scheduled", deadlineExtractor });
     console.log(
       `lifecycle run ${out.runId || "(nothing to check)"}: checked ${out.selected}, changed ${out.changed}, unchanged ${out.unchanged}, skipped ${out.skipped}, failed ${out.failed}`
     );

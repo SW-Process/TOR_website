@@ -1,9 +1,10 @@
 import type { QueryFilter, Types } from "mongoose";
+import { ZodError } from "zod";
 import { Tor, type ITor, type IProcurement, type IProcurementAnnouncement } from "../../models";
 import type { EgpClientLike } from "../../scraper/egpClient.types";
 import type { BlobStorage } from "../../storage/storage.types";
 import { resolveBidDeadline } from "../../utils/bidDeadline";
-import type { BidDeadlineExtractor } from "../enrichment/torExtractor";
+import type { BidDeadlineExtractor, BidDeadlineResult } from "../enrichment/torExtractor";
 
 export interface DeadlineStepArgs {
   torId: Types.ObjectId;
@@ -22,14 +23,26 @@ export interface DeadlineStepDeps {
   now: () => Date;
 }
 
-export type DeadlineStepOutcome = "skipped" | "read" | "unreadable" | "conflict";
+/** "cleared": a stale AI deadline was removed because the latest invitation has no readable file yet. */
+export type DeadlineStepOutcome = "skipped" | "read" | "unreadable" | "conflict" | "cleared";
+
+const UNREADABLE: BidDeadlineResult = { date: null, time: null, confidence: 0 };
+
+/** Errors that will fail the same way tomorrow: bad model output or a 4xx (except 429) from the API. */
+function isNonRetryable(err: unknown): boolean {
+  if (err instanceof ZodError) return true;
+  const e = err as { message?: unknown; status?: unknown; code?: unknown } | null;
+  if (typeof e?.message === "string" && e.message.startsWith("Gemini returned invalid JSON")) return true;
+  const n = Number(e?.status ?? e?.code);
+  return Number.isInteger(n) && n >= 400 && n < 500 && n !== 429;
+}
 
 const timeOf = (a: IProcurementAnnouncement): number => a.publishedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
 
-/** Latest invitation that has a file; on equal dates the later one in stored order wins. */
+/** Latest invitation (file or not, like stage derivation); on equal dates the later one in stored order wins. */
 function latestInvitation(p: IProcurement): IProcurementAnnouncement | null {
   return p.announcements
-    .filter((a) => a.kind === "invitation" && a.hasFile)
+    .filter((a) => a.kind === "invitation")
     .reduce<IProcurementAnnouncement | null>((best, a) => (best === null || timeOf(a) >= timeOf(best) ? a : best), null);
 }
 
@@ -45,17 +58,38 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
   const invitation = latestInvitation(p);
   if (!invitation) return "skipped";
   if (p.deadlineAttempt?.announcementId === invitation.announcementId) return "skipped";
-  const filename = args.filenames.get(invitation.announcementId);
-  if (!filename) return "skipped";
+  const filename = invitation.hasFile ? args.filenames.get(invitation.announcementId) : undefined;
+  if (!filename) {
+    // The current invitation has no readable file (yet). A deadline read from an OLDER invitation
+    // is stale, so clear it; no attempt is recorded, so the read happens once the file appears.
+    if (p.bidDeadline?.source !== "invitation-pdf") return "skipped";
+    const res = await Tor.updateOne(
+      {
+        _id: args.torId,
+        "procurement.lastCheckedAt": p.lastCheckedAt,
+        "procurement.bidDeadline.source": { $ne: "admin" },
+      } as QueryFilter<ITor>,
+      { $set: { "procurement.bidDeadline": null, "procurement.lastCheckedAt": deps.now() } },
+      { timestamps: false }
+    );
+    return res.matchedCount === 0 ? "conflict" : "cleared";
+  }
 
   const content = await deps.client.downloadFile(invitation.announcementId, filename);
   const key = `tor-pdfs/${args.projectCode ?? String(args.torId)}/${invitation.announcementId}.pdf`;
   await deps.storage.put(key, content, { contentType: "application/pdf" });
 
-  const result = await deps.extractor.extractBidDeadline({
-    pdf: { fileName: filename, content },
-    meta: { projectCode: args.projectCode, title: args.title },
-  });
+  let result: BidDeadlineResult;
+  try {
+    result = await deps.extractor.extractBidDeadline({
+      pdf: { fileName: filename, content },
+      meta: { projectCode: args.projectCode, title: args.title },
+    });
+  } catch (err) {
+    // A PDF that always fails must not cost a Gemini call every day: record it as unreadable.
+    if (!isNonRetryable(err)) throw err;
+    result = UNREADABLE;
+  }
   const deadline = resolveBidDeadline(result, { notBefore: invitation.publishedAt ?? null });
 
   const now = deps.now();
