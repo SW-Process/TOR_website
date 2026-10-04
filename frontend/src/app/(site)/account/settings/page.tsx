@@ -14,17 +14,19 @@ import { useMyReports, type MyReport } from "@/lib/useMyReports";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, useBookmarks, type ApplicationStatus } from "@/lib/useBookmarks";
 import { useHiddenTors } from "@/lib/useHiddenTors";
 import { useSessions, type AccountSession } from "@/lib/useSessions";
+import { ShortcutKeys, ShortcutTable } from "@/components/KeyboardShortcuts";
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_NAME_LENGTH = 60;
 
-type SectionId = "profile" | "email" | "password" | "sessions" | "saved" | "hidden" | "reports" | "delete";
+type SectionId = "profile" | "email" | "password" | "sessions" | "shortcuts" | "saved" | "hidden" | "reports" | "delete";
 
 const SECTION_TITLES: Record<SectionId, string> = {
   profile: "แก้ไขโปรไฟล์",
   email: "อีเมล",
   password: "รหัสผ่านและความปลอดภัย",
   sessions: "อุปกรณ์ที่เข้าสู่ระบบ",
+  shortcuts: "ปุ่มลัดบนคีย์บอร์ด",
   saved: "รายการที่บันทึก",
   hidden: "TOR ที่ซ่อนไว้",
   reports: "รายงานที่ฉันส่ง",
@@ -802,6 +804,23 @@ function SessionsSection() {
   );
 }
 
+/** "ปุ่มลัดบนคีย์บอร์ด", like LINE's: every shortcut this account can use, by group. */
+function ShortcutsSection() {
+  const { user } = useAuth();
+  return (
+    <div className="flex flex-col gap-8">
+      <p className="text-sm leading-relaxed text-[var(--color-text-muted)]">
+        ใช้ปุ่มลัดเพื่อไปหน้าต่าง ๆ และจัดการ TOR ได้เร็วขึ้น ปุ่มลัดใช้ได้เมื่อไม่ได้พิมพ์อยู่ในช่องข้อความ
+        และใช้ได้ทั้งตอนตั้งคีย์บอร์ดเป็นภาษาไทยหรืออังกฤษ
+      </p>
+      <ShortcutTable role={user?.role ?? null} />
+      <p className="flex flex-wrap items-center gap-2 rounded-2xl bg-[var(--color-surface-alt)] px-4 py-3 text-xs text-[var(--color-text-muted)]">
+        กด <ShortcutKeys keys={["?"]} /> ที่หน้าไหนก็ได้ เพื่อเปิดรายการปุ่มลัดนี้
+      </p>
+    </div>
+  );
+}
+
 /** "ออกจากระบบอุปกรณ์อื่นทั้งหมด": a confirm step, then every other session is signed out. */
 function SessionsBlock({ onDone }: { onDone: () => void }) {
   const { logoutOthers } = useAuth();
@@ -951,6 +970,7 @@ function SettingsContent() {
         {section === "email" && <EmailSection />}
         {section === "password" && <PasswordSection />}
         {section === "sessions" && <SessionsSection />}
+        {section === "shortcuts" && <ShortcutsSection />}
         {section === "saved" && <SavedSection />}
         {section === "hidden" && <HiddenSection />}
         {section === "reports" && <ReportsSection />}

@@ -9,6 +9,7 @@ import {
   ChevronRight,
   EyeOff,
   Flag,
+  Keyboard,
   KeyRound,
   LogOut,
   Mail,
@@ -21,7 +22,7 @@ import { useAuth } from "@/lib/useAuth";
 import { Avatar } from "./ui";
 
 /** Every page reachable from the settings sidebar; `/account/settings?section=<id>` unless noted. */
-export type SettingsPageId = "profile" | "email" | "password" | "sessions" | "saved" | "hidden" | "reports" | "delete" | "business";
+export type SettingsPageId = "profile" | "email" | "password" | "sessions" | "shortcuts" | "saved" | "hidden" | "reports" | "delete" | "business";
 
 export const SETTINGS_ROOT = "/account/settings";
 
@@ -159,6 +160,7 @@ export default function SettingsShell({
             </NavGroup>
 
             <NavGroup title="อื่นๆ">
+              <NavItem icon={Keyboard} label="ปุ่มลัดบนคีย์บอร์ด" href={settingsHref("shortcuts")} active={active === "shortcuts"} />
               <NavItem icon={LogOut} label="ออกจากระบบ" onClick={handleLogout} />
               {isVendor && (
                 <NavItem icon={Trash2} label="ลบบัญชี" href={settingsHref("delete")} active={active === "delete"} danger />
