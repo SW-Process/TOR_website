@@ -3,11 +3,13 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Building2, EyeOff } from "lucide-react";
+import { AlertTriangle, Building2, Clock, ExternalLink, Eye, EyeOff, Hash, Sparkles } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
+import StatusBadge from "@/components/StatusBadge";
 import SettingsShell from "@/components/account/SettingsShell";
 import { AvatarCard, FieldBlock, SubmitBar, inputClass, useSubmit } from "@/components/account/ui";
-import { formatThaiDate } from "@/lib/mockData";
+import { formatBudget, formatThaiDate, type TOR } from "@/lib/mockData";
+import { statusNote } from "@/lib/torStatus";
 import { useAuth } from "@/lib/useAuth";
 import { useHiddenTors } from "@/lib/useHiddenTors";
 
@@ -251,7 +253,87 @@ function PasswordSection() {
   );
 }
 
-/** Instagram "restricted accounts"-style list of hidden TORs, each with an unhide button. */
+/** One hidden TOR as a card, laid out like the admin report cards: meta, AI summary, TOR box, action. */
+function HiddenTorCard({ tor, hiddenAt, onUnhide }: { tor: TOR; hiddenAt: string; onUnhide: () => void }) {
+  const [pending, setPending] = useState(false);
+
+  return (
+    <article className="flex flex-col gap-4 rounded-3xl border border-[var(--color-border)] bg-white p-5 shadow-[var(--shadow-sm)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <StatusBadge status={tor.status} />
+          <span className="badge bg-[var(--color-rose-light)] text-[var(--color-rose-dark)]">{tor.category}</span>
+        </div>
+        <span className="flex shrink-0 items-center gap-1 text-xs text-[var(--color-text-faint)]">
+          <Clock size={12} />
+          ซ่อนเมื่อ {formatThaiDate(hiddenAt.slice(0, 10))}
+        </span>
+      </div>
+
+      {/* aiSummary.summary is a model-written summary, never the agency's own text — label it so. */}
+      <div className="rounded-2xl bg-[var(--color-surface-alt)] px-4 py-3">
+        <p className="flex items-center gap-1 text-[11px] font-semibold text-[var(--color-rose-dark)]">
+          <Sparkles size={11} />
+          สรุปโดย AI
+        </p>
+        <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--color-ink-soft)]">
+          {tor.description || "ยังไม่มีสรุปสำหรับ TOR นี้"}
+        </p>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-2 rounded-2xl border border-[var(--color-border)] p-4">
+        <p className="text-[11px] font-semibold text-[var(--color-text-faint)]">TOR ที่ซ่อน</p>
+        <Link
+          href={`/tor/${tor.id}`}
+          className="line-clamp-2 text-[15px] font-bold leading-snug text-[var(--color-text)] hover:text-[var(--color-rose-dark)]"
+        >
+          {tor.title}
+        </Link>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--color-text-muted)]">
+          {tor.projectCode && (
+            <span className="flex items-center gap-1">
+              <Hash size={11} />
+              {tor.projectCode}
+            </span>
+          )}
+          <span className="flex min-w-0 items-center gap-1">
+            <Building2 size={11} className="shrink-0" />
+            <span className="truncate">{tor.agency}</span>
+          </span>
+        </div>
+        <div className="mt-auto flex items-end justify-between gap-3 pt-2">
+          <div>
+            <p className="text-base font-extrabold text-[var(--color-rose-dark)]">{formatBudget(tor.budget)}</p>
+            <p className="text-[11px] text-[var(--color-text-faint)]">{statusNote(tor)}</p>
+          </div>
+          <Link
+            href={`/tor/${tor.id}`}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-border-strong)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-ink)]/40"
+          >
+            <ExternalLink size={13} />
+            เปิดดู
+          </Link>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          disabled={pending}
+          onClick={() => {
+            setPending(true);
+            onUnhide();
+          }}
+          className="inline-flex items-center gap-2 rounded-full bg-[var(--color-ink)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-black disabled:opacity-50"
+        >
+          <Eye size={15} />
+          เลิกซ่อน
+        </button>
+      </div>
+    </article>
+  );
+}
+
+/** Hidden TORs as a two-column card grid, each with an unhide button. */
 function HiddenSection() {
   const { items, ready, error, unhide } = useHiddenTors();
 
@@ -259,6 +341,7 @@ function HiddenSection() {
     <div className="flex flex-col gap-6">
       <p className="text-sm leading-relaxed text-[var(--color-text-muted)]">
         TOR ที่คุณซ่อนไว้จะไม่แสดงในผลการค้นหาและ TOR ที่แนะนำสำหรับคุณ หน่วยงานเจ้าของโครงการจะไม่รู้ว่าคุณซ่อน
+        {ready && items.length > 0 && <span className="font-semibold text-[var(--color-text)]"> · ซ่อนอยู่ {items.length} รายการ</span>}
       </p>
 
       {error && (
@@ -279,32 +362,11 @@ function HiddenSection() {
           </p>
         </div>
       ) : (
-        <ul className="flex flex-col">
+        <div className="grid gap-4 md:grid-cols-2">
           {items.map(({ tor, hiddenAt }) => (
-            <li key={tor.id} className="flex items-center gap-4 py-3">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-alt)] text-[var(--color-text-muted)]">
-                <Building2 size={20} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <Link
-                  href={`/tor/${tor.id}`}
-                  className="line-clamp-1 text-[15px] font-semibold text-[var(--color-text)] hover:underline"
-                >
-                  {tor.title}
-                </Link>
-                <p className="truncate text-xs text-[var(--color-text-muted)]">
-                  {tor.agency} · ซ่อนเมื่อ {formatThaiDate(hiddenAt.slice(0, 10))}
-                </p>
-              </div>
-              <button
-                onClick={() => void unhide(tor.id)}
-                className="shrink-0 rounded-xl bg-[var(--color-surface-alt)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-border)]"
-              >
-                เลิกซ่อน
-              </button>
-            </li>
+            <HiddenTorCard key={tor.id} tor={tor} hiddenAt={hiddenAt} onUnhide={() => void unhide(tor.id)} />
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
@@ -370,7 +432,7 @@ function SettingsContent() {
   const section: SectionId = picked ? param : "profile";
 
   return (
-    <SettingsShell active={section} title={SECTION_TITLES[section]} showDetailOnMobile={picked}>
+    <SettingsShell active={section} title={SECTION_TITLES[section]} showDetailOnMobile={picked} wide={section === "hidden"}>
       {/* key: a fresh form state per section, so switching back doesn't show stale input */}
       <div key={section}>
         {section === "profile" && <ProfileSection />}

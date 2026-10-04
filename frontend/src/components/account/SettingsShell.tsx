@@ -69,11 +69,14 @@ export default function SettingsShell({
   active,
   title,
   showDetailOnMobile,
+  wide = false,
   children,
 }: {
   active: SettingsPageId;
   title: string;
   showDetailOnMobile: boolean;
+  /** Card grids (e.g. hidden TORs) get a wider column than single-column forms. */
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   const { user, displayName, logout } = useAuth();
@@ -142,7 +145,7 @@ export default function SettingsShell({
         </aside>
 
         <main className={`min-w-0 py-8 lg:pl-16 ${showDetailOnMobile ? "" : "hidden lg:block"}`}>
-          <div className="mx-auto max-w-[640px]">
+          <div className={`mx-auto ${wide ? "max-w-[980px]" : "max-w-[640px]"}`}>
             <div className="flex items-center gap-2">
               <Link
                 href={SETTINGS_ROOT}
