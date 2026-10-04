@@ -21,6 +21,7 @@ import { ANNOUNCEMENT_KIND_LABELS, statusNote } from "@/lib/torStatus";
 import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
 import HideTorButton from "@/components/HideTorButton";
+import TorViewCount from "@/components/TorViewCount";
 import ReportIssueButton from "@/components/ReportIssueButton";
 import ShareTorButtons from "@/components/ShareTorButtons";
 import TORCard from "@/components/TORCard";
@@ -62,7 +63,7 @@ export default async function TORDetailPage({
     { icon: Hash, label: "เลขที่โครงการ", value: tor.projectCode },
     { icon: Building2, label: "หน่วยงานย่อย", value: tor.department },
     { icon: MapPin, label: "พื้นที่ดำเนินการ", value: tor.location },
-    { icon: Eye, label: "จำนวนผู้เข้าชม", value: `${tor.views.toLocaleString("th-TH")} ครั้ง` },
+    { icon: Eye, label: "จำนวนผู้เข้าชม", value: <TorViewCount torId={tor.id} initial={tor.views} /> },
   ];
 
   return (

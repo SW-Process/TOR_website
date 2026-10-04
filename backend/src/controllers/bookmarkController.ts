@@ -11,7 +11,7 @@ const APPLICATION_STATUSES = ["interested", "preparing", "submitted", "missed"] 
 // The public TOR list fields (torController LIST_PROJECTION), plus the AI summary line the
 // account settings cards show.
 const TOR_PROJECTION =
-  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt aiSummary.summary";
+  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt aiSummary.summary viewCount";
 
 const updateSchema = z
   .object({

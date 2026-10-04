@@ -13,7 +13,7 @@ const listQuerySchema = z.object({
 });
 
 const OPEN_TOR_PROJECTION =
-  "title agency category budget referencePrice technologyStack announcementDate submissionDeadline status procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt";
+  "title agency category budget referencePrice technologyStack announcementDate submissionDeadline status procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt viewCount";
 
 /**
  * GET /api/vendor/matches — open TORs ranked by rule-based match score

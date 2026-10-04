@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 // Mongoose 9 renamed `FilterQuery` (the brief's name) to `QueryFilter`.
-import type { PipelineStage, QueryFilter } from "mongoose";
+import { isValidObjectId, type PipelineStage, type QueryFilter } from "mongoose";
 import { Tor } from "../models";
 import type { ITor } from "../models";
 import { httpError } from "../utils/httpError";
@@ -67,7 +67,7 @@ const listQuerySchema = z.object({
 export type ListQuery = z.infer<typeof listQuerySchema>;
 
 export const LIST_PROJECTION =
-  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt";
+  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt viewCount";
 
 const LIST_PROJECT_STAGE = Object.fromEntries(LIST_PROJECTION.split(" ").map((f) => [f, 1]));
 
@@ -264,6 +264,22 @@ export async function listTechnologies(_req: Request, res: Response): Promise<vo
     { $sort: { count: -1, _id: 1 } },
   ]);
   res.status(200).json({ data: rows.map((r) => ({ name: r._id, count: r.count })) });
+}
+
+/**
+ * POST /api/tors/:id/view — count one view of a public TOR's detail page. Called by
+ * the browser once per TOR per tab session, not on the server-side fetch, so Next.js
+ * prefetches and re-renders don't inflate the count. It counts page views, not
+ * unique people.
+ */
+export async function recordView(req: Request, res: Response): Promise<void> {
+  if (!isValidObjectId(req.params.id)) throw httpError(400, "Invalid TOR id");
+  const { matchedCount } = await Tor.updateOne(
+    { _id: req.params.id, pipelineStatus: "enriched" },
+    { $inc: { viewCount: 1 } }
+  );
+  if (!matchedCount) throw httpError(404, "TOR not found");
+  res.status(204).end();
 }
 
 /** GET /api/tors/:id */

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { streamTorDocument } from "../controllers/torDocumentController";
-import { listTors, listAgencies, listTechnologies, getTor, priceStats } from "../controllers/torController";
+import { listTors, listAgencies, listTechnologies, getTor, priceStats, recordView } from "../controllers/torController";
 import { reportTorError } from "../controllers/errorReportController";
 import { optionalAuth } from "../middleware/auth";
 
@@ -15,5 +15,6 @@ router.get("/technologies", listTechnologies);
 router.get("/:id", getTor);
 router.get("/:id/document", streamTorDocument);
 router.post("/:id/report", optionalAuth, reportTorError);
+router.post("/:id/view", recordView);
 
 export default router;
