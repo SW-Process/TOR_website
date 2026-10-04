@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileSearch, Mail, ShieldCheck } from "lucide-react";
+import { FileSearch, Mail, Phone, ShieldCheck } from "lucide-react";
 
 const HIDDEN_ON = ["/login", "/signup", "/account/profile"];
 
@@ -49,10 +49,14 @@ export default function Footer() {
           <ul className="mt-4 space-y-2.5 text-sm text-white/65">
             <li className="flex items-center gap-2">
               <Mail size={13} />
-              <span>support@tor-insight.go.th (ตัวอย่าง)</span>
+              <a href="mailto:paranyu.lion@gmail.com" className="hover:text-white transition-colors">paranyu.lion@gmail.com</a>
+            </li>
+            <li className="flex items-center gap-2">
+              <Phone size={13} />
+              <a href="tel:+66933239415" className="hover:text-white transition-colors">093-323-9415</a>
             </li>
             <li><Link href="/privacy-policy" className="hover:text-white transition-colors">นโยบายความเป็นส่วนตัว (PDPA)</Link></li>
-            <li><Link href="#" className="hover:text-white transition-colors">ข้อกำหนดการใช้งาน</Link></li>
+            <li><Link href="/terms-of-use" className="hover:text-white transition-colors">ข้อกำหนดการใช้งาน</Link></li>
           </ul>
         </div>
       </div>
