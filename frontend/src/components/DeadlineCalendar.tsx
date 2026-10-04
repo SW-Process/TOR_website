@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { BellRing, ChevronLeft, ChevronRight, X } from "lucide-react";
-import { daysUntil, formatThaiDate, TODAY_ISO, type TOR } from "@/lib/mockData";
+import { formatThaiDate, TODAY_ISO, type TOR } from "@/lib/mockData";
+import { bidDaysLeft, isBiddable } from "@/lib/torStatus";
 import { useDayNotes } from "@/lib/useDayNotes";
 
 const weekdayLabels = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
@@ -259,10 +260,10 @@ export default function DeadlineCalendar({ saved }: { saved: TOR[] }) {
 
   const upcoming = saved
     .filter((t) => {
-      const remaining = daysUntil(t.deadline);
-      return remaining >= 0 && remaining <= 3;
+      const d = bidDaysLeft(t);
+      return isBiddable(t.status) && d !== null && d >= 0 && d <= 3;
     })
-    .sort((a, b) => daysUntil(a.deadline) - daysUntil(b.deadline));
+    .sort((a, b) => (bidDaysLeft(a) ?? 0) - (bidDaysLeft(b) ?? 0));
 
   return (
     <div className="flex flex-col gap-5">
@@ -274,7 +275,7 @@ export default function DeadlineCalendar({ saved }: { saved: TOR[] }) {
           </div>
           <div className="flex flex-col gap-1.5">
             {upcoming.map((tor) => {
-              const remaining = daysUntil(tor.deadline);
+              const remaining = bidDaysLeft(tor) ?? 0;
               return (
                 <Link
                   key={tor.id}

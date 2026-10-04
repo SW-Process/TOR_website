@@ -39,6 +39,12 @@ function daysFromNow(iso: string): number {
   return Math.ceil((Date.parse(iso) - Date.now()) / DAY_MS);
 }
 
+/** Whole days until the real bid deadline, or null when the TOR has none known. Real clock. */
+export function bidDaysLeft(tor: Pick<TOR, "procurement">): number | null {
+  const bid = tor.procurement?.bidDeadline ?? null;
+  return bid ? daysFromNow(bid) : null;
+}
+
 /**
  * One-line status detail for cards and tables. The only deadline it ever uses is the real
  * bid-submission deadline (`procurement.bidDeadline`), never the legacy extracted date.

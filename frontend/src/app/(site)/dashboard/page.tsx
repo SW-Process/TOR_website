@@ -18,7 +18,7 @@ import { useProfile } from "@/lib/useProfile";
 import { useMatches } from "@/lib/useMatches";
 import { daysUntil, categories, type Category, type TOR } from "@/lib/mockData";
 import { fetchTorList, mapApiTor } from "@/lib/torApi";
-import { isActiveOpportunity } from "@/lib/torStatus";
+import { bidDaysLeft, isActiveOpportunity, isBiddable } from "@/lib/torStatus";
 
 const catalogFilters: (Category | "ทั้งหมด")[] = ["ทั้งหมด", ...categories];
 
@@ -74,10 +74,10 @@ function DashboardContent() {
   const saved = bookmarks.map((b) => b.tor);
   const upcoming = saved
     .filter((t) => {
-      const r = daysUntil(t.deadline);
-      return r >= 0 && r <= 3;
+      const d = bidDaysLeft(t);
+      return isBiddable(t.status) && d !== null && d >= 0 && d <= 3;
     })
-    .sort((a, b) => daysUntil(a.deadline) - daysUntil(b.deadline));
+    .sort((a, b) => (bidDaysLeft(a) ?? 0) - (bidDaysLeft(b) ?? 0));
   const submittedCount = bookmarks.filter((b) => b.applicationStatus === "submitted").length;
 
   return (
@@ -147,7 +147,7 @@ function DashboardContent() {
           </div>
           <div className="mt-2 flex flex-col gap-1">
             {upcoming.map((tor) => {
-              const r = daysUntil(tor.deadline);
+              const r = bidDaysLeft(tor) ?? 0;
               return (
                 <Link
                   key={tor.id}
