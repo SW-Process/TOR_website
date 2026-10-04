@@ -1,15 +1,18 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { isValidObjectId } from "mongoose";
-import { User } from "../models";
+import { Session, User } from "../models";
 import { verifyToken, COOKIE_NAME } from "../utils/token";
+import { LAST_SEEN_RESOLUTION_MS, startSession } from "../services/sessions";
 import type { UserRole } from "../models/User";
 import type { AuthUser } from "../types/http";
 
 /**
  * The account a session cookie belongs to, or null when the token is invalid or
- * expired, the account is gone, or the session was signed out (its token version
- * is behind the user's — see User.tokenVersion). The role comes from the database,
- * not the token, so a role change applies at once.
+ * expired, the account is gone, or the session was signed out — its row deleted
+ * (one device revoked) or its token version behind the user's (everything revoked;
+ * see User.tokenVersion). The role comes from the database, not the token, so a
+ * role change applies at once. A token from before session rows existed has no
+ * `sid`; it still works and is reported with no sessionId.
  */
 export async function sessionUser(token: string | undefined): Promise<AuthUser | null> {
   if (!token) return null;
@@ -20,15 +23,27 @@ export async function sessionUser(token: string | undefined): Promise<AuthUser |
     return null;
   }
   if (!isValidObjectId(payload.sub)) return null;
+  if (payload.sid !== undefined && !isValidObjectId(payload.sid)) return null;
 
-  const user = await User.findById(payload.sub).select("role tokenVersion").lean();
+  const [user, session] = await Promise.all([
+    User.findById(payload.sub).select("role tokenVersion").lean(),
+    payload.sid ? Session.findOne({ _id: payload.sid, userId: payload.sub }).select("lastSeenAt").lean() : null,
+  ]);
   if (!user || (user.tokenVersion ?? 0) !== (payload.tv ?? 0)) return null;
-  return { id: String(user._id), role: user.role };
+  if (payload.sid && !session) return null;
+
+  if (session && Date.now() - session.lastSeenAt.getTime() > LAST_SEEN_RESOLUTION_MS) {
+    await Session.updateOne({ _id: session._id }, { $set: { lastSeenAt: new Date() } });
+  }
+  return { id: String(user._id), role: user.role, ...(session ? { sessionId: String(session._id) } : {}) };
 }
 
 /**
- * Require a valid, still-current session cookie. Attaches `req.user = { id, role }`
- * on success, responds 401 otherwise.
+ * Require a valid, still-current session cookie. Attaches `req.user = { id, role,
+ * sessionId }` on success, responds 401 otherwise. A legacy cookie (no session row)
+ * is upgraded here — a row is created and the cookie re-issued — so every signed-in
+ * device shows up in the session list. Only requireAuth upgrades: optionalAuth also
+ * serves server-side fetches whose Set-Cookie would be thrown away, minting orphans.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = req.cookies?.[COOKIE_NAME] as string | undefined;
@@ -41,6 +56,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   if (!user) {
     res.status(401).json({ message: "Invalid or expired session" });
     return;
+  }
+  if (!user.sessionId) {
+    const doc = await User.findById(user.id).select("+passwordHash");
+    if (doc) user.sessionId = await startSession(req, res, doc, doc.googleOAuthId && !doc.passwordHash ? "google" : "password");
   }
   req.user = user;
   next();
