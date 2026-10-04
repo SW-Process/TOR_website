@@ -88,8 +88,23 @@ Mongo lease and runs one Gemini (`@google/genai`, Vertex) multimodal call per TO
 that classifies software-relatedness, writes `aiSummary` + scalar fields, and sets
 `category` from `config/taxonomy.ts`. `Tor.pipelineStatus` gates the public read
 API (`GET /api/tors`, `/:id`, `/price-stats`) to `"enriched"` rows only. Extraction
-is behind the `TorExtractor` seam (`EXTRACTOR` env). Deploy: two Cloud Run Jobs on
-Cloud Scheduler — see `docs/deployment/gcp.md`.
+is behind the `TorExtractor` seam (`EXTRACTOR` env). Deploy: Cloud Run Jobs on
+Cloud Scheduler (discovery, enrichment, lifecycle) — see `docs/deployment/gcp.md`.
+
+### Lifecycle refresh (`backend/src/ingestion/lifecycle/`)
+`Tor.procurement` (stage `draft|inviting|awarded|cancelled`, announcements, contract
+status) is derived from e-GP announcements by `ingestion/procurementStage.ts`. Discovery
+fills it for sighted TORs; a separate daily batch (`refreshLifecycle`, entrypoint
+`dist/jobs/lifecycle.js`, admin `POST /api/ingestion/lifecycle/runs`) re-checks existing
+enriched, unfinished TORs oldest-first up to `MAX_LIFECYCLE_REFRESH_PER_RUN`. It writes only
+the refresh-owned `procurement` paths and never touches `sourceContentHash`,
+`pipelineStatus` or the AI queue — a status check costs no Gemini call. After refreshing an
+`inviting` TOR the batch downloads its latest invitation PDF and reads the real bid deadline with
+one small Gemini call (`MAX_DEADLINE_EXTRACTIONS_PER_RUN`), once per invitation id; an admin value
+(`source: "admin"`) always wins. Both `procurement` writers go through
+`ingestion/procurementWrite.ts` (optimistic precondition on `lastCheckedAt`). The enrichment batch also ends by running this
+refresh for exactly the TORs it just enriched (`lifecycle/afterEnrichment.ts`), so new TORs get
+their stage and bid deadline at once; `MAX_DEADLINE_EXTRACTIONS_PER_RUN` applies to that chained run.
 
 ## Environment
 

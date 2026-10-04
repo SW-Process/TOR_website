@@ -137,4 +137,84 @@ describe("/api/admin/tors", () => {
     expect((await Tor.findById(flagged).lean())!.pipelineStatus).toBe("rejected");
     expect((await admin.delete(`/api/admin/tors/${flagged}`)).status).toBe(404);
   });
+
+  it("labels rows with their real status and filters by it; a manual close wins", async () => {
+    const stage = (s: string) => ({ stage: s, announcements: [], lastCheckedAt: new Date() });
+    const [awarded, manuallyClosed] = await Tor.insertMany([
+      { title: "ได้ผู้ชนะแล้ว", pipelineStatus: "enriched", procurement: stage("awarded") },
+      { title: "ปิดโดยแอดมิน", pipelineStatus: "enriched", status: "closed", procurement: stage("awarded") },
+    ]);
+    const admin = await agentWithRole("admin");
+
+    const all = await admin.get("/api/admin/tors?pageSize=100");
+    const byTitle = Object.fromEntries(
+      all.body.data.map((t: { title: string; displayStatus: string }) => [t.title, t.displayStatus])
+    );
+    expect(byTitle["ได้ผู้ชนะแล้ว"]).toBe("awarded");
+    expect(byTitle["ปิดโดยแอดมิน"]).toBe("closed");
+
+    const onlyAwarded = await admin.get("/api/admin/tors?status=awarded");
+    expect(onlyAwarded.body.data.map((t: { _id: string }) => t._id)).toContain(String(awarded!._id));
+    expect(onlyAwarded.body.data.map((t: { _id: string }) => t._id)).not.toContain(String(manuallyClosed!._id));
+
+    const patched = await admin.patch(`/api/admin/tors/${awarded!._id}`).send({ status: "closed" });
+    expect(patched.status).toBe(200);
+    expect(patched.body.tor.displayStatus).toBe("closed");
+  });
+});
+
+describe("PATCH /api/admin/tors/:id — bidDeadline", () => {
+  const inviting = (over: Record<string, unknown> = {}) => ({
+    title: "ระบบ",
+    pipelineStatus: "enriched" as const,
+    procurement: {
+      stage: "inviting" as const,
+      announcements: [],
+      lastCheckedAt: new Date("2026-10-03T00:00:00Z"),
+      bidDeadline: { date: new Date("2026-10-10T16:59:00Z"), source: "invitation-pdf" as const, extractedAt: new Date("2026-10-03T00:00:00Z") },
+      deadlineAttempt: { announcementId: "inv-1", at: new Date("2026-10-03T00:00:00Z"), outcome: "read" as const },
+    },
+    ...over,
+  });
+
+  it("stores an admin deadline at the end of that Bangkok day, wins over the AI value, and keeps the rest", async () => {
+    const tor = await Tor.create(inviting());
+    const admin = await agentWithRole("admin");
+    const res = await admin.patch(`/api/admin/tors/${tor.id}`).send({ bidDeadline: "2026-10-25" });
+    expect(res.status).toBe(200);
+    const saved = (await Tor.findById(tor.id).lean())?.procurement;
+    expect(saved?.bidDeadline).toMatchObject({ source: "admin", date: new Date("2026-10-25T16:59:00.000Z") });
+    expect(saved?.deadlineAttempt?.announcementId).toBe("inv-1");
+    expect(saved?.stage).toBe("inviting");
+    expect(res.body.tor.procurement.bidDeadline.date).toBe("2026-10-25T16:59:00.000Z");
+    expect(res.body.tor.displayStatus).toBe("open");
+  });
+
+  it("null clears the deadline", async () => {
+    const tor = await Tor.create(inviting());
+    const admin = await agentWithRole("admin");
+    expect((await admin.patch(`/api/admin/tors/${tor.id}`).send({ bidDeadline: null })).status).toBe(200);
+    expect(((await Tor.findById(tor.id).lean())?.procurement?.bidDeadline ?? null)).toBeNull();
+  });
+
+  it("does not change the deadline when the field is absent", async () => {
+    const tor = await Tor.create(inviting());
+    const admin = await agentWithRole("admin");
+    await admin.patch(`/api/admin/tors/${tor.id}`).send({ title: "ชื่อใหม่" });
+    expect((await Tor.findById(tor.id).lean())?.procurement?.bidDeadline?.source).toBe("invitation-pdf");
+  });
+
+  it.each(["2026-02-31", "20/10/2026", "", "tomorrow"])("400 for %p", async (bad) => {
+    const tor = await Tor.create(inviting());
+    const admin = await agentWithRole("admin");
+    expect((await admin.patch(`/api/admin/tors/${tor.id}`).send({ bidDeadline: bad })).status).toBe(400);
+  });
+
+  it("409 for a TOR that has no procurement data yet, and nothing else is saved", async () => {
+    const tor = await Tor.create({ title: "เดิม", pipelineStatus: "enriched" });
+    const admin = await agentWithRole("admin");
+    const res = await admin.patch(`/api/admin/tors/${tor.id}`).send({ title: "ใหม่", bidDeadline: "2026-10-25" });
+    expect(res.status).toBe(409);
+    expect((await Tor.findById(tor.id).lean())?.title).toBe("เดิม");
+  });
 });

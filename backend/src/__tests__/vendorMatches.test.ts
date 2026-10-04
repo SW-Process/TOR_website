@@ -266,4 +266,31 @@ describe("GET /api/vendor/matches — pagination", () => {
       expect((await agent.get(`/api/vendor/matches?${query}`)).status).toBe(400);
     }
   );
+
+  it("only ranks TORs a vendor can still act on, and keeps TORs with no procurement yet", async () => {
+    const stage = (s: string) => ({ stage: s, announcements: [], lastCheckedAt: new Date() });
+    const inviting = (daysAhead: number) => ({
+      ...stage("inviting"),
+      bidDeadline: { date: new Date(Date.now() + daysAhead * 86_400_000), source: "admin", extractedAt: new Date() },
+    });
+    await Tor.insertMany([
+      { title: "ร่าง", pipelineStatus: "enriched", category: "gis", procurement: stage("draft") },
+      { title: "ยังไม่มีข้อมูลสถานะ", pipelineStatus: "enriched", category: "gis" },
+      { title: "เปิดรับ", pipelineStatus: "enriched", category: "gis", procurement: inviting(30) },
+      { title: "ใกล้ปิด", pipelineStatus: "enriched", category: "gis", procurement: inviting(2) },
+      { title: "ประกาศผู้ชนะแล้ว", pipelineStatus: "enriched", category: "gis", procurement: stage("awarded") },
+      { title: "ยกเลิก", pipelineStatus: "enriched", category: "gis", procurement: stage("cancelled") },
+      { title: "เลยกำหนด", pipelineStatus: "enriched", category: "gis", procurement: inviting(-2) },
+      { title: "แอดมินปิดแล้ว", pipelineStatus: "enriched", status: "closed", category: "gis", procurement: inviting(30) },
+    ]);
+    const agent = await vendorAgent();
+
+    const res = await agent.get("/api/vendor/matches?pageSize=100");
+
+    const titles = res.body.data.map((m: { tor: { title: string } }) => m.tor.title).sort();
+    expect(titles).toEqual(["ใกล้ปิด", "ร่าง", "เปิดรับ", "ยังไม่มีข้อมูลสถานะ"].sort());
+    const closing = res.body.data.find((m: { tor: { title: string } }) => m.tor.title === "ใกล้ปิด");
+    expect(closing.tor.displayStatus).toBe("closing_soon");
+    expect(closing.tor.procurement).not.toHaveProperty("announcements");
+  });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, RotateCw, Sparkles } from "lucide-react";
+import { Clock, ListChecks, RotateCw, Sparkles } from "lucide-react";
 import AdminPageHeader from "./AdminPageHeader";
 import RunStatusBadge from "./RunStatusBadge";
 import { formatDateTime, formatRelativeTime } from "@/lib/adminMockData";
@@ -10,16 +10,20 @@ import {
   type EnrichmentQueueInfo,
   type IngestionPhase,
   type IngestionRun,
+  type LifecycleQueueInfo,
 } from "@/lib/useIngestionRuns";
 
 const PHASE_LABEL: Record<IngestionPhase, string> = {
   discovery: "ดึงข้อมูล (Ingestion)",
   enrichment: "วิเคราะห์ด้วย AI (Enrichment)",
+  lifecycle: "ตรวจสถานะการจัดซื้อ (Lifecycle)",
 };
 
 const DAYS_PER_MONTH = 30;
 // Mirrors ENRICHMENT_MAX_CALLS_CEILING in backend ingestionController.
 const ENRICHMENT_MAX_CALLS_CEILING = 200;
+// Mirrors LIFECYCLE_MAX_TORS_CEILING (the max accepted by createLifecycleRun) in backend ingestionController.
+const LIFECYCLE_MAX_TORS_CEILING = 300;
 
 const SEARCH_SUGGESTIONS = [
   "ซอฟต์แวร์",
@@ -31,6 +35,44 @@ const SEARCH_SUGGESTIONS = [
   "บำรุงรักษาระบบ",
   "ระบบเครือข่าย",
 ];
+
+/** "X / N" with a progress bar and a one-line breakdown, shared by the batch phases. */
+function RunProgress({
+  label,
+  done,
+  total,
+  detail,
+}: {
+  label: string;
+  done: number;
+  total: number;
+  detail: string;
+}) {
+  const percent = Math.min(100, Math.round((done / total) * 100));
+  return (
+    <div className="mt-4" aria-live="polite">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-[var(--color-text-faint)]">{label}</span>
+        <span className="font-medium text-[var(--color-text)]">
+          {done} / {total} รายการ
+        </span>
+      </div>
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={done}
+        className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-border)]"
+      >
+        <div
+          className="h-full rounded-full bg-[var(--color-ink)] transition-all"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">{detail}</p>
+    </div>
+  );
+}
 
 /** Before a run: how many TORs it will analyse. During a run: "X / N" with a progress bar. */
 function EnrichmentStatus({
@@ -54,32 +96,15 @@ function EnrichmentStatus({
     }
     const { torsFound: done, enrichedOk, enrichedRejected, enrichedFailed, enrichmentRetried } =
       run.stats;
-    const percent = Math.min(100, Math.round((done / planned) * 100));
     return (
-      <div className="mt-4" aria-live="polite">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-[var(--color-text-faint)]">กำลังวิเคราะห์</span>
-          <span className="font-medium text-[var(--color-text)]">
-            {done} / {planned} รายการ
-          </span>
-        </div>
-        <div
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={planned}
-          aria-valuenow={done}
-          className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-border)]"
-        >
-          <div
-            className="h-full rounded-full bg-[var(--color-ink)] transition-all"
-            style={{ width: `${percent}%` }}
-          />
-        </div>
-        <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
-          สำเร็จ {enrichedOk} · ไม่เกี่ยวกับซอฟต์แวร์ {enrichedRejected} · ล้มเหลว {enrichedFailed}
-          {enrichmentRetried > 0 && ` · รอลองใหม่ ${enrichmentRetried}`}
-        </p>
-      </div>
+      <RunProgress
+        label="กำลังวิเคราะห์"
+        done={done}
+        total={planned}
+        detail={`สำเร็จ ${enrichedOk} · ไม่เกี่ยวกับซอฟต์แวร์ ${enrichedRejected} · ล้มเหลว ${enrichedFailed}${
+          enrichmentRetried > 0 ? ` · รอลองใหม่ ${enrichmentRetried}` : ""
+        }`}
+      />
     );
   }
 
@@ -99,6 +124,53 @@ function EnrichmentStatus({
   );
 }
 
+/** Before a run: how many TORs it will check. During a run: "X / N" with a progress bar. */
+function LifecycleStatus({
+  pending,
+  queue,
+  maxTors,
+  run,
+}: {
+  pending: boolean;
+  queue: LifecycleQueueInfo | null;
+  maxTors: number | null;
+  run: IngestionRun | null;
+}) {
+  if (pending) {
+    const total = run?.stats.torsFound ?? 0;
+    // The run row appears once the batch is selected; until then there is nothing to count.
+    if (!run || total === 0) {
+      return (
+        <p className="mt-4 text-xs text-[var(--color-text-muted)]">กำลังเตรียมรายการที่จะตรวจ...</p>
+      );
+    }
+    const { torsUpdated, torsUnchanged, torsSkipped, torsFailed } = run.stats;
+    return (
+      <RunProgress
+        label="กำลังตรวจสถานะ"
+        done={torsUpdated + torsUnchanged + torsSkipped + torsFailed}
+        total={total}
+        detail={`เปลี่ยนสถานะ ${torsUpdated} · ไม่เปลี่ยน ${torsUnchanged} · ข้าม ${torsSkipped} · ล้มเหลว ${torsFailed}`}
+      />
+    );
+  }
+
+  if (!queue) return null;
+  const willCheck = Math.min(queue.candidates, maxTors ?? queue.maxTors);
+  if (queue.candidates === 0) {
+    return (
+      <p className="mt-4 text-xs text-[var(--color-text-faint)]">ไม่มี TOR ที่ต้องตรวจสถานะ</p>
+    );
+  }
+  return (
+    <p className="mt-4 text-xs text-[var(--color-text-muted)]">
+      พร้อมตรวจ <span className="font-semibold text-[var(--color-text)]">{willCheck}</span>{" "}
+      รายการ
+      {queue.candidates > willCheck && ` (จากทั้งหมด ${queue.candidates})`}
+    </p>
+  );
+}
+
 export default function ScraperHealth() {
   const {
     runs,
@@ -108,8 +180,11 @@ export default function ScraperHealth() {
     ingestionPending,
     enrichmentPending,
     enrichmentQueue,
+    lifecyclePending,
+    lifecycleQueue,
     triggerIngestion,
     triggerEnrichment,
+    triggerLifecycle,
     lastRunFor,
   } = useIngestionRuns();
 
@@ -121,6 +196,9 @@ export default function ScraperHealth() {
   // null = untouched, follow the backend default (MAX_AI_CALLS_PER_RUN)
   const [enrichmentMaxCalls, setEnrichmentMaxCalls] = useState<number | null>(null);
   const effectiveMaxCalls = enrichmentMaxCalls ?? enrichmentQueue?.maxCalls ?? null;
+  // null = untouched, follow the backend default
+  const [lifecycleMaxTors, setLifecycleMaxTors] = useState<number | null>(null);
+  const effectiveMaxTors = lifecycleMaxTors ?? lifecycleQueue?.maxTors ?? null;
 
   function runIngestion() {
     triggerIngestion({
@@ -147,7 +225,7 @@ export default function ScraperHealth() {
         )}
         {runsError && <p className="mt-3 text-xs text-[var(--color-danger)]">{runsError}</p>}
 
-        <div className="mt-3 grid sm:grid-cols-2 gap-4">
+        <div className="mt-3 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {(
             [
               {
@@ -163,11 +241,21 @@ export default function ScraperHealth() {
                     enrichmentMaxCalls === null ? undefined : { maxCalls: enrichmentMaxCalls }
                   ),
               },
+              {
+                phase: "lifecycle" as const,
+                pending: lifecyclePending,
+                onTrigger: () =>
+                  triggerLifecycle(
+                    lifecycleMaxTors === null ? undefined : { maxTors: lifecycleMaxTors }
+                  ),
+              },
             ]
           ).map(({ phase, pending, onTrigger }) => {
             const last = lastRunFor(phase);
             const nothingQueued =
-              phase === "enrichment" && !pending && enrichmentQueue?.runnable === 0;
+              !pending &&
+              ((phase === "enrichment" && enrichmentQueue?.runnable === 0) ||
+                (phase === "lifecycle" && lifecycleQueue?.candidates === 0));
             return (
               <div key={phase} className="card p-5">
                 <div className="flex items-start justify-between gap-2">
@@ -306,6 +394,36 @@ export default function ScraperHealth() {
                   </>
                 )}
 
+                {phase === "lifecycle" && (
+                  <>
+                    {effectiveMaxTors !== null && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-xs text-[var(--color-text-faint)]">
+                          <span>ตรวจสูงสุดต่อรอบ</span>
+                          <span className="font-medium text-[var(--color-text)]">
+                            {effectiveMaxTors}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={1}
+                          max={Math.max(LIFECYCLE_MAX_TORS_CEILING, effectiveMaxTors)}
+                          value={effectiveMaxTors}
+                          onChange={(e) => setLifecycleMaxTors(Number(e.target.value))}
+                          disabled={pending}
+                          className="mt-1 w-full accent-[var(--color-ink)] disabled:opacity-60"
+                        />
+                      </div>
+                    )}
+                    <LifecycleStatus
+                      pending={pending}
+                      queue={lifecycleQueue}
+                      maxTors={effectiveMaxTors}
+                      run={last?.status === "running" ? last : null}
+                    />
+                  </>
+                )}
+
                 <button
                   type="button"
                   onClick={onTrigger}
@@ -314,6 +432,8 @@ export default function ScraperHealth() {
                 >
                   {phase === "enrichment" ? (
                     <Sparkles size={13} className={pending ? "animate-pulse" : ""} />
+                  ) : phase === "lifecycle" ? (
+                    <ListChecks size={13} className={pending ? "animate-pulse" : ""} />
                   ) : (
                     <RotateCw size={13} className={pending ? "animate-spin" : ""} />
                   )}

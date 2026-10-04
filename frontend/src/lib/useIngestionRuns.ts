@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { requestAdminStatsRefresh } from "@/lib/adminStats";
 
 export type IngestionRunStatus = "running" | "success" | "partial" | "failed";
-export type IngestionPhase = "discovery" | "enrichment";
+export type IngestionPhase = "discovery" | "enrichment" | "lifecycle";
 
 export interface IngestionRunStats {
   torsFound: number;
@@ -30,6 +30,13 @@ export interface EnrichmentQueueInfo {
   willProcess: number;
 }
 
+/** What the next lifecycle refresh would do (GET /api/ingestion/lifecycle/pending). */
+export interface LifecycleQueueInfo {
+  candidates: number;
+  maxTors: number;
+  willCheck: number;
+}
+
 export interface IngestionRun {
   _id: string;
   trigger: "manual" | "scheduled";
@@ -47,6 +54,7 @@ const POLL_INTERVAL_MS = 4000;
 const POLL_TIMEOUT_MS: Record<IngestionPhase, number> = {
   discovery: 3 * 60_000,
   enrichment: 40 * 60_000,
+  lifecycle: 40 * 60_000,
 };
 
 /** Real admin controls for the ingestion/enrichment pipeline (FR-35, FR-36). */
@@ -57,6 +65,8 @@ export function useIngestionRuns() {
   const [ingestionPending, setIngestionPending] = useState(false);
   const [enrichmentPending, setEnrichmentPending] = useState(false);
   const [enrichmentQueue, setEnrichmentQueue] = useState<EnrichmentQueueInfo | null>(null);
+  const [lifecyclePending, setLifecyclePending] = useState(false);
+  const [lifecycleQueue, setLifecycleQueue] = useState<LifecycleQueueInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pollTimers = useRef<Partial<Record<IngestionPhase, ReturnType<typeof setInterval>>>>({});
 
@@ -82,6 +92,16 @@ export function useIngestionRuns() {
     }
   }, []);
 
+  const refreshLifecycleQueue = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/ingestion/lifecycle/pending");
+      if (!res.ok) return;
+      setLifecycleQueue((await res.json()) as LifecycleQueueInfo);
+    } catch {
+      // The count is advisory; the trigger button still works without it.
+    }
+  }, []);
+
   const pollUntilSettled = useCallback(
     (phase: IngestionPhase, setPending: (v: boolean) => void) => {
       const stop = () => {
@@ -100,6 +120,7 @@ export function useIngestionRuns() {
             stop();
             requestAdminStatsRefresh();
             if (phase === "enrichment") void refreshEnrichmentQueue();
+            if (phase === "lifecycle") void refreshLifecycleQueue();
           }
         } catch {
           setPending(false);
@@ -109,7 +130,7 @@ export function useIngestionRuns() {
       void check();
       pollTimers.current[phase] = setInterval(check, POLL_INTERVAL_MS);
     },
-    [refresh, refreshEnrichmentQueue]
+    [refresh, refreshEnrichmentQueue, refreshLifecycleQueue]
   );
 
   useEffect(() => {
@@ -131,12 +152,21 @@ export function useIngestionRuns() {
           setIngestionPending(true);
           pollUntilSettled("discovery", setIngestionPending);
         }
+        if (list.some((r) => r.phase === "lifecycle" && r.status === "running")) {
+          setLifecyclePending(true);
+          pollUntilSettled("lifecycle", setLifecyclePending);
+        }
       })
       .catch(() => setError("โหลดประวัติการรันไม่สำเร็จ"))
       .finally(() => setReady(true));
     apiFetch("/api/ingestion/enrichment/pending")
       .then(async (res) => {
         if (res.ok) setEnrichmentQueue((await res.json()) as EnrichmentQueueInfo);
+      })
+      .catch(() => undefined); // advisory count only
+    apiFetch("/api/ingestion/lifecycle/pending")
+      .then(async (res) => {
+        if (res.ok) setLifecycleQueue((await res.json()) as LifecycleQueueInfo);
       })
       .catch(() => undefined); // advisory count only
   }, [pollUntilSettled]);
@@ -202,6 +232,31 @@ export function useIngestionRuns() {
     }
   }, [pollUntilSettled]);
 
+  const triggerLifecycle = useCallback(async (params?: { maxTors?: number }) => {
+    setError(null);
+    setLifecyclePending(true);
+    try {
+      const res = await apiFetch("/api/ingestion/lifecycle/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params ?? {}),
+      });
+      if (res.status === 401 || res.status === 403) {
+        setForbidden(true);
+        setLifecyclePending(false);
+        return;
+      }
+      if (!res.ok && res.status !== 409) {
+        throw new Error("failed to trigger lifecycle refresh");
+      }
+      requestAdminStatsRefresh();
+      pollUntilSettled("lifecycle", setLifecyclePending);
+    } catch {
+      setError("สั่งตรวจสถานะการจัดซื้อไม่สำเร็จ");
+      setLifecyclePending(false);
+    }
+  }, [pollUntilSettled]);
+
   const lastRunFor = useCallback(
     (phase: IngestionPhase) => runs.find((r) => r.phase === phase) ?? null,
     [runs]
@@ -215,8 +270,11 @@ export function useIngestionRuns() {
     ingestionPending,
     enrichmentPending,
     enrichmentQueue,
+    lifecyclePending,
+    lifecycleQueue,
     triggerIngestion,
     triggerEnrichment,
+    triggerLifecycle,
     lastRunFor,
   };
 }

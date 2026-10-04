@@ -1,0 +1,60 @@
+// backend/src/ingestion/lifecycle/candidates.ts
+import type { QueryFilter } from "mongoose";
+import { Tor, type ITor } from "../../models";
+
+/**
+ * Contract statuses after which a project no longer changes, so it is no longer refreshed:
+ * work delivered in full, on time, or late. ("ยกเลิกโครงการ" is covered by the cancelled stage.)
+ */
+const FINISHED_CONTRACT_STATUSES = ["ส่งงานครบถ้วน", "ส่งงานตามกำหนด", "ส่งงานล่าช้ากว่ากำหนด"];
+
+const DEFAULT_MAX_PER_RUN = 100;
+
+/** Max TORs one lifecycle refresh may check (`MAX_LIFECYCLE_REFRESH_PER_RUN`, default 100). */
+export function maxLifecycleRefreshPerRun(env: NodeJS.ProcessEnv = process.env): number {
+  const n = Number(env.MAX_LIFECYCLE_REFRESH_PER_RUN);
+  return Number.isInteger(n) && n >= 1 ? n : DEFAULT_MAX_PER_RUN;
+}
+
+const DEFAULT_MAX_DEADLINE_EXTRACTIONS = 20;
+
+/** Max invitation PDFs one lifecycle run may send to Gemini (`MAX_DEADLINE_EXTRACTIONS_PER_RUN`, default 20). */
+export function maxDeadlineExtractionsPerRun(env: NodeJS.ProcessEnv = process.env): number {
+  const n = Number(env.MAX_DEADLINE_EXTRACTIONS_PER_RUN);
+  return Number.isInteger(n) && n >= 1 ? n : DEFAULT_MAX_DEADLINE_EXTRACTIONS;
+}
+
+/**
+ * TORs worth re-checking: publicly visible (enriched), reachable (has a listing URL) and not
+ * finished (not cancelled, work not yet delivered). `$ne` / `$nin` also match a missing field, so
+ * TORs that have never been checked are included.
+ */
+export function lifecycleFilter(): QueryFilter<ITor> {
+  return {
+    pipelineStatus: "enriched",
+    sourceListingUrl: { $type: "string", $ne: "" },
+    "procurement.stage": { $ne: "cancelled" },
+    "procurement.contractStatus": { $nin: FINISHED_CONTRACT_STATUSES },
+  };
+}
+
+export function countLifecycleCandidates(): Promise<number> {
+  return Tor.countDocuments(lifecycleFilter());
+}
+
+/**
+ * e-GP's project id is the last path segment of the listing URL that `mapProject` stored
+ * (`<listingBase>/<projectId>`). Returns null when it cannot be recovered.
+ */
+export function projectIdFromListingUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let pathname: string;
+  try {
+    pathname = new URL(url).pathname;
+  } catch {
+    return null;
+  }
+  const segments = pathname.split("/").filter(Boolean);
+  const last = segments[segments.length - 1];
+  return last && last !== "project-detail" ? last : null;
+}

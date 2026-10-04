@@ -1,5 +1,6 @@
 import { API_BASE } from "@/lib/api";
-import { type AISummary, type Category, type FairnessField, type FairnessFlag, type TOR, type TORStatus } from "@/lib/mockData";
+import { type AISummary, type Category, type FairnessField, type FairnessFlag, type TOR, type TorProcurementView } from "@/lib/mockData";
+import { STATUS_FROM_API } from "@/lib/torStatus";
 
 /**
  * API_BASE (NEXT_PUBLIC_API_BASE_URL) is the browser-facing address — in
@@ -80,19 +81,6 @@ export function slugToCategory(raw: string): Category | null {
 /** A TOR whose submission deadline is at most this many days away is "ใกล้ปิดรับ". */
 export const CLOSING_SOON_DAYS = 7;
 
-// The backend's denormalized `status` defaults to "open" and is never
-// recomputed, so derive the status from the deadline instead — only an
-// admin-stored "closed" is honored. Mirrors statusClause in the backend's
-// torController.
-function mapStatus(raw: string | undefined, deadline: string): TORStatus {
-  // Real clock, not the mock TODAY_ISO, so this agrees with the backend filter.
-  if (raw === "closed") return "ปิดรับแล้ว";
-  if (isUnknownDeadline(deadline)) return "เปิดรับ";
-  const msLeft = Date.parse(deadline) - Date.now();
-  if (msLeft < 0) return "ปิดรับแล้ว";
-  return msLeft <= CLOSING_SOON_DAYS * 86_400_000 ? "ใกล้ปิดรับ" : "เปิดรับ";
-}
-
 const CONFIDENCE_MAP: Record<string, AISummary["confidence"]> = {
   high: "สูง",
   medium: "ปานกลาง",
@@ -120,6 +108,42 @@ interface ApiFairnessFlag {
   detectedAt?: string;
 }
 
+interface ApiAnnouncement {
+  announcementId: string;
+  typeName?: string;
+  kind?: string;
+  publishedAt?: string;
+  hasFile?: boolean;
+}
+
+interface ApiProcurement {
+  stage?: string;
+  contractStatus?: string;
+  bidDeadline?: { date?: string } | null;
+  lastCheckedAt?: string;
+  /** Detail responses only. */
+  announcements?: ApiAnnouncement[];
+}
+
+const PROCUREMENT_STAGES = ["draft", "inviting", "awarded", "cancelled"] as const;
+
+function mapProcurement(raw: ApiProcurement | null | undefined): TorProcurementView | null {
+  if (!raw?.stage) return null;
+  return {
+    stage: PROCUREMENT_STAGES.find((s) => s === raw.stage) ?? "draft",
+    contractStatus: raw.contractStatus ?? null,
+    bidDeadline: raw.bidDeadline?.date ?? null,
+    lastCheckedAt: raw.lastCheckedAt ?? null,
+    announcements: (raw.announcements ?? []).map((a) => ({
+      id: a.announcementId,
+      kind: a.kind ?? "unknown",
+      typeName: a.typeName ?? null,
+      publishedAt: a.publishedAt ?? null,
+      hasFile: a.hasFile ?? false,
+    })),
+  };
+}
+
 export interface ApiTor {
   _id: string;
   title: string;
@@ -131,6 +155,9 @@ export interface ApiTor {
   announcementDate?: string;
   submissionDeadline?: string;
   status?: string;
+  /** Server-computed effective status (draft | open | closing_soon | closed | awarded | cancelled). */
+  displayStatus?: string;
+  procurement?: ApiProcurement | null;
   projectCode?: string;
   location?: string;
   viewCount?: number;
@@ -192,7 +219,11 @@ export function mapApiTor(raw: ApiTor): TOR {
     budget: raw.budget ?? raw.referencePrice ?? 0,
     announceDate,
     deadline,
-    status: mapStatus(raw.status, deadline),
+    // The server computes the status from the procurement stage; a missing value (an old
+    // response) falls back to the pre-lifecycle default.
+    status: STATUS_FROM_API[raw.displayStatus ?? ""] ?? "เปิดรับ",
+    procurement: mapProcurement(raw.procurement),
+    manualClosed: raw.status === "closed",
     projectCode: raw.projectCode ?? raw._id,
     location: raw.location ?? raw.agency ?? "",
     views: raw.viewCount ?? 0,
@@ -262,7 +293,7 @@ export function daysLeft(iso: string): number {
 }
 
 /**
- * Count of public TORs per API status (open / closing_soon / closed), from the
+ * Count of public TORs per API status (draft / open / closing_soon / closed / awarded / cancelled), from the
  * same effective-status filter the search page uses. One cheap request each.
  */
 export async function fetchStatusCounts(statuses: readonly string[]): Promise<Record<string, number>> {

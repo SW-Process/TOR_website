@@ -5,17 +5,12 @@ import Link from "next/link";
 import { FileText, Search } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import { categories, type Category, type TOR, type TORStatus } from "@/lib/mockData";
-import { categoryToSlug, daysLeft, isUnknownDeadline, searchTors } from "@/lib/torApi";
+import { categoryToSlug, searchTors } from "@/lib/torApi";
+import { statusNote } from "@/lib/torStatus";
 import { STATUS_API, STATUSES as statuses } from "@/lib/torSearch";
 
 const PREVIEW_SIZE = 5;
 const SEARCH_DEBOUNCE_MS = 300;
-
-function deadlineLabel(tor: TOR): string {
-  if (isUnknownDeadline(tor.deadline)) return "ไม่ระบุวันปิดรับ";
-  const days = daysLeft(tor.deadline);
-  return days >= 0 ? `ปิดรับใน ${days} วัน` : "ปิดรับแล้ว";
-}
 
 /** Latest public TORs from GET /api/tors, newest announcement first. */
 export default function TORPreviewTable() {
@@ -131,7 +126,7 @@ export default function TORPreviewTable() {
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   <StatusBadge status={tor.status} />
                   <span className="text-[11px] text-[var(--color-text-muted)] whitespace-nowrap">
-                    {deadlineLabel(tor)}
+                    {statusNote(tor)}
                   </span>
                 </div>
               </Link>

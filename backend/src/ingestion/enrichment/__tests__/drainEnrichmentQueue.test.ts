@@ -43,6 +43,7 @@ function extractorReturning(...results: (TorExtractionResult | Error)[]): TorExt
   let i = 0;
   return {
     id: "fake-extractor",
+    extractBidDeadline: async () => ({ date: null, time: null, confidence: 0 }),
     extract: async () => {
       const r = results[Math.min(i++, results.length - 1)] as TorExtractionResult | Error;
       if (r instanceof Error) throw r;
@@ -132,6 +133,37 @@ describe("drainEnrichmentQueue", () => {
     expect(run?.stats.enrichmentRetried).toBe(1); // but visible as a retry, not silently dropped
   });
 
+  it("lists exactly the TORs that ended enriched in enrichedTorIds", async () => {
+    setStorageForTest(fakeStorage);
+    const a = await seedTorWithJob();
+    const b = await seedTorWithJob();
+    const c = await seedTorWithJob();
+    const d = await seedTorWithJob();
+    // c fails terminally, d errors transiently; a is ok, b is rejected (matched by projectCode).
+    await EnrichmentJob.updateOne({ torId: c._id }, { $set: { attempts: 4 } });
+    const extractor: TorExtractor = {
+      id: "fake",
+      extractBidDeadline: async () => ({ date: null, time: null, confidence: 0 }),
+      extract: async ({ meta }) => {
+        const code = meta.projectCode;
+        if (code === c.projectCode || code === d.projectCode) throw new Error("boom");
+        if (code === b.projectCode) return result({ isSoftwareRelated: false, summary: null });
+        return result();
+      },
+    };
+    const out = await drainEnrichmentQueue({ extractor });
+    expect(out.enrichedOk).toBe(1);
+    expect(out.enrichedRejected).toBe(1);
+    expect(out.enrichedFailed).toBe(1);
+    expect(out.enrichedTorIds).toEqual([a.id]);
+  });
+
+  it("returns an empty enrichedTorIds when the queue is empty", async () => {
+    setStorageForTest(fakeStorage);
+    const out = await drainEnrichmentQueue({ extractor: extractorReturning(result()) });
+    expect(out.enrichedTorIds).toEqual([]);
+  });
+
   it("files its logs under source ai-pipeline, not ingestion", async () => {
     setStorageForTest(fakeStorage);
     await seedTorWithJob();
@@ -213,6 +245,7 @@ describe("drainEnrichmentQueue", () => {
     let call = 0;
     const extractor: TorExtractor = {
       id: "fake",
+      extractBidDeadline: async () => ({ date: null, time: null, confidence: 0 }),
       extract: async () => {
         // On the 2nd call the 1st job has finished — its progress must be in Mongo already,
     // and the job in flight is not yet counted as processed.
@@ -246,7 +279,7 @@ describe("drainEnrichmentQueue", () => {
     const announcementDate = new Date("2026-08-01T00:00:00.000Z");
     await seedTorWithJob({ announcementDate });
     const extract = jest.fn().mockResolvedValue(result());
-    await drainEnrichmentQueue({ extractor: { id: "fake", extract } });
+    await drainEnrichmentQueue({ extractor: { id: "fake", extract, extractBidDeadline: async () => ({ date: null, time: null, confidence: 0 }) } });
     expect(extract).toHaveBeenCalledWith(
       expect.objectContaining({
         meta: expect.objectContaining({ announcementDate: announcementDate.toISOString() }),

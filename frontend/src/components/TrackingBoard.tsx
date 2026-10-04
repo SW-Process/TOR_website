@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Building2, GripVertical, Inbox } from "lucide-react";
-import { daysUntil, formatThaiDate } from "@/lib/mockData";
-import { isUnknownDeadline } from "@/lib/torApi";
+import { statusNote } from "@/lib/torStatus";
 import {
   APPLICATION_STATUSES,
   APPLICATION_STATUS_LABELS,
@@ -92,9 +91,7 @@ export default function TrackingBoard({
               </div>
             ) : (
               <div className="flex flex-col gap-2.5">
-                {items.map((tor) => {
-                  const remaining = daysUntil(tor.deadline);
-                  return (
+                {items.map((tor) => (
                     <div
                       key={tor.id}
                       draggable
@@ -123,16 +120,12 @@ export default function TrackingBoard({
                       </span>
                       <span
                         className={`text-[11px] font-medium ${
-                          remaining <= 3 && remaining >= 0
+                          tor.status === "ใกล้ปิดรับ"
                             ? "text-[var(--color-warning)]"
                             : "text-[var(--color-text-faint)]"
                         }`}
                       >
-                        {isUnknownDeadline(tor.deadline)
-                          ? "ไม่ระบุวันปิดรับ"
-                          : remaining < 0
-                          ? `ปิดรับเมื่อ ${formatThaiDate(tor.deadline)}`
-                          : `เหลือ ${remaining} วัน`}
+                        {statusNote(tor)}
                       </span>
 
                       <select
@@ -147,8 +140,7 @@ export default function TrackingBoard({
                         ))}
                       </select>
                     </div>
-                  );
-                })}
+                  ))}
               </div>
             )}
           </div>

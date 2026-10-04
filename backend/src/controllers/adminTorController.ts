@@ -6,6 +6,8 @@ import { Tor } from "../models";
 import type { ITor } from "../models";
 import { TAXONOMY } from "../config/taxonomy";
 import { httpError } from "../utils/httpError";
+import { bangkokEndOfDay } from "../utils/bidDeadline";
+import { withDisplayStatus, type StatusInput } from "../utils/torStatus";
 import { DEFAULT_ORDER, LIST_PROJECTION, buildFilter, parseQuery, sortStages } from "./torController";
 
 /**
@@ -51,7 +53,7 @@ export async function listAdminTors(req: Request, res: Response): Promise<void> 
   ]);
   const totalCount = result?.meta[0]?.totalCount ?? 0;
   res.status(200).json({
-    data: result?.data ?? [],
+    data: (result?.data ?? []).map((row) => withDisplayStatus(row as StatusInput)),
     page: q.page,
     pageSize: q.pageSize,
     totalCount,
@@ -68,6 +70,8 @@ const updateSchema = z
     budget: z.number().min(0).nullable().optional(),
     submissionDeadline: z.coerce.date().nullable().optional(),
     status: z.enum(["open", "closing_soon", "closed"]).optional(),
+    /** Real bid-submission deadline, `YYYY-MM-DD` (end of that Bangkok day); null clears it. */
+    bidDeadline: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "bidDeadline must be YYYY-MM-DD").nullable().optional(),
     /** Mark every open fairness flag as acknowledged (reviewed). */
     resolveFlags: z.boolean().optional(),
   })
@@ -84,10 +88,21 @@ export async function updateAdminTor(req: Request, res: Response): Promise<void>
   const id = torIdParam(req);
   const parsed = updateSchema.safeParse(req.body ?? {});
   if (!parsed.success) throw httpError(400, parsed.error.issues.map((i) => i.message).join("; "));
-  const { resolveFlags, budget, submissionDeadline, ...fields } = parsed.data;
+  const { resolveFlags, budget, submissionDeadline, bidDeadline, ...fields } = parsed.data;
 
   const tor = await Tor.findOne({ _id: id, pipelineStatus: "enriched" });
   if (!tor) throw httpError(404, "TOR not found");
+
+  let bidDeadlineValue: Date | null | undefined;
+  if (bidDeadline !== undefined) {
+    if (bidDeadline === null) bidDeadlineValue = null;
+    else {
+      const d = bangkokEndOfDay(bidDeadline);
+      if (!d) throw httpError(400, "bidDeadline is not a valid date");
+      bidDeadlineValue = d;
+    }
+    if (!tor.procurement) throw httpError(409, "TOR has no procurement data yet; wait for the next lifecycle refresh");
+  }
 
   tor.set(fields);
   // null clears the field (e.g. a deadline the model got wrong and the TOR doesn't state).
@@ -99,9 +114,22 @@ export async function updateAdminTor(req: Request, res: Response): Promise<void>
     }
   }
   await tor.save();
+  if (bidDeadlineValue !== undefined) {
+    // Targeted path write: never clobbers the refresh-owned procurement fields.
+    await Tor.updateOne(
+      { _id: id, procurement: { $ne: null } },
+      {
+        $set: {
+          "procurement.bidDeadline":
+            bidDeadlineValue === null ? null : { date: bidDeadlineValue, source: "admin", extractedAt: new Date() },
+        },
+      },
+      { timestamps: false }
+    );
+  }
 
   const saved = await Tor.findById(id).select(ADMIN_PROJECT_STAGE).lean();
-  res.status(200).json({ tor: saved });
+  res.status(200).json({ tor: saved ? withDisplayStatus(saved) : saved });
 }
 
 /**

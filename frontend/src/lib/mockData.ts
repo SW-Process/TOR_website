@@ -1,4 +1,31 @@
-export type TORStatus = "เปิดรับ" | "ใกล้ปิดรับ" | "ปิดรับแล้ว";
+export type TORStatus =
+  | "เปิดรับ"
+  | "ใกล้ปิดรับ"
+  | "ปิดรับแล้ว"
+  | "ร่าง TOR"
+  | "ประกาศผู้ชนะแล้ว"
+  | "ยกเลิก";
+
+export interface TorAnnouncementView {
+  id: string;
+  /** Normalised kind from the backend (`invitation`, `winner`, …); see ANNOUNCEMENT_KIND_LABELS. */
+  kind: string;
+  typeName: string | null;
+  publishedAt: string | null;
+  hasFile: boolean;
+}
+
+/** Where the project sits in the e-GP procurement lifecycle (Tor.procurement). */
+export interface TorProcurementView {
+  stage: "draft" | "inviting" | "awarded" | "cancelled";
+  /** Raw e-GP contract status, e.g. "ระหว่างดำเนินการ". */
+  contractStatus: string | null;
+  /** Real bid-submission deadline (ISO) when known; null until it has been read. */
+  bidDeadline: string | null;
+  lastCheckedAt: string | null;
+  /** Dated timeline; only the detail response includes it. */
+  announcements: TorAnnouncementView[];
+}
 
 export type Category =
   | "พัฒนาระบบซอฟต์แวร์"
@@ -71,6 +98,10 @@ export interface TOR {
   summary: AISummary;
   description: string;
   fairnessFlags: FairnessFlag[];
+  /** Optional so the mock rows below stay valid; real API rows always set it (or null). */
+  procurement?: TorProcurementView | null;
+  /** True when an admin closed the TOR by hand (stored status "closed"). */
+  manualClosed?: boolean;
 }
 
 export const categories: Category[] = [

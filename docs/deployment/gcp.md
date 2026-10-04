@@ -1,7 +1,7 @@
 # GCP Deployment — TOR ingestion
 
 Deploys the backend as one Cloud Run **service** (`tor-api`, the read/admin API) plus
-two Cloud Run **jobs** (`tor-discovery`, `tor-enrichment`) driven by Cloud Scheduler.
+three Cloud Run **jobs** (`tor-discovery`, `tor-enrichment`, `tor-lifecycle`) driven by Cloud Scheduler.
 Placeholders: `<PROJECT>`, `<REGION>` (`asia-southeast1`), `<BUCKET>`, `<IMG>`,
 `<MONGODB_URI>`, `<FRONTEND_URL>`.
 
@@ -61,6 +61,9 @@ Placeholders: `<PROJECT>`, `<REGION>` (`asia-southeast1`), `<BUCKET>`, `<IMG>`,
   gcloud run jobs add-iam-policy-binding tor-enrichment \
     --member="serviceAccount:tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com" \
     --role="roles/run.invoker" --region asia-southeast1
+  gcloud run jobs add-iam-policy-binding tor-lifecycle \
+    --member="serviceAccount:tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com" \
+    --role="roles/run.invoker" --region asia-southeast1
   ```
 
 ## Image
@@ -103,13 +106,32 @@ gcloud run jobs deploy tor-enrichment \
   --set-secrets MONGODB_URI=MONGODB_URI:latest \
   --set-env-vars "^::^STORAGE_DRIVER=gcs::GCS_BUCKET=<BUCKET>::GOOGLE_CLOUD_PROJECT=<PROJECT>::GOOGLE_CLOUD_LOCATION=us-central1::VERTEX_MODEL=gemini-2.5-flash::MAX_AI_CALLS_PER_RUN=50" \
   --command node --args dist/jobs/enrichment.js --max-retries 0 --task-timeout 1800s --memory 1Gi
+
+gcloud run jobs deploy tor-lifecycle \
+  --image <IMG> --region asia-southeast1 --service-account tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com \
+  --set-secrets MONGODB_URI=MONGODB_URI:latest \
+  --set-env-vars "^::^STORAGE_DRIVER=gcs::GCS_BUCKET=<BUCKET>::GOOGLE_CLOUD_PROJECT=<PROJECT>::GOOGLE_CLOUD_LOCATION=us-central1::VERTEX_MODEL=gemini-2.5-flash::MAX_LIFECYCLE_REFRESH_PER_RUN=100::MAX_DEADLINE_EXTRACTIONS_PER_RUN=20" \
+  --command node --args dist/jobs/lifecycle.js --max-retries 0 --task-timeout 1800s --memory 1Gi
 ```
 
-> Both commands use gcloud's alternate-delimiter form `--set-env-vars "^::^k=v::k=v..."`
+> `tor-enrichment` ends by running the lifecycle refresh for the TORs it just enriched, so it needs
+> the same e-GP access and env it already has (no new env vars); the lifecycle's
+> `MAX_DEADLINE_EXTRACTIONS_PER_RUN` cap applies to that chained run.
+>
+> `tor-lifecycle` now also reads the bid deadline of `inviting` TORs from their invitation PDF
+> (one small Gemini call each, capped by `MAX_DEADLINE_EXTRACTIONS_PER_RUN`), so `tor-jobs-sa`
+> needs the same Vertex AI and bucket-write roles for this job as for `tor-enrichment`. The
+> admin-triggered refresh (`POST /api/ingestion/lifecycle/runs`) runs inside the backend service
+> and uses that service's own env, which needs the same variables there. Set the `tor-lifecycle`
+> env (`STORAGE_DRIVER=gcs`, `GCS_BUCKET`, the Vertex vars) before or together with the image
+> update; otherwise storage defaults to local disk on an ephemeral container and the stored keys
+> point to blobs that do not exist.
+
+> All the job commands use gcloud's alternate-delimiter form `--set-env-vars "^::^k=v::k=v..."`
 > because `INGEST_AGENCIES` is itself a comma-separated list: with the default separator
 > gcloud would read each agency name after the first as its own `key=value` pair and
 > reject the command. `::` is the separator here (no value contains it); the
-> `tor-enrichment` command uses the same form for consistency even though none of its
+> `tor-enrichment` and `tor-lifecycle` commands use the same form for consistency even though none of their
 > values contain a comma.
 
 ## Schedules (cadence lives here — change with `gcloud scheduler jobs update`, no redeploy)
@@ -128,6 +150,13 @@ gcloud scheduler jobs create http tor-discovery-cron --location asia-southeast1 
 gcloud scheduler jobs create http tor-enrichment-cron --location asia-southeast1 \
   --schedule "*/15 * * * *" \
   --uri "https://<REGION>-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/<PROJECT>/jobs/tor-enrichment:run" \
+  --http-method POST \
+  --oauth-service-account-email tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com
+
+# daily at 02:30 Bangkok time (19:30 UTC) — offset from the hourly discovery cron, which fires at minute 0
+gcloud scheduler jobs create http tor-lifecycle-cron --location asia-southeast1 \
+  --schedule "30 19 * * *" \
+  --uri "https://<REGION>-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/<PROJECT>/jobs/tor-lifecycle:run" \
   --http-method POST \
   --oauth-service-account-email tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com
 ```

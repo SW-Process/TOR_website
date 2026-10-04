@@ -6,6 +6,7 @@ import { Tor } from "../models";
 import type { ITor } from "../models";
 import { httpError } from "../utils/httpError";
 import { PROJECT_TYPES } from "../config/projectTypes";
+import { TOR_STATUSES, statusClause, withDisplayStatus, type StatusInput } from "../utils/torStatus";
 
 /** Escape a user string so it is a literal inside a RegExp. */
 function escapeRegExp(input: string): string {
@@ -17,14 +18,20 @@ const asArray = (v: unknown): string[] | undefined => {
   return Array.isArray(v) ? v.map(String) : [String(v)];
 };
 
-const TOR_STATUSES = ["open", "closing_soon", "closed"] as const;
-const SORT_FIELDS = ["announcementDate", "submissionDeadline", "budget"] as const;
+const SORT_FIELDS = ["announcementDate", "bidDeadline", "budget"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
+
+/** Stored path behind each sort value (`bidDeadline` is the real bid deadline from the lifecycle refresh / admin). */
+const SORT_PATH: Record<SortField, string> = {
+  announcementDate: "announcementDate",
+  bidDeadline: "procurement.bidDeadline.date",
+  budget: "budget",
+};
 
 /** Default direction per sort field: newest / soonest deadline / largest budget first. */
 export const DEFAULT_ORDER: Record<SortField, "asc" | "desc"> = {
   announcementDate: "desc",
-  submissionDeadline: "asc",
+  bidDeadline: "asc",
   budget: "desc",
 };
 
@@ -59,36 +66,9 @@ const listQuerySchema = z.object({
 export type ListQuery = z.infer<typeof listQuerySchema>;
 
 export const LIST_PROJECTION =
-  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl";
+  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt";
 
 const LIST_PROJECT_STAGE = Object.fromEntries(LIST_PROJECTION.split(" ").map((f) => [f, 1]));
-
-/** A TOR whose submission deadline is at most this many days away is "closing soon". */
-export const CLOSING_SOON_DAYS = 7;
-const DAY_MS = 86_400_000;
-
-/**
- * Effective lifecycle status, derived from submissionDeadline rather than the
- * stored `status` (which defaults to "open" and is never recomputed):
- *   closed       — deadline passed, or an admin stored "closed"
- *   closing_soon — deadline within CLOSING_SOON_DAYS from now
- *   open         — deadline further out, or unknown
- * Mirrors mapStatus in frontend/src/lib/torApi.ts.
- */
-function statusClause(status: (typeof TOR_STATUSES)[number], now: Date): QueryFilter<ITor> {
-  const soon = new Date(now.getTime() + CLOSING_SOON_DAYS * DAY_MS);
-  const notStoredClosed = { status: { $ne: "closed" as const } };
-  switch (status) {
-    case "closed":
-      return { $or: [{ submissionDeadline: { $lt: now } }, { status: "closed" }] };
-    case "closing_soon":
-      return { $and: [notStoredClosed, { submissionDeadline: { $gte: now, $lte: soon } }] };
-    case "open":
-      return {
-        $and: [notStoredClosed, { $or: [{ submissionDeadline: { $gt: soon } }, { submissionDeadline: null }] }],
-      };
-  }
-}
 
 export function buildFilter(q: ListQuery): QueryFilter<ITor> {
   const filter: QueryFilter<ITor> = { pipelineStatus: "enriched" };
@@ -128,12 +108,13 @@ export function buildFilter(q: ListQuery): QueryFilter<ITor> {
     if (q.publishedTo) range.$lte = q.publishedTo;
     filter.announcementDate = range;
   }
-  // FR-4: TORs with an unknown deadline never match a deadline range.
+  // FR-4: the deadline range is over the real bid deadline (procurement.bidDeadline.date,
+  // not the legacy TOR-document date); TORs without one never match a deadline range.
   if (q.deadlineFrom || q.deadlineTo) {
     const range: Record<string, Date> = {};
     if (q.deadlineFrom) range.$gte = q.deadlineFrom;
     if (q.deadlineTo) range.$lte = q.deadlineTo;
-    filter.submissionDeadline = range;
+    filter["procurement.bidDeadline.date"] = range;
   }
   if (q.status?.length) {
     const now = new Date();
@@ -144,26 +125,39 @@ export function buildFilter(q: ListQuery): QueryFilter<ITor> {
 
 /**
  * Sort stages for the list. Rows missing the sort field always go last. The
- * deadline ascending sort ("closing soonest") puts upcoming deadlines first,
- * then already-passed ones (most recent first), then unknown deadlines —
- * otherwise years-old closed TORs would top the list.
+ * bid-deadline ascending sort ("closing soonest") is three groups: (0) still
+ * inviting, not manually closed, deadline not yet passed — soonest first; (1) any
+ * other TOR with a deadline (passed, awarded/cancelled, manually closed) — most
+ * recent first; (2) no deadline. `bidDeadline` stays stored after a TOR moves
+ * on, so a future date alone must not float a finished TOR to the top.
  */
 export function sortStages(field: SortField, order: "asc" | "desc"): PipelineStage.FacetPipelineStage[] {
   const dir = order === "asc" ? 1 : -1;
-  const missing = { $cond: [{ $ifNull: [`$${field}`, false] }, 0, 1] };
+  const path = SORT_PATH[field];
+  const missing = { $cond: [{ $ifNull: [`$${path}`, false] }, 0, 1] };
 
-  if (field === "submissionDeadline" && order === "asc") {
+  if (field === "bidDeadline" && order === "asc") {
     const now = new Date();
+    const deadline = "$procurement.bidDeadline.date";
     return [
       {
         $addFields: {
           _bucket: {
             $switch: {
               branches: [
-                { case: { $eq: [{ $ifNull: ["$submissionDeadline", null] }, null] }, then: 2 },
-                { case: { $lt: ["$submissionDeadline", now] }, then: 1 },
+                { case: { $eq: [{ $ifNull: [deadline, null] }, null] }, then: 2 },
+                {
+                  case: {
+                    $and: [
+                      { $eq: ["$procurement.stage", "inviting"] },
+                      { $ne: ["$status", "closed"] },
+                      { $gte: [deadline, now] },
+                    ],
+                  },
+                  then: 0,
+                },
               ],
-              default: 0,
+              default: 1,
             },
           },
         },
@@ -173,8 +167,8 @@ export function sortStages(field: SortField, order: "asc" | "desc"): PipelineSta
           _key: {
             $switch: {
               branches: [
-                { case: { $eq: ["$_bucket", 0] }, then: { $toLong: "$submissionDeadline" } },
-                { case: { $eq: ["$_bucket", 1] }, then: { $multiply: [-1, { $toLong: "$submissionDeadline" }] } },
+                { case: { $eq: ["$_bucket", 0] }, then: { $toLong: deadline } },
+                { case: { $eq: ["$_bucket", 1] }, then: { $multiply: [-1, { $toLong: deadline }] } },
               ],
               default: 0,
             },
@@ -184,7 +178,7 @@ export function sortStages(field: SortField, order: "asc" | "desc"): PipelineSta
       { $sort: { _bucket: 1, _key: 1, _id: -1 } },
     ];
   }
-  return [{ $addFields: { _missing: missing } }, { $sort: { _missing: 1, [field]: dir, _id: -1 } }];
+  return [{ $addFields: { _missing: missing } }, { $sort: { _missing: 1, [path]: dir, _id: -1 } }];
 }
 
 export function parseQuery(req: Request): ListQuery {
@@ -226,7 +220,7 @@ export async function listTors(req: Request, res: Response): Promise<void> {
   ]);
   const totalCount = result?.meta[0]?.totalCount ?? 0;
   res.status(200).json({
-    data: result?.data ?? [],
+    data: (result?.data ?? []).map((row) => withDisplayStatus(row as StatusInput)),
     page: q.page,
     pageSize: q.pageSize,
     sort: q.sort,
@@ -270,11 +264,11 @@ export async function listTechnologies(_req: Request, res: Response): Promise<vo
 export async function getTor(req: Request, res: Response): Promise<void> {
   const tor = await Tor.findOne({ _id: req.params.id, pipelineStatus: "enriched" })
     .select(
-      "-sourceContentHash -classification -ingestionRunId -__v -sourceDocument.storageKey -sourceDocument.sha256"
+      "-sourceContentHash -classification -ingestionRunId -__v -sourceDocument.storageKey -sourceDocument.sha256 -procurement.announcements.storageKey -procurement.deadlineAttempt"
     )
     .lean();
   if (!tor) throw httpError(404, "TOR not found");
-  res.status(200).json({ tor });
+  res.status(200).json({ tor: withDisplayStatus(tor) });
 }
 
 function percentile(sorted: number[], p: number): number {

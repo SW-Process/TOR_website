@@ -4,6 +4,8 @@ import type {
   EgpProjectDetail,
   EgpSearchProject,
 } from "../scraper/egpClient.types";
+import type { IProcurement } from "../models/Tor";
+import { buildProcurement } from "./procurementStage";
 
 export interface TorAnnouncementRef {
   announcementId: string;
@@ -28,16 +30,22 @@ export interface MappedProjectSet {
 export interface MappedProject {
   projectCode: string;
   sourceContentHash: string;
+  /** The pre-procurement-stage hash (also covered contract status); see runIngestion. */
+  legacySourceContentHash: string;
   set: MappedProjectSet;
+  procurement: IProcurement;
   torAnnouncement: TorAnnouncementRef | null;
   ingestErrors: string[];
 }
 
 const TOR_KIND_PREFIX = "ร่างขอบเขตของงาน";
 
-/** sha256 of the detail fields we persist, with a fixed key order. */
-export function canonicalDetailHash(detail: EgpProjectDetail): string {
-  const ordered = [
+function sha256OfFields(fields: unknown[]): string {
+  return createHash("sha256").update(JSON.stringify(fields)).digest("hex");
+}
+
+function coreDetailFields(detail: EgpProjectDetail): unknown[] {
+  return [
     detail.projectName,
     detail.masterOrgGroupName,
     detail.masterOrgDepartmentName,
@@ -46,9 +54,49 @@ export function canonicalDetailHash(detail: EgpProjectDetail): string {
     detail.masterMethodIdName,
     detail.masterTypeIdName,
     detail.masterGoodsIdName,
-    detail.masterContractAvailableName,
   ];
-  return createHash("sha256").update(JSON.stringify(ordered)).digest("hex");
+}
+
+/**
+ * sha256 of the detail fields we persist, with a fixed key order. Deliberately excludes the
+ * contract status: it changes as a project progresses and must not re-trigger AI enrichment
+ * (it lives on `Tor.procurement` instead).
+ */
+export function canonicalDetailHash(detail: EgpProjectDetail): string {
+  return sha256OfFields(coreDetailFields(detail));
+}
+
+/** The hash stored before procurement stages existed: the core fields plus contract status. */
+export function legacyDetailHash(detail: EgpProjectDetail): string {
+  return sha256OfFields([...coreDetailFields(detail), detail.masterContractAvailableName]);
+}
+
+type CoreFields = Pick<
+  MappedProjectSet,
+  | "title"
+  | "agency"
+  | "department"
+  | "budget"
+  | "referencePrice"
+  | "procurementMethod"
+  | "procurementType"
+  | "goodsCategory"
+>;
+
+const CORE_KEYS: (keyof CoreFields)[] = [
+  "title",
+  "agency",
+  "department",
+  "budget",
+  "referencePrice",
+  "procurementMethod",
+  "procurementType",
+  "goodsCategory",
+];
+
+/** True when the stored Tor and the freshly mapped set agree on every hashed field (null == undefined). */
+export function sameCoreFields(stored: Partial<CoreFields>, set: MappedProjectSet): boolean {
+  return CORE_KEYS.every((k) => (stored[k] ?? null) === (set[k] ?? null));
 }
 
 function optionalString(value: string | null | undefined): string | undefined {
@@ -74,7 +122,7 @@ export function mapProject(
   project: EgpSearchProject,
   detail: EgpProjectDetail,
   announcements: EgpAnnouncement[],
-  opts: { fileBase: string; listingBase: string }
+  opts: { fileBase: string; listingBase: string; now?: Date }
 ): MappedProject {
   const ingestErrors: string[] = [];
 
@@ -111,7 +159,9 @@ export function mapProject(
   return {
     projectCode: project.projectNumber,
     sourceContentHash: canonicalDetailHash(detail),
+    legacySourceContentHash: legacyDetailHash(detail),
     set,
+    procurement: buildProcurement(announcements, detail.masterContractAvailableName, opts.now ?? new Date()),
     torAnnouncement,
     ingestErrors,
   };

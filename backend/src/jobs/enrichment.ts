@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { connectDB } from "../config/db";
 import { drainEnrichmentQueue } from "../ingestion/enrichment/drainEnrichmentQueue";
 import { GeminiExtractor } from "../ingestion/enrichment/geminiExtractor";
+import { chainLifecycleAfterEnrichment } from "../ingestion/lifecycle/afterEnrichment";
 import type { TorExtractor } from "../ingestion/enrichment/torExtractor";
 
 /**
@@ -27,6 +28,8 @@ export async function runEnrichmentJob(): Promise<void> {
     await connectDB();
     const extractor = selectExtractor();
     const out = await drainEnrichmentQueue({ extractor });
+    // Never throws; runs before disconnect so Mongo stays open until it finishes.
+    await chainLifecycleAfterEnrichment(out, { trigger: "scheduled", deadlineExtractor: extractor });
     console.log(
       `enrichment run ${out.runId}: claimed ${out.claimed}, ok ${out.enrichedOk}, rejected ${out.enrichedRejected}, failed ${out.enrichedFailed}`
     );

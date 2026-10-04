@@ -15,12 +15,17 @@ export interface DrainDeps {
   now?: () => Date;
 }
 
+/**
+ * Counts for one drain. `enrichedTorIds` lists (as strings) the TORs whose job ended `enriched` in
+ * this run only: not rejected, not failed, not retried. `[]` when none.
+ */
 export interface DrainResult {
   runId: string;
   claimed: number;
   enrichedOk: number;
   enrichedRejected: number;
   enrichedFailed: number;
+  enrichedTorIds: string[];
 }
 
 async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
@@ -59,6 +64,7 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
   let enrichedRejected = 0;
   let enrichedFailed = 0;
   let enrichedRetried = 0;
+  const enrichedTorIds: string[] = [];
 
   // Progress denominator for the admin UI: what this run will claim at most.
   const planned = Math.max(0, Math.min(await countRunnable(now()), maxCalls));
@@ -142,6 +148,7 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
           await complete(job._id, workerId, "rejected");
         } else {
           enrichedOk += 1;
+          enrichedTorIds.push(tor.id);
           await complete(job._id, workerId, "done");
         }
       } catch (err) {
@@ -172,7 +179,7 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
     }
 
     if (!run) {
-      return { runId: "", claimed, enrichedOk, enrichedRejected, enrichedFailed };
+      return { runId: "", claimed, enrichedOk, enrichedRejected, enrichedFailed, enrichedTorIds };
     }
 
     const activeRun: HydratedDocument<IIngestionRun> = run;
@@ -194,7 +201,7 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
       component: "drainEnrichmentQueue",
       ingestionRunId: runId,
     });
-    return { runId: runId.toString(), claimed, enrichedOk, enrichedRejected, enrichedFailed };
+    return { runId: runId.toString(), claimed, enrichedOk, enrichedRejected, enrichedFailed, enrichedTorIds };
   } catch (fatal) {
     if (run) {
       const activeRun: HydratedDocument<IIngestionRun> = run;
@@ -216,9 +223,10 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
         enrichedOk,
         enrichedRejected,
         enrichedFailed,
+        enrichedTorIds,
       };
     }
-    return { runId: "", claimed, enrichedOk, enrichedRejected, enrichedFailed };
+    return { runId: "", claimed, enrichedOk, enrichedRejected, enrichedFailed, enrichedTorIds };
   }
 }
 

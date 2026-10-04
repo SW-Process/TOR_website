@@ -4,7 +4,9 @@ import { EgpClient, egpConfigFromEnv, listingUrl } from "../scraper/egpClient";
 import { TOR_TYPE_ID, type EgpClientLike } from "../scraper/egpClient.types";
 import { getStorage } from "../storage";
 import type { BlobStorage } from "../storage/storage.types";
-import { mapProject } from "./mapProject";
+import { mapProject, sameCoreFields } from "./mapProject";
+import { mergeProcurement } from "./procurementStage";
+import { writeProcurementIfUnchanged } from "./procurementWrite";
 import { fetchAndStoreTorPdf } from "./fetchAndStoreTorPdf";
 import { logIngestionEvent } from "./log";
 import type { PdfParseFn } from "./pdfInspect";
@@ -75,6 +77,11 @@ async function processProject(
   stats: { torsCreated: number; torsUpdated: number; torsSkipped: number; torsUnchanged: number },
   ctx: ProcessContext
 ): Promise<void> {
+  // The procurement the guarded write below is conditional on, read BEFORE the slow e-GP calls
+  // so a writer that advances the TOR meanwhile (lifecycle refresh) is detected, not overwritten.
+  const readProcurement = (
+    await Tor.findOne({ projectCode: project.projectNumber }).select("procurement").lean()
+  )?.procurement;
   const detail = await client.projectDetail(project.projectId);
 
   if (!isAgencyAllowed(detail.masterOrgGroupName, ctx.allowlist)) {
@@ -86,8 +93,13 @@ async function processProject(
   const mapped = mapProject(project, detail, announcements, {
     fileBase: egpConfigFromEnv().fileBase,
     listingBase: listingUrl("", process.env).replace(/\/$/, ""),
+    now: ctx.now(),
   });
 
+  // Procurement is refreshed on every sighting through the guarded writer, BEFORE the rest of the
+  // Tor is saved: a failed write throws and leaves the Tor untouched (re-sighted next run), and a
+  // concurrent writer is detected (skipped, the lifecycle refresh repairs it) instead of being
+  // overwritten. mergeProcurement keeps `bidDeadline` and each announcement's stored copy.
   let tor = await Tor.findOne({ projectCode: mapped.projectCode });
   let created = false;
   let updated = false;
@@ -97,18 +109,40 @@ async function processProject(
       projectCode: mapped.projectCode,
       sourceContentHash: mapped.sourceContentHash,
       ingestionRunId: runId,
+      procurement: mergeProcurement(null, mapped.procurement),
     });
     created = true;
     stats.torsCreated += 1;
-  } else if (tor.sourceContentHash !== mapped.sourceContentHash) {
-    tor.set({ ...mapped.set, sourceContentHash: mapped.sourceContentHash, ingestionRunId: runId });
-    await tor.save();
-    updated = true;
-    stats.torsUpdated += 1;
   } else {
-    // Found, but the source content hash matches what we already have — a
-    // deliberate idempotent no-op, not an unaccounted-for outcome.
-    stats.torsUnchanged += 1;
+    await writeProcurementIfUnchanged(
+      tor._id as Types.ObjectId,
+      readProcurement,
+      mergeProcurement(readProcurement, mapped.procurement)
+    );
+
+    // A hash stored before procurement stages existed also covered the contract status. Adopt
+    // the new hash quietly (no update, PDF fetch or AI enqueue) when either:
+    //  (i) the stored hash equals the legacy hash of the fresh detail (nothing at all changed), or
+    //  (ii) every stored hashed core field equals the fresh one, so the only possible difference
+    //       is the contract status. Deliberately not conditioned on `procurement` being absent:
+    //       the lifecycle refresh job may already have written it onto a legacy-hash Tor.
+    if (
+      tor.sourceContentHash !== mapped.sourceContentHash &&
+      (tor.sourceContentHash === mapped.legacySourceContentHash || sameCoreFields(tor, mapped.set))
+    ) {
+      tor.sourceContentHash = mapped.sourceContentHash;
+    }
+
+    if (tor.sourceContentHash !== mapped.sourceContentHash) {
+      tor.set({ ...mapped.set, sourceContentHash: mapped.sourceContentHash, ingestionRunId: runId });
+      updated = true;
+      stats.torsUpdated += 1;
+    } else {
+      // Found, but the source content hash matches what we already have — a
+      // deliberate idempotent no-op, not an unaccounted-for outcome.
+      stats.torsUnchanged += 1;
+    }
+    await tor.save();
   }
 
   for (const message of mapped.ingestErrors) {

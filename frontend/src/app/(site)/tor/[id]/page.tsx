@@ -14,8 +14,9 @@ import {
   ShieldAlert,
   Sparkles,
 } from "lucide-react";
-import { daysUntil, formatBudget, formatThaiDate, type FairnessField, type FairnessFlag } from "@/lib/mockData";
+import { formatBudget, formatThaiDate, type FairnessField, type FairnessFlag } from "@/lib/mockData";
 import { fetchTorById, fetchTorList, isUnknownDeadline } from "@/lib/torApi";
+import { ANNOUNCEMENT_KIND_LABELS, statusNote } from "@/lib/torStatus";
 import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
 import ReportIssueButton from "@/components/ReportIssueButton";
@@ -47,7 +48,8 @@ export default async function TORDetailPage({
   const tor = await fetchTorById(id);
   if (!tor) notFound();
 
-  const remaining = daysUntil(tor.deadline);
+  const procurement = tor.procurement ?? null;
+  const bidDeadline = procurement?.bidDeadline ?? null;
   const torList = await fetchTorList();
   const related = torList
     .filter((t) => t.category === tor.category && t.id !== tor.id)
@@ -101,6 +103,35 @@ export default async function TORDetailPage({
               </div>
             ))}
           </div>
+
+          {procurement && procurement.announcements.length > 0 && (
+            <div className="mt-8 card p-6 sm:p-7">
+              <h2 className="font-[family-name:var(--font-heading)] font-bold text-[var(--color-text)]">
+                ลำดับประกาศใน e-GP
+              </h2>
+              <ol className="mt-4 space-y-3">
+                {procurement.announcements.map((a) => (
+                  <li key={a.id} className="flex items-start gap-3">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--color-rose-dark)]" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[var(--color-text)]">
+                        {ANNOUNCEMENT_KIND_LABELS[a.kind] ?? a.typeName ?? "ประกาศ"}
+                      </p>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        {a.publishedAt ? formatThaiDate(a.publishedAt) : "ไม่ระบุวันที่"}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <div className="mt-5 flex flex-wrap gap-x-5 gap-y-1 border-t border-[var(--color-border)] pt-4 text-xs text-[var(--color-text-muted)]">
+                {procurement.contractStatus && <span>สถานะสัญญา: {procurement.contractStatus}</span>}
+                {procurement.lastCheckedAt && (
+                  <span>ตรวจสอบสถานะล่าสุด {formatThaiDate(procurement.lastCheckedAt)}</span>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="mt-8 card p-6 sm:p-7 bg-gradient-to-br from-white to-[var(--color-blush-soft)]">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -235,15 +266,18 @@ export default async function TORDetailPage({
             <div className="mt-4 rounded-2xl bg-[var(--color-surface-alt)] px-3.5 py-3">
               <p className="text-xs text-[var(--color-text-muted)]">กำหนดยื่นข้อเสนอ</p>
               <p className="text-sm font-medium text-[var(--color-text)] mt-0.5">
-                {isUnknownDeadline(tor.deadline) ? "ไม่ระบุ" : formatThaiDate(tor.deadline)}
+                {bidDeadline ? formatThaiDate(bidDeadline) : "ไม่ระบุ"}
               </p>
-              {tor.status !== "ปิดรับแล้ว" && !isUnknownDeadline(tor.deadline) && (
-                <p
-                  className={`text-xs mt-1 font-medium ${
-                    remaining <= 5 ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"
-                  }`}
-                >
-                  {remaining > 0 ? `เหลืออีก ${remaining} วัน` : "ปิดรับวันนี้"}
+              <p
+                className={`text-xs mt-1 font-medium ${
+                  tor.status === "ใกล้ปิดรับ" ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"
+                }`}
+              >
+                {statusNote(tor)}
+              </p>
+              {!bidDeadline && !isUnknownDeadline(tor.deadline) && (
+                <p className="mt-2 border-t border-[var(--color-border)] pt-2 text-[11px] text-[var(--color-text-faint)]">
+                  วันที่ระบุในเอกสาร TOR (อ่านโดย AI): {formatThaiDate(tor.deadline)}
                 </p>
               )}
             </div>

@@ -18,7 +18,7 @@ import StatusBadge from "@/components/StatusBadge";
 import { categories, formatBudget, formatThaiDate, type TOR, type TORStatus } from "@/lib/mockData";
 import { apiFetch } from "@/lib/api";
 import { categoryToSlug, fetchAgencies, isUnknownDeadline, mapApiTor, type ApiTor } from "@/lib/torApi";
-import { STATUS_API } from "@/lib/torSearch";
+import { STATUS_API, STATUSES } from "@/lib/torSearch";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
 type TabValue = TORStatus | "ทั้งหมด" | "ต้องตรวจสอบ";
@@ -26,9 +26,7 @@ type TabValue = TORStatus | "ทั้งหมด" | "ต้องตรวจ�
 const statusTabs: { label: string; value: TabValue }[] = [
   { label: "ทั้งหมด", value: "ทั้งหมด" },
   { label: "ต้องตรวจสอบ", value: "ต้องตรวจสอบ" },
-  { label: "เปิดรับ", value: "เปิดรับ" },
-  { label: "ใกล้ปิดรับ", value: "ใกล้ปิดรับ" },
-  { label: "ปิดรับแล้ว", value: "ปิดรับแล้ว" },
+  ...STATUSES.map((s) => ({ label: s, value: s as TabValue })),
 ];
 
 type FlagField = "budget" | "deadline" | "category" | "agency" | "title" | "qualificationRequirements" | "other";
@@ -78,7 +76,14 @@ interface Draft {
   budget: string;
   /** `YYYY-MM-DD`; "" = unknown. */
   deadline: string;
-  status: TORStatus;
+  /** Close the TOR by hand: it then shows as ปิดรับแล้ว whatever its real stage is. */
+  manualClosed: boolean;
+  /** Only for `inviting` TORs. `YYYY-MM-DD` (Bangkok day); "" = unknown. */
+  bidDeadline: string;
+  /** Value loaded from the API, so an untouched field is never sent back (it would turn an AI value into an admin one). */
+  originalBidDeadline: string;
+  /** The field is shown only while the TOR is in the invitation stage. */
+  canSetBidDeadline: boolean;
   openFlags: AdminTor["openFlags"];
 }
 
@@ -87,6 +92,14 @@ function toAdminTor(raw: ApiAdminTor): AdminTor {
     ...mapApiTor(raw),
     openFlags: (raw.fairnessFlags ?? []).filter((f) => f.status === "open"),
   };
+}
+
+/** The Bangkok calendar day of an ISO instant, as `YYYY-MM-DD`; "" when absent. */
+function bangkokDay(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok" }).format(d);
 }
 
 function toDraft(tor: AdminTor): Draft {
@@ -98,7 +111,10 @@ function toDraft(tor: AdminTor): Draft {
     category: tor.category,
     budget: tor.budget ? String(tor.budget) : "",
     deadline: isUnknownDeadline(tor.deadline) ? "" : tor.deadline.slice(0, 10),
-    status: tor.status,
+    manualClosed: tor.manualClosed ?? false,
+    bidDeadline: bangkokDay(tor.procurement?.bidDeadline),
+    originalBidDeadline: bangkokDay(tor.procurement?.bidDeadline),
+    canSetBidDeadline: tor.procurement?.stage === "inviting",
     openFlags: tor.openFlags,
   };
 }
@@ -231,7 +247,12 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
         category: categoryToSlug(draft.category),
         budget: draft.budget === "" ? null : Number(draft.budget),
         submissionDeadline: draft.deadline || null,
-        status: STATUS_API[draft.status],
+        // Only "closed" has an effect (manual close); any other stored value means "no override".
+        status: draft.manualClosed ? "closed" : "open",
+        // Sent only when the admin changed it; "" clears the deadline.
+        ...(draft.canSetBidDeadline && draft.bidDeadline !== draft.originalBidDeadline
+          ? { bidDeadline: draft.bidDeadline || null }
+          : {}),
         resolveFlags: true,
       }),
     }).catch(() => null);
@@ -541,7 +562,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                   />
                 </label>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold text-[var(--color-text)]">วันปิดรับ</span>
+                  <span className="text-xs font-semibold text-[var(--color-text)]">วันที่ระบุในเอกสาร TOR</span>
                   <input
                     type="date"
                     value={draft.deadline}
@@ -551,17 +572,34 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                 </label>
               </div>
 
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-semibold text-[var(--color-text)]">สถานะ</span>
-                <select
-                  value={draft.status}
-                  onChange={(e) => setDraft({ ...draft, status: e.target.value as TORStatus })}
-                  className="rounded-full border border-[var(--color-border)] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[var(--color-ink)]"
-                >
-                  <option value="เปิดรับ">เปิดรับ</option>
-                  <option value="ใกล้ปิดรับ">ใกล้ปิดรับ</option>
-                  <option value="ปิดรับแล้ว">ปิดรับแล้ว</option>
-                </select>
+              {draft.canSetBidDeadline && (
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold text-[var(--color-text)]">กำหนดยื่นข้อเสนอ</span>
+                  <input
+                    type="date"
+                    value={draft.bidDeadline}
+                    onChange={(e) => setDraft({ ...draft, bidDeadline: e.target.value })}
+                    className="rounded-full border border-[var(--color-border)] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[var(--color-ink)]"
+                  />
+                  <span className="text-xs text-[var(--color-text-muted)]">
+                    ระบบอ่านจากประกาศเชิญชวนให้อัตโนมัติ — ค่าที่กรอกเองจะใช้แทนและไม่ถูกเขียนทับ
+                  </span>
+                </label>
+              )}
+
+              <label className="flex items-start gap-2.5 rounded-2xl bg-[var(--color-surface-alt)] px-3.5 py-3 text-sm text-[var(--color-text)]">
+                <input
+                  type="checkbox"
+                  checked={draft.manualClosed}
+                  onChange={(e) => setDraft({ ...draft, manualClosed: e.target.checked })}
+                  className="mt-0.5 accent-[var(--color-rose-dark)]"
+                />
+                <span>
+                  ปิดรับด้วยตนเอง
+                  <span className="block text-xs text-[var(--color-text-muted)]">
+                    แสดงเป็น “ปิดรับแล้ว” ไม่ว่าสถานะการจัดซื้อจริงจะเป็นอย่างไร
+                  </span>
+                </span>
               </label>
 
               <div className="mt-2 flex items-center gap-3">
@@ -588,7 +626,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                 </p>
               )}
               {draft.deadline === "" && (
-                <p className="text-xs text-[var(--color-text-muted)]">เว้นวันปิดรับว่างไว้หากประกาศไม่ได้ระบุ</p>
+                <p className="text-xs text-[var(--color-text-muted)]">เว้นว่างไว้หากเอกสารไม่ได้ระบุ (ไม่กระทบสถานะการรับข้อเสนอ)</p>
               )}
             </form>
           </div>

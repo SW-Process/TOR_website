@@ -5,6 +5,7 @@ import type { ITor } from "../models";
 import { computeMatch } from "../services/matching";
 import { loadOrCreateProfile } from "./vendorProfileController";
 import { httpError } from "../utils/httpError";
+import { statusClause, withDisplayStatus } from "../utils/torStatus";
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -12,7 +13,7 @@ const listQuerySchema = z.object({
 });
 
 const OPEN_TOR_PROJECTION =
-  "title agency category budget referencePrice technologyStack announcementDate submissionDeadline status";
+  "title agency category budget referencePrice technologyStack announcementDate submissionDeadline status procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt";
 
 /**
  * GET /api/vendor/matches — open TORs ranked by rule-based match score
@@ -25,9 +26,14 @@ export async function listMatches(req: Request, res: Response): Promise<void> {
   const q = parsed.data;
   const profile = await loadOrCreateProfile(req.user!.id);
 
-  // pipelineStatus gate mirrors the public read API; status excludes TORs
-  // already marked closed for submissions.
-  const openTors = await Tor.find({ pipelineStatus: "enriched", status: { $ne: "closed" } })
+  // pipelineStatus gate mirrors the public read API. Candidates are TORs a vendor can still act
+  // on — a draft ahead of bidding, or bidding itself; awarded, cancelled and closed (including
+  // manually closed) projects are no opportunity. A TOR with no procurement yet reads as draft.
+  const now = new Date();
+  const openTors = await Tor.find({
+    pipelineStatus: "enriched",
+    $or: (["draft", "open", "closing_soon"] as const).map((s) => statusClause(s, now)),
+  })
     .select(OPEN_TOR_PROJECTION)
     .lean<ITor[]>();
 
@@ -40,7 +46,7 @@ export async function listMatches(req: Request, res: Response): Promise<void> {
 
   res.status(200).json({
     data: page.map(({ tor, score, matchedCriteria }) => ({
-      tor,
+      tor: withDisplayStatus(tor),
       matchScore: score,
       matchedCriteria,
     })),
