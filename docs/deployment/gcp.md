@@ -114,6 +114,10 @@ gcloud run jobs deploy tor-lifecycle \
   --command node --args dist/jobs/lifecycle.js --max-retries 0 --task-timeout 1800s --memory 1Gi
 ```
 
+> `tor-enrichment` ends by running the lifecycle refresh for the TORs it just enriched, so it needs
+> the same e-GP access and env it already has (no new env vars); the lifecycle's
+> `MAX_DEADLINE_EXTRACTIONS_PER_RUN` cap applies to that chained run.
+>
 > `tor-lifecycle` now also reads the bid deadline of `inviting` TORs from their invitation PDF
 > (one small Gemini call each, capped by `MAX_DEADLINE_EXTRACTIONS_PER_RUN`), so `tor-jobs-sa`
 > needs the same Vertex AI and bucket-write roles for this job as for `tor-enrichment`. The

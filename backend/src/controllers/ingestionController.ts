@@ -7,6 +7,7 @@ import { countRunnable, maxCallsPerRun } from "../ingestion/enrichment/enrichmen
 import { refreshLifecycle } from "../ingestion/lifecycle/refreshLifecycle";
 import { countLifecycleCandidates, maxLifecycleRefreshPerRun } from "../ingestion/lifecycle/candidates";
 import { sweepStaleEnrichmentRuns, sweepStaleRuns } from "../ingestion/enrichment/sweepStaleRuns";
+import { chainLifecycleAfterEnrichment } from "../ingestion/lifecycle/afterEnrichment";
 import { selectExtractor } from "../jobs/enrichment";
 
 const MAX_PROJECTS_CEILING = 500;
@@ -94,9 +95,14 @@ export async function createEnrichmentRun(req: Request, res: Response): Promise<
   if (active) throw httpError(409, "An enrichment run is already in progress");
 
   const extractor = selectExtractor();
-  void drainEnrichmentQueue({ extractor, maxCalls }).catch((err) => {
-    console.error("enrichment run failed:", err);
-  });
+  const adminId = req.user!.id;
+  void drainEnrichmentQueue({ extractor, maxCalls })
+    .then((out) =>
+      chainLifecycleAfterEnrichment(out, { trigger: "manual", triggeredBy: adminId, deadlineExtractor: extractor })
+    )
+    .catch((err) => {
+      console.error("enrichment run failed:", err);
+    });
 
   res.status(202).json({ status: "running" });
 }

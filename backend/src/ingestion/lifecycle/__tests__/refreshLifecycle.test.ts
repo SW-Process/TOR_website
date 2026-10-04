@@ -195,6 +195,48 @@ describe("refreshLifecycle", () => {
     expect(untouched?.procurement?.lastCheckedAt).toEqual(new Date("2026-09-20"));
   });
 
+  describe("torIds", () => {
+    it("checks only the listed TORs and leaves other eligible ones untouched", async () => {
+      const p1 = await seedTor("p1");
+      await seedTor("p2");
+      const p3 = await seedTor("p3");
+      const client = fakeClient();
+      const out = await refreshLifecycle(deps(client, { torIds: [p1.id, p3._id] }));
+      expect(client.detailCalls.sort()).toEqual(["p1", "p3"]);
+      expect(out.selected).toBe(2);
+      expect((await Tor.findOne({ projectCode: "code-p2" }).lean())?.procurement?.lastCheckedAt).toBeFalsy();
+    });
+
+    it("defaults the cap to the list length, not MAX_LIFECYCLE_REFRESH_PER_RUN", async () => {
+      const ids = [(await seedTor("p1")).id, (await seedTor("p2")).id];
+      await seedTor("p3");
+      await seedTor("p4");
+      const client = fakeClient();
+      const out = await refreshLifecycle(deps(client, { torIds: ids }));
+      expect(out.selected).toBe(2);
+      expect(client.detailCalls).toHaveLength(2);
+    });
+
+    it("an explicit maxTors still limits", async () => {
+      const ids = [(await seedTor("p1")).id, (await seedTor("p2")).id, (await seedTor("p3")).id];
+      const client = fakeClient();
+      const out = await refreshLifecycle(deps(client, { torIds: ids, maxTors: 1 }));
+      expect(out.selected).toBe(1);
+    });
+
+    it("skips listed TORs that are not eligible without erroring", async () => {
+      const ok = await seedTor("p1");
+      const pending = await seedTor("p2", { pipelineStatus: "pending" });
+      const done = await seedTor("p3", {
+        procurement: { stage: "awarded", contractStatus: "ส่งงานครบถ้วน", announcements: [], lastCheckedAt: new Date("2026-09-01") },
+      });
+      const client = fakeClient();
+      const out = await refreshLifecycle(deps(client, { torIds: [ok.id, pending.id, done.id] }));
+      expect(client.detailCalls).toEqual(["p1"]);
+      expect(out).toMatchObject({ selected: 1, failed: 0 });
+    });
+  });
+
   it("isolates a per-TOR e-GP failure: logs it, keeps that TOR's lastCheckedAt, finishes partial", async () => {
     await seedTor("p1", { procurement: oldProcurement("2026-09-01") });
     await seedTor("p2", { procurement: oldProcurement("2026-09-02") });

@@ -89,6 +89,47 @@ describe("job entrypoints", () => {
     expect(process.exitCode).toBe(0);
   });
 
+  it("runEnrichmentJob then refreshes the lifecycle of the TORs it enriched, as a scheduled run", async () => {
+    drainEnrichmentQueue.mockResolvedValueOnce({
+      runId: "r2",
+      claimed: 1,
+      enrichedOk: 1,
+      enrichedRejected: 0,
+      enrichedFailed: 0,
+      enrichedTorIds: ["t1"],
+    } as never);
+    const { runEnrichmentJob } = await import("../enrichment");
+    await runEnrichmentJob();
+    expect(refreshLifecycle).toHaveBeenCalledTimes(1);
+    expect(refreshLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ torIds: ["t1"], trigger: "scheduled", deadlineExtractor: expect.any(FakeGeminiExtractor) })
+    );
+    expect(process.exitCode).toBe(0);
+  });
+
+  it("runEnrichmentJob does not refresh the lifecycle when nothing was enriched", async () => {
+    const { runEnrichmentJob } = await import("../enrichment");
+    await runEnrichmentJob();
+    expect(refreshLifecycle).not.toHaveBeenCalled();
+  });
+
+  it("runEnrichmentJob keeps exitCode 0 when the chained refresh throws", async () => {
+    drainEnrichmentQueue.mockResolvedValueOnce({
+      runId: "r2",
+      claimed: 1,
+      enrichedOk: 1,
+      enrichedRejected: 0,
+      enrichedFailed: 0,
+      enrichedTorIds: ["t1"],
+    } as never);
+    refreshLifecycle.mockRejectedValueOnce(new Error("boom"));
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { runEnrichmentJob } = await import("../enrichment");
+    await runEnrichmentJob();
+    spy.mockRestore();
+    expect(process.exitCode).toBe(0);
+  });
+
   it("sets exitCode 1 when the work throws", async () => {
     drainEnrichmentQueue.mockRejectedValueOnce(new Error("boom"));
     const { runEnrichmentJob } = await import("../enrichment");

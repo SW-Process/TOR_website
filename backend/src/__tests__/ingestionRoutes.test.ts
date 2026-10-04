@@ -47,6 +47,14 @@ afterAll(async () => {
   await mongod.stop();
 });
 
+async function waitFor(cond: () => boolean, timeoutMs = 2000): Promise<void> {
+  const start = Date.now();
+  while (!cond()) {
+    if (Date.now() - start > timeoutMs) throw new Error("waitFor timed out");
+    await new Promise((r) => setTimeout(r, 10));
+  }
+}
+
 async function adminAgent() {
   const agent = request.agent(app);
   await agent.post("/api/auth/register").send({ email: "admin@test.com", password: "secret123" });
@@ -149,6 +157,54 @@ describe("POST /api/ingestion/enrichment/runs", () => {
     expect(res.body).toEqual({ status: "running" });
     expect(drainEnrichmentQueueMock).toHaveBeenCalledTimes(1);
     expect(drainEnrichmentQueueMock.mock.calls[0][0]).toMatchObject({ extractor });
+  });
+
+  it("chains a manual lifecycle refresh for the TORs the drain enriched", async () => {
+    const extractor = { id: "fake", extract: jest.fn() };
+    selectExtractorMock.mockReturnValue(extractor);
+    refreshLifecycleMock.mockResolvedValue({});
+    drainEnrichmentQueueMock.mockResolvedValue({
+      runId: "r",
+      claimed: 2,
+      enrichedOk: 2,
+      enrichedRejected: 0,
+      enrichedFailed: 0,
+      enrichedTorIds: ["t1", "t2"],
+    });
+    const agent = await adminAgent();
+    const admin = await User.findOne({ email: "admin@test.com" });
+
+    const res = await agent.post("/api/ingestion/enrichment/runs").send({});
+
+    expect(res.status).toBe(202);
+    await waitFor(() => refreshLifecycleMock.mock.calls.length > 0);
+    expect(refreshLifecycleMock).toHaveBeenCalledTimes(1);
+    expect(refreshLifecycleMock.mock.calls[0][0]).toEqual({
+      torIds: ["t1", "t2"],
+      trigger: "manual",
+      triggeredBy: admin!.id,
+      deadlineExtractor: extractor,
+    });
+  });
+
+  it("does not chain a lifecycle refresh when nothing was enriched", async () => {
+    selectExtractorMock.mockReturnValue({ id: "fake", extract: jest.fn() });
+    drainEnrichmentQueueMock.mockResolvedValue({
+      runId: "",
+      claimed: 0,
+      enrichedOk: 0,
+      enrichedRejected: 0,
+      enrichedFailed: 0,
+      enrichedTorIds: [],
+    });
+    const agent = await adminAgent();
+
+    const res = await agent.post("/api/ingestion/enrichment/runs").send({});
+
+    expect(res.status).toBe(202);
+    await waitFor(() => drainEnrichmentQueueMock.mock.results.length > 0);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(refreshLifecycleMock).not.toHaveBeenCalled();
   });
 
   it("passes an explicit maxCalls through to the drain", async () => {

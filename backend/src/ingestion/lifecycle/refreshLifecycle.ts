@@ -31,6 +31,11 @@ export interface RefreshLifecycleDeps {
   storage?: BlobStorage;
   /** Max Gemini deadline reads this run; defaults to MAX_DEADLINE_EXTRACTIONS_PER_RUN. */
   maxDeadlineExtractions?: number;
+  /**
+   * Restrict the refresh to these TORs (still only those matching `lifecycleFilter()`). The cap
+   * then defaults to the list length instead of MAX_LIFECYCLE_REFRESH_PER_RUN.
+   */
+  torIds?: ReadonlyArray<string | Types.ObjectId>;
 }
 
 export interface RefreshLifecycleResult {
@@ -77,7 +82,7 @@ export async function refreshLifecycle(
 ): Promise<RefreshLifecycleResult> {
   const client = deps.client ?? new EgpClient(egpConfigFromEnv());
   const now = deps.now ?? (() => new Date());
-  const cap = deps.maxTors ?? maxLifecycleRefreshPerRun();
+  const cap = deps.maxTors ?? (deps.torIds ? deps.torIds.length : maxLifecycleRefreshPerRun());
   let extractor = deps.deadlineExtractor;
   const deadlineCap = deps.maxDeadlineExtractions ?? maxDeadlineExtractionsPerRun();
   let storage: BlobStorage | null = null;
@@ -99,7 +104,9 @@ export async function refreshLifecycle(
   await sweepStaleRuns("lifecycle");
 
   // A missing lastCheckedAt sorts before any date, so never-checked TORs come first.
-  const tors = await Tor.find(lifecycleFilter())
+  const tors = await Tor.find(
+    deps.torIds ? { $and: [lifecycleFilter(), { _id: { $in: [...deps.torIds] } }] } : lifecycleFilter()
+  )
     .sort({ "procurement.lastCheckedAt": 1, _id: 1 })
     .limit(cap)
     .select("projectCode title sourceListingUrl procurement")

@@ -102,7 +102,9 @@ the refresh-owned `procurement` paths and never touches `sourceContentHash`,
 `inviting` TOR the batch downloads its latest invitation PDF and reads the real bid deadline with
 one small Gemini call (`MAX_DEADLINE_EXTRACTIONS_PER_RUN`), once per invitation id; an admin value
 (`source: "admin"`) always wins. Both `procurement` writers go through
-`ingestion/procurementWrite.ts` (optimistic precondition on `lastCheckedAt`).
+`ingestion/procurementWrite.ts` (optimistic precondition on `lastCheckedAt`). The enrichment batch also ends by running this
+refresh for exactly the TORs it just enriched (`lifecycle/afterEnrichment.ts`), so new TORs get
+their stage and bid deadline at once; `MAX_DEADLINE_EXTRACTIONS_PER_RUN` applies to that chained run.
 
 ## Environment
 
