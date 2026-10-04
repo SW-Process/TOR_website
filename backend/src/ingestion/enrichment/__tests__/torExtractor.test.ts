@@ -162,3 +162,28 @@ describe("applyExtractionToTor", () => {
     expect(tor.fairnessFlags).toHaveLength(0);
   });
 });
+
+describe("applyExtractionToTor — projectType", () => {
+  it("writes a valid projectType onto the TOR", async () => {
+    const tor = await Tor.create({ title: "t", pipelineStatus: "processing", sourceDocument: null });
+    applyExtractionToTor(tor, ok({ projectType: "license-purchase" }), {
+      extractorId: "gemini-2.5-flash",
+      fallbackText: "",
+    });
+    expect(tor.projectType).toBe("license-purchase");
+  });
+
+  it("drops a projectType outside the taxonomy instead of storing it", async () => {
+    const tor = await Tor.create({ title: "t", pipelineStatus: "processing", sourceDocument: null });
+    applyExtractionToTor(tor, ok({ projectType: "made-up-type" }), {
+      extractorId: "gemini-2.5-flash",
+      fallbackText: "",
+    });
+    expect(tor.projectType).toBeUndefined();
+  });
+
+  it("accepts a result that omits projectType entirely", () => {
+    const parsed = torExtractionResultSchema.parse({ ...ok(), projectType: undefined });
+    expect(parsed.projectType).toBeUndefined();
+  });
+});
