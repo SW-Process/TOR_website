@@ -18,7 +18,7 @@ export default function BookmarkButton({
 
   if (variant === "full") {
     return (
-      <button onClick={() => void toggle(id)} disabled={!ready} className="btn-pill w-full px-4 py-2.5 text-sm border border-[var(--color-border-strong)] bg-white text-[var(--color-text)] hover:border-[var(--color-ink)] transition-colors">
+      <button data-shortcut="bookmark" onClick={() => void toggle(id)} disabled={!ready} className="btn-pill w-full px-4 py-2.5 text-sm border border-[var(--color-border-strong)] bg-white text-[var(--color-text)] hover:border-[var(--color-ink)] transition-colors">
         <Bookmark size={16} className={active ? "text-[var(--color-rose-dark)]" : ""} fill={active ? "currentColor" : "none"} />
         {active ? "บันทึกแล้ว" : "บันทึก TOR นี้"}
       </button>
