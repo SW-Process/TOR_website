@@ -22,6 +22,8 @@ const PHASE_LABEL: Record<IngestionPhase, string> = {
 const DAYS_PER_MONTH = 30;
 // Mirrors ENRICHMENT_MAX_CALLS_CEILING in backend ingestionController.
 const ENRICHMENT_MAX_CALLS_CEILING = 200;
+// Mirrors LIFECYCLE_MAX_TORS_CEILING (the max accepted by createLifecycleRun) in backend ingestionController.
+const LIFECYCLE_MAX_TORS_CEILING = 300;
 
 const SEARCH_SUGGESTIONS = [
   "ซอฟต์แวร์",
@@ -126,10 +128,12 @@ function EnrichmentStatus({
 function LifecycleStatus({
   pending,
   queue,
+  maxTors,
   run,
 }: {
   pending: boolean;
   queue: LifecycleQueueInfo | null;
+  maxTors: number | null;
   run: IngestionRun | null;
 }) {
   if (pending) {
@@ -152,6 +156,7 @@ function LifecycleStatus({
   }
 
   if (!queue) return null;
+  const willCheck = Math.min(queue.candidates, maxTors ?? queue.maxTors);
   if (queue.candidates === 0) {
     return (
       <p className="mt-4 text-xs text-[var(--color-text-faint)]">ไม่มี TOR ที่ต้องตรวจสถานะ</p>
@@ -159,9 +164,9 @@ function LifecycleStatus({
   }
   return (
     <p className="mt-4 text-xs text-[var(--color-text-muted)]">
-      พร้อมตรวจ <span className="font-semibold text-[var(--color-text)]">{queue.willCheck}</span>{" "}
+      พร้อมตรวจ <span className="font-semibold text-[var(--color-text)]">{willCheck}</span>{" "}
       รายการ
-      {queue.candidates > queue.willCheck && ` (จากทั้งหมด ${queue.candidates})`}
+      {queue.candidates > willCheck && ` (จากทั้งหมด ${queue.candidates})`}
     </p>
   );
 }
@@ -191,6 +196,9 @@ export default function ScraperHealth() {
   // null = untouched, follow the backend default (MAX_AI_CALLS_PER_RUN)
   const [enrichmentMaxCalls, setEnrichmentMaxCalls] = useState<number | null>(null);
   const effectiveMaxCalls = enrichmentMaxCalls ?? enrichmentQueue?.maxCalls ?? null;
+  // null = untouched, follow the backend default
+  const [lifecycleMaxTors, setLifecycleMaxTors] = useState<number | null>(null);
+  const effectiveMaxTors = lifecycleMaxTors ?? lifecycleQueue?.maxTors ?? null;
 
   function runIngestion() {
     triggerIngestion({
@@ -236,7 +244,10 @@ export default function ScraperHealth() {
               {
                 phase: "lifecycle" as const,
                 pending: lifecyclePending,
-                onTrigger: () => triggerLifecycle(),
+                onTrigger: () =>
+                  triggerLifecycle(
+                    lifecycleMaxTors === null ? undefined : { maxTors: lifecycleMaxTors }
+                  ),
               },
             ]
           ).map(({ phase, pending, onTrigger }) => {
@@ -384,11 +395,33 @@ export default function ScraperHealth() {
                 )}
 
                 {phase === "lifecycle" && (
-                  <LifecycleStatus
-                    pending={pending}
-                    queue={lifecycleQueue}
-                    run={last?.status === "running" ? last : null}
-                  />
+                  <>
+                    {effectiveMaxTors !== null && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-xs text-[var(--color-text-faint)]">
+                          <span>ตรวจสูงสุดต่อรอบ</span>
+                          <span className="font-medium text-[var(--color-text)]">
+                            {effectiveMaxTors}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={1}
+                          max={Math.max(LIFECYCLE_MAX_TORS_CEILING, effectiveMaxTors)}
+                          value={effectiveMaxTors}
+                          onChange={(e) => setLifecycleMaxTors(Number(e.target.value))}
+                          disabled={pending}
+                          className="mt-1 w-full accent-[var(--color-ink)] disabled:opacity-60"
+                        />
+                      </div>
+                    )}
+                    <LifecycleStatus
+                      pending={pending}
+                      queue={lifecycleQueue}
+                      maxTors={effectiveMaxTors}
+                      run={last?.status === "running" ? last : null}
+                    />
+                  </>
                 )}
 
                 <button
