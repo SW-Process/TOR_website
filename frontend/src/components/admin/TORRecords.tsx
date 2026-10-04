@@ -541,7 +541,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                   />
                 </label>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold text-[var(--color-text)]">วันปิดรับ</span>
+                  <span className="text-xs font-semibold text-[var(--color-text)]">วันที่ระบุในเอกสาร TOR</span>
                   <input
                     type="date"
                     value={draft.deadline}
@@ -590,7 +590,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                 </p>
               )}
               {draft.deadline === "" && (
-                <p className="text-xs text-[var(--color-text-muted)]">เว้นวันปิดรับว่างไว้หากประกาศไม่ได้ระบุ</p>
+                <p className="text-xs text-[var(--color-text-muted)]">เว้นว่างไว้หากเอกสารไม่ได้ระบุ (ไม่กระทบสถานะการรับข้อเสนอ)</p>
               )}
             </form>
           </div>
