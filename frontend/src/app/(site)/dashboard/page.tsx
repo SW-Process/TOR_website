@@ -18,6 +18,7 @@ import { useProfile } from "@/lib/useProfile";
 import { useMatches } from "@/lib/useMatches";
 import { daysUntil, categories, type Category, type TOR } from "@/lib/mockData";
 import { fetchTorList, mapApiTor } from "@/lib/torApi";
+import { isActiveOpportunity } from "@/lib/torStatus";
 
 const catalogFilters: (Category | "ทั้งหมด")[] = ["ทั้งหมด", ...categories];
 
@@ -39,7 +40,7 @@ function DashboardContent() {
 
   const ready = bookmarksReady && profileReady && torsReady;
 
-  const openTor = useMemo(() => torList.filter((t) => t.status !== "ปิดรับแล้ว"), [torList]);
+  const openTor = useMemo(() => torList.filter((t) => isActiveOpportunity(t.status)), [torList]);
 
   // Deadline/views ordering: shown without a score before a profile exists,
   // and as the placeholder list while the backend scores are loading.

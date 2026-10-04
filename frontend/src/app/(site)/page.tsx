@@ -23,6 +23,7 @@ import mascotSign from "@/components/picture/circle.png";
 import mascotPoint from "@/components/picture/good.png";
 import { formatBudget } from "@/lib/mockData";
 import { fetchTorList } from "@/lib/torApi";
+import { isBiddable } from "@/lib/torStatus";
 
 /** "฿8.5M"-style budget for the compact hero card. */
 function formatCompactBaht(amount: number): string {
@@ -32,14 +33,14 @@ function formatCompactBaht(amount: number): string {
 
 export default async function Home() {
   const torList = await fetchTorList();
-  const openTOR = torList.filter((t) => t.status !== "ปิดรับแล้ว");
+  const openTOR = torList.filter((t) => isBiddable(t.status));
   const totalOpenBudget = openTOR.reduce((sum, t) => sum + t.budget, 0);
   const agencyCount = new Set(torList.map((t) => t.agency)).size;
   const latest = [...torList]
     .sort((a, b) => (a.announceDate < b.announceDate ? 1 : -1))
     .slice(0, 6);
   // Hero showcase: the newest TOR still taking bids.
-  const featured = latest.find((t) => t.status !== "ปิดรับแล้ว") ?? latest[0];
+  const featured = latest.find((t) => isBiddable(t.status)) ?? latest[0];
 
   const trust = [
     { icon: ShieldCheck, title: "ข้อมูลจาก e-GP", sub: "กรมบัญชีกลาง" },
