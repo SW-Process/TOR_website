@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bookmark, Briefcase, ChevronLeft, ChevronRight, EyeOff, KeyRound, LogOut, Mail, Trash2, UserRound } from "lucide-react";
+import { Bookmark, Briefcase, ChevronLeft, ChevronRight, EyeOff, Flag, KeyRound, LogOut, Mail, Trash2, UserRound } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import { useAuth } from "@/lib/useAuth";
 import { Avatar } from "./ui";
 
 /** Every page reachable from the settings sidebar; `/account/settings?section=<id>` unless noted. */
-export type SettingsPageId = "profile" | "email" | "password" | "saved" | "hidden" | "delete" | "business";
+export type SettingsPageId = "profile" | "email" | "password" | "saved" | "hidden" | "reports" | "delete" | "business";
 
 export const SETTINGS_ROOT = "/account/settings";
 
@@ -127,13 +127,17 @@ export default function SettingsShell({
               />
             </NavGroup>
 
-            {isVendor && (
-              <NavGroup title="การใช้งาน TOR Checker">
-                <NavItem icon={Briefcase} label="โปรไฟล์ธุรกิจ" href="/account/profile" active={active === "business"} />
-                <NavItem icon={Bookmark} label="รายการที่บันทึก" href={settingsHref("saved")} active={active === "saved"} />
-                <NavItem icon={EyeOff} label="TOR ที่ซ่อนไว้" href={settingsHref("hidden")} active={active === "hidden"} />
-              </NavGroup>
-            )}
+            <NavGroup title="การใช้งาน TOR Checker">
+              {isVendor && (
+                <>
+                  <NavItem icon={Briefcase} label="โปรไฟล์ธุรกิจ" href="/account/profile" active={active === "business"} />
+                  <NavItem icon={Bookmark} label="รายการที่บันทึก" href={settingsHref("saved")} active={active === "saved"} />
+                  <NavItem icon={EyeOff} label="TOR ที่ซ่อนไว้" href={settingsHref("hidden")} active={active === "hidden"} />
+                </>
+              )}
+              {/* Any signed-in user can report a TOR, so this one isn't vendor-only. */}
+              <NavItem icon={Flag} label="รายงานที่ฉันส่ง" href={settingsHref("reports")} active={active === "reports"} />
+            </NavGroup>
 
             <NavGroup title="อื่นๆ">
               <NavItem icon={LogOut} label="ออกจากระบบ" onClick={handleLogout} />
