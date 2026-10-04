@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Bookmark, BookmarkX, Building2, CheckCircle2, ChevronDown, Clock, ExternalLink, Eye, EyeOff, Flag, Hash, KanbanSquare } from "lucide-react";
+import { AlertTriangle, Bookmark, BookmarkX, Building2, CheckCircle2, ChevronDown, Clock, ExternalLink, Eye, EyeOff, Flag, Hash, KanbanSquare, Loader2, MonitorSmartphone } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
 import AccountTorCard, { CardAction } from "@/components/account/AccountTorCard";
 import SettingsShell from "@/components/account/SettingsShell";
@@ -198,7 +198,7 @@ function PasswordSection() {
             บัญชีนี้ยังไม่มีรหัสผ่าน ตั้งรหัสผ่านเพื่อเข้าสู่ระบบด้วยอีเมลได้ นอกจาก Google
           </div>
         )}
-        <FieldBlock title="รหัสผ่านใหม่" help="อย่างน้อย 8 ตัวอักษร">
+        <FieldBlock title="รหัสผ่านใหม่" help="อย่างน้อย 8 ตัวอักษร · อุปกรณ์อื่นที่เข้าสู่ระบบอยู่จะถูกออกจากระบบ">
           <input
             type="password"
             required
@@ -227,6 +227,8 @@ function PasswordSection() {
           doneText="บันทึกรหัสผ่านแล้ว"
         />
       </form>
+
+      <SessionsBlock />
 
       <FieldBlock title="การเชื่อมต่อบัญชี">
         <div className="flex items-center gap-4 rounded-3xl border border-[var(--color-border)] p-4 sm:p-5">
@@ -545,6 +547,82 @@ function HiddenSection() {
         </div>
       )}
     </div>
+  );
+}
+
+/** "ออกจากระบบอุปกรณ์อื่นทั้งหมด": a confirm step, then every other session is signed out. */
+function SessionsBlock() {
+  const { logoutOthers } = useAuth();
+  const [confirming, setConfirming] = useState(false);
+  const { pending, error, done, setDone, run } = useSubmit();
+
+  return (
+    <FieldBlock title="อุปกรณ์ที่เข้าสู่ระบบ">
+      <div className="flex flex-col gap-4 rounded-3xl border border-[var(--color-border)] p-4 sm:p-5">
+        <div className="flex items-center gap-4">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-alt)] text-[var(--color-ink)]">
+            <MonitorSmartphone size={20} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold text-[var(--color-text)]">ออกจากระบบอุปกรณ์อื่นทั้งหมด</p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              ใช้เมื่อลืมออกจากระบบบนเครื่องอื่น หรือสงสัยว่ามีคนอื่นเข้าบัญชีของคุณ อุปกรณ์นี้จะยังเข้าสู่ระบบอยู่
+            </p>
+          </div>
+          {!confirming && (
+            <button
+              type="button"
+              onClick={() => {
+                setDone(false);
+                setConfirming(true);
+              }}
+              className="shrink-0 rounded-xl bg-[var(--color-surface-alt)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-border)]"
+            >
+              ออกจากระบบ
+            </button>
+          )}
+        </div>
+
+        {confirming && (
+          <div className="flex flex-col gap-3 rounded-2xl bg-[var(--color-surface-alt)] p-4 sm:flex-row sm:items-center">
+            <p className="flex-1 text-sm text-[var(--color-text)]">ออกจากระบบทุกอุปกรณ์ ยกเว้นเครื่องนี้?</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirming(false)}
+                disabled={pending}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => void run(logoutOthers, () => setConfirming(false))}
+                className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
+              >
+                {pending && <Loader2 size={14} className="animate-spin" />}
+                ยืนยัน
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error ? (
+          <p className="flex items-center gap-1.5 text-sm text-[var(--color-rose-dark)]">
+            <AlertTriangle size={14} />
+            {error}
+          </p>
+        ) : (
+          done && (
+            <p className="flex items-center gap-1.5 text-sm text-[var(--color-success)]">
+              <CheckCircle2 size={14} />
+              ออกจากระบบอุปกรณ์อื่นทั้งหมดแล้ว
+            </p>
+          )
+        )}
+      </div>
+    </FieldBlock>
   );
 }
 

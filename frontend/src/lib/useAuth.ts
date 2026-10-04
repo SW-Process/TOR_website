@@ -221,6 +221,9 @@ export function useAuth() {
     []
   );
 
+  /** Signs out every other device; this one gets a fresh cookie and stays signed in. */
+  const logoutOthers = useCallback(() => sendAccount("POST", "/api/auth/logout-others", {}), []);
+
   /** Permanently deletes the account; the response carries no user, so the session clears. */
   const deleteAccount = useCallback(
     (confirm: { currentPassword?: string; confirmEmail?: string }) => sendAccount("DELETE", "/api/auth/me", confirm),
@@ -241,6 +244,7 @@ export function useAuth() {
     updateDisplayName,
     changePassword,
     changeEmail,
+    logoutOthers,
     deleteAccount,
     refresh: refreshSession,
   };
