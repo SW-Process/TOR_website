@@ -2,6 +2,7 @@ import "dotenv/config";
 import mongoose from "mongoose";
 import { connectDB } from "../config/db";
 import { refreshLifecycle } from "../ingestion/lifecycle/refreshLifecycle";
+import { selectExtractor } from "./enrichment";
 
 /**
  * Cloud Run Job entrypoint: refresh the procurement stage of existing TORs once (up to
@@ -12,7 +13,7 @@ import { refreshLifecycle } from "../ingestion/lifecycle/refreshLifecycle";
 export async function runLifecycleJob(): Promise<void> {
   try {
     await connectDB();
-    const out = await refreshLifecycle({ trigger: "scheduled" });
+    const out = await refreshLifecycle({ trigger: "scheduled", deadlineExtractor: selectExtractor() });
     console.log(
       `lifecycle run ${out.runId || "(nothing to check)"}: checked ${out.selected}, changed ${out.changed}, unchanged ${out.unchanged}, skipped ${out.skipped}, failed ${out.failed}`
     );

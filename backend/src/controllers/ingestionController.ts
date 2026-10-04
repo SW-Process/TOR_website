@@ -118,7 +118,15 @@ export async function createLifecycleRun(req: Request, res: Response): Promise<v
   const active = await IngestionRun.exists({ status: "running", phase: "lifecycle" });
   if (active) throw httpError(409, "A lifecycle refresh is already in progress");
 
-  void refreshLifecycle({ trigger: "manual", triggeredBy: req.user!.id, maxTors }).catch((err) => {
+  // A missing/invalid extractor must not block the status refresh itself — run without the deadline step.
+  let deadlineExtractor: ReturnType<typeof selectExtractor> | undefined;
+  try {
+    deadlineExtractor = selectExtractor();
+  } catch (err) {
+    console.error("lifecycle run without deadline extraction:", err);
+  }
+
+  void refreshLifecycle({ trigger: "manual", triggeredBy: req.user!.id, maxTors, deadlineExtractor }).catch((err) => {
     console.error("lifecycle run failed:", err);
   });
 

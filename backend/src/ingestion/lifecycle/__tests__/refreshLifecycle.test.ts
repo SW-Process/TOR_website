@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { EnrichmentJob, IngestionRun, SystemLog, Tor } from "../../../models";
 import type { EgpAnnouncement, EgpClientLike, EgpProjectDetail } from "../../../scraper/egpClient.types";
+import type { BidDeadlineExtractor } from "../../enrichment/torExtractor";
+import type { BlobStorage } from "../../../storage/storage.types";
 import { procurementChanged, refreshLifecycle } from "../refreshLifecycle";
 
 let mongod: MongoMemoryServer;
@@ -96,6 +98,22 @@ const deps = (client: EgpClientLike, extra: Record<string, unknown> = {}) => ({
   now: () => NOW,
   ...extra,
 });
+
+function deadlineDeps(opts: { result?: { date: string | null; time: string | null; confidence: number } | Error } = {}) {
+  const extractCalls: string[] = [];
+  const extractor: BidDeadlineExtractor = {
+    async extractBidDeadline(input) {
+      extractCalls.push(input.meta.projectCode ?? "");
+      if (opts.result instanceof Error) throw opts.result;
+      return opts.result ?? { date: "2026-10-20", time: null, confidence: 0.9 };
+    },
+  };
+  const storage = { async put(key: string) { return { key, size: 1 }; } } as unknown as BlobStorage;
+  return { extractor, storage, extractCalls };
+}
+
+const withDownload = (c: ReturnType<typeof fakeClient>) =>
+  Object.assign(c, { async downloadFile() { return Buffer.from("%PDF-1.4 fake"); } });
 
 describe("refreshLifecycle", () => {
   it("fills procurement for a TOR that has none and records a successful lifecycle run", async () => {
@@ -320,6 +338,85 @@ describe("refreshLifecycle", () => {
     const run = await IngestionRun.findById(out.runId).lean();
     expect(run?.trigger).toBe("manual");
     expect(String(run?.triggeredBy)).toBe(userId);
+  });
+
+  describe("bid deadline step", () => {
+    const INV = (p: string) => ann(`${p}-inv`, "ประกาศเชิญชวน", "2026-10-01T00:00:00Z");
+
+    it("reads the deadline of an inviting TOR after refreshing it", async () => {
+      await seedTor("p1");
+      const d = deadlineDeps();
+      const out = await refreshLifecycle(
+        deps(withDownload(fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")] } })), {
+          deadlineExtractor: d.extractor,
+          storage: d.storage,
+        })
+      );
+      expect(out).toMatchObject({ selected: 1, changed: 1, failed: 0 });
+      const saved = await Tor.findOne({ projectCode: "code-p1" }).lean();
+      expect(saved?.procurement?.stage).toBe("inviting");
+      expect(saved?.procurement?.bidDeadline?.date).toEqual(new Date("2026-10-20T16:59:00.000Z"));
+      const run = await IngestionRun.findById(out.runId).lean();
+      expect(run?.outcomeSummary).toBe(
+        "checked 1, changed 1, unchanged 0, skipped 0, failed 0; bid deadlines: read 1, unreadable 0, errors 0"
+      );
+    });
+
+    it("is off when no extractor is supplied (unchanged behaviour)", async () => {
+      await seedTor("p1");
+      const out = await refreshLifecycle(
+        deps(fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")] } }))
+      );
+      expect(out.failed).toBe(0);
+      const run = await IngestionRun.findById(out.runId).lean();
+      expect(run?.outcomeSummary).toBe("checked 1, changed 1, unchanged 0, skipped 0, failed 0");
+    });
+
+    it("respects the per-run extraction cap", async () => {
+      await seedTor("p1");
+      await seedTor("p2");
+      const d = deadlineDeps();
+      const client = withDownload(
+        fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")], p2: [TOR_DRAFT("p2"), INV("p2")] } })
+      );
+      await refreshLifecycle(deps(client, { deadlineExtractor: d.extractor, storage: d.storage, maxDeadlineExtractions: 1 }));
+      expect(d.extractCalls).toHaveLength(1);
+    });
+
+    it("a Gemini error is logged and does not undo the stage write or stop other TORs", async () => {
+      await seedTor("p1", { procurement: oldProcurement("2026-09-01") });
+      await seedTor("p2", { procurement: oldProcurement("2026-09-02") });
+      const d = deadlineDeps({ result: new Error("Gemini 500") });
+      const client = withDownload(
+        fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")], p2: [TOR_DRAFT("p2")] } })
+      );
+      const out = await refreshLifecycle(deps(client, { deadlineExtractor: d.extractor, storage: d.storage }));
+
+      expect(out).toMatchObject({ selected: 2, changed: 2, failed: 0 });
+      const p1 = await Tor.findOne({ projectCode: "code-p1" }).lean();
+      expect(p1?.procurement?.stage).toBe("inviting");
+      expect(p1?.procurement?.deadlineAttempt ?? null).toBeNull();
+      const run = await IngestionRun.findById(out.runId).lean();
+      expect(run?.outcomeSummary).toContain("errors 1");
+      const log = await SystemLog.findOne({ severity: "error", ingestionRunId: out.runId }).lean();
+      expect(log?.message).toContain("code-p1");
+      expect(log?.message).toContain("Gemini 500");
+    });
+
+    it("does not touch the hash, pipelineStatus or the enrichment queue", async () => {
+      const tor = await seedTor("p1");
+      const d = deadlineDeps();
+      await refreshLifecycle(
+        deps(withDownload(fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")] } })), {
+          deadlineExtractor: d.extractor,
+          storage: d.storage,
+        })
+      );
+      const after = await Tor.findById(tor.id).lean();
+      expect(after?.sourceContentHash).toBe("hash-p1");
+      expect(after?.pipelineStatus).toBe("enriched");
+      expect(await EnrichmentJob.countDocuments({})).toBe(0);
+    });
   });
 });
 

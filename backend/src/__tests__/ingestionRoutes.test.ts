@@ -298,6 +298,27 @@ describe("POST /api/ingestion/lifecycle/runs", () => {
     expect(refreshLifecycleMock.mock.calls[0][0]).toMatchObject({ maxTors: 7 });
   });
 
+  it("hands the selected extractor to the refresh", async () => {
+    refreshLifecycleMock.mockResolvedValue(settled);
+    const extractor = { extractBidDeadline: jest.fn() };
+    selectExtractorMock.mockReturnValueOnce(extractor);
+    const agent = await adminAgent();
+    expect((await agent.post("/api/ingestion/lifecycle/runs").send({})).status).toBe(202);
+    expect(refreshLifecycleMock.mock.calls[0][0].deadlineExtractor).toBe(extractor);
+  });
+
+  it("still runs the refresh, without deadline extraction, when the extractor cannot be created", async () => {
+    refreshLifecycleMock.mockResolvedValue(settled);
+    selectExtractorMock.mockImplementationOnce(() => {
+      throw new Error("unknown EXTRACTOR: x");
+    });
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/lifecycle/runs").send({});
+    expect(res.status).toBe(202);
+    expect(refreshLifecycleMock).toHaveBeenCalledTimes(1);
+    expect(refreshLifecycleMock.mock.calls[0][0].deadlineExtractor).toBeUndefined();
+  });
+
   it.each([0, -1, 1.5, 301, "abc"])("400 when maxTors is %p", async (maxTors) => {
     const agent = await adminAgent();
     const res = await agent.post("/api/ingestion/lifecycle/runs").send({ maxTors });

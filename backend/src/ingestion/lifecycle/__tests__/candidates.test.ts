@@ -4,6 +4,7 @@ import { Tor } from "../../../models";
 import {
   countLifecycleCandidates,
   lifecycleFilter,
+  maxDeadlineExtractionsPerRun,
   maxLifecycleRefreshPerRun,
   projectIdFromListingUrl,
 } from "../candidates";
@@ -30,6 +31,16 @@ describe("maxLifecycleRefreshPerRun", () => {
   });
   it.each(["0", "-3", "1.5", "abc", ""])("falls back to 100 for %p", (raw) => {
     expect(maxLifecycleRefreshPerRun({ MAX_LIFECYCLE_REFRESH_PER_RUN: raw })).toBe(100);
+  });
+});
+
+describe("maxDeadlineExtractionsPerRun", () => {
+  it("defaults to 20 and reads a positive integer", () => {
+    expect(maxDeadlineExtractionsPerRun({})).toBe(20);
+    expect(maxDeadlineExtractionsPerRun({ MAX_DEADLINE_EXTRACTIONS_PER_RUN: "5" })).toBe(5);
+  });
+  it.each(["0", "-1", "1.5", "abc", ""])("falls back to 20 for %p", (raw) => {
+    expect(maxDeadlineExtractionsPerRun({ MAX_DEADLINE_EXTRACTIONS_PER_RUN: raw })).toBe(20);
   });
 });
 

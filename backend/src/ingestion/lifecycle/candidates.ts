@@ -16,6 +16,14 @@ export function maxLifecycleRefreshPerRun(env: NodeJS.ProcessEnv = process.env):
   return Number.isInteger(n) && n >= 1 ? n : DEFAULT_MAX_PER_RUN;
 }
 
+const DEFAULT_MAX_DEADLINE_EXTRACTIONS = 20;
+
+/** Max invitation PDFs one lifecycle run may send to Gemini (`MAX_DEADLINE_EXTRACTIONS_PER_RUN`, default 20). */
+export function maxDeadlineExtractionsPerRun(env: NodeJS.ProcessEnv = process.env): number {
+  const n = Number(env.MAX_DEADLINE_EXTRACTIONS_PER_RUN);
+  return Number.isInteger(n) && n >= 1 ? n : DEFAULT_MAX_DEADLINE_EXTRACTIONS;
+}
+
 /**
  * TORs worth re-checking: publicly visible (enriched), reachable (has a listing URL) and not
  * finished (not cancelled, work not yet delivered). `$ne` / `$nin` also match a missing field, so
