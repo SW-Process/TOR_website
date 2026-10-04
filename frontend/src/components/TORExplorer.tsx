@@ -439,6 +439,7 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
       <div className="flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white px-5 py-1 shadow-[var(--shadow-sm)]">
         <Search size={18} className="text-[var(--color-text-faint)]" />
         <input
+          data-shortcut-search
           value={filters.q}
           onChange={(e) => update({ q: e.target.value })}
           placeholder="ค้นหาชื่อโครงการ, หน่วยงาน, เลขที่โครงการ หรือคำสำคัญ"
