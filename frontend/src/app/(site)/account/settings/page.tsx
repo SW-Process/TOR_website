@@ -254,7 +254,7 @@ function PasswordSection() {
 }
 
 /** One hidden TOR as a card, laid out like the admin report cards: meta, AI summary, TOR box, action. */
-function HiddenTorCard({ tor, hiddenAt, onUnhide }: { tor: TOR; hiddenAt: string; onUnhide: () => void }) {
+function HiddenTorCard({ tor, hiddenAt, onUnhide }: { tor: TOR; hiddenAt: string; onUnhide: () => Promise<void> }) {
   const [pending, setPending] = useState(false);
 
   return (
@@ -321,7 +321,8 @@ function HiddenTorCard({ tor, hiddenAt, onUnhide }: { tor: TOR; hiddenAt: string
           disabled={pending}
           onClick={() => {
             setPending(true);
-            onUnhide();
+            // On success the card unmounts; on failure it stays, so re-enable the button.
+            void onUnhide().finally(() => setPending(false));
           }}
           className="inline-flex items-center gap-2 rounded-full bg-[var(--color-ink)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-black disabled:opacity-50"
         >
@@ -364,7 +365,7 @@ function HiddenSection() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {items.map(({ tor, hiddenAt }) => (
-            <HiddenTorCard key={tor.id} tor={tor} hiddenAt={hiddenAt} onUnhide={() => void unhide(tor.id)} />
+            <HiddenTorCard key={tor.id} tor={tor} hiddenAt={hiddenAt} onUnhide={() => unhide(tor.id)} />
           ))}
         </div>
       )}

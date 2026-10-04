@@ -50,16 +50,19 @@ export async function hideTor(req: Request, res: Response): Promise<void> {
   if (!(await Tor.exists({ _id: torId, pipelineStatus: "enriched" }))) throw httpError(404, "TOR not found");
 
   const profile = await loadOrCreateProfile(req.user!.id);
-  const already = profile!.hiddenTors.some((h) => String(h.torId) === torId);
-  if (!already) {
-    if (profile!.hiddenTors.length >= MAX_HIDDEN_TORS) {
-      throw httpError(409, `You can hide at most ${MAX_HIDDEN_TORS} TORs`);
-    }
-    // The $ne guard keeps a concurrent double-click from adding the TOR twice.
-    await VendorProfile.updateOne(
-      { _id: profile!._id, "hiddenTors.torId": { $ne: torId } },
-      { $push: { hiddenTors: { torId, hiddenAt: new Date() } } }
-    );
+  // One atomic write: skip if already hidden (a double-click) and refuse once the list
+  // is full, so concurrent hides can neither duplicate an entry nor overshoot the cap.
+  const { modifiedCount } = await VendorProfile.updateOne(
+    {
+      _id: profile!._id,
+      "hiddenTors.torId": { $ne: torId },
+      [`hiddenTors.${MAX_HIDDEN_TORS - 1}`]: { $exists: false },
+    },
+    { $push: { hiddenTors: { torId, hiddenAt: new Date() } } }
+  );
+  if (!modifiedCount) {
+    const already = await VendorProfile.exists({ _id: profile!._id, "hiddenTors.torId": torId });
+    if (!already) throw httpError(409, `You can hide at most ${MAX_HIDDEN_TORS} TORs`);
   }
   res.status(204).end();
 }

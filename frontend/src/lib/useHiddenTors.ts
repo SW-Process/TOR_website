@@ -43,6 +43,13 @@ let state: State = EMPTY;
  * from most lists), so a refresh makes hidden TORs disappear.
  */
 const hiddenThisVisit = new Set<string>();
+/**
+ * The state each TOR is heading to while its write is in flight. A list reload
+ * that lands mid-write would otherwise flip a just-hidden card back on screen.
+ */
+const pending = new Map<string, boolean>();
+/** Per-TOR write queue, so a quick hide→unhide reaches the server in that order. */
+const writes = new Map<string, Promise<void>>();
 const listeners = new Set<() => void>();
 let inflight: Promise<void> | null = null;
 
@@ -61,14 +68,23 @@ function subscribe(listener: () => void) {
 const getSnapshot = () => state;
 const getServerSnapshot = () => EMPTY;
 
+/** Server rows with the in-flight writes laid over them. */
+function withPending(items: readonly HiddenTor[]): Pick<State, "items" | "ids"> {
+  const ids = new Set(items.map((i) => i.tor.id));
+  for (const [id, hidden] of pending) {
+    if (hidden) ids.add(id);
+    else ids.delete(id);
+  }
+  return { ids, items: items.filter((i) => ids.has(i.tor.id)) };
+}
+
 async function reload(userId: string): Promise<void> {
   try {
     const res = await apiFetch("/api/vendor/hidden-tors");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const rows = ((await res.json()) as { data: ApiHiddenRow[] }).data;
     if (state.userId !== userId) return;
-    const items = rows.map((r) => ({ tor: mapApiTor(r.tor), hiddenAt: r.hiddenAt }));
-    setState({ ready: true, items, ids: new Set(items.map((i) => i.tor.id)) });
+    setState({ ready: true, ...withPending(rows.map((r) => ({ tor: mapApiTor(r.tor), hiddenAt: r.hiddenAt }))) });
   } catch {
     if (state.userId !== userId) return;
     setState({ ready: true, error: "โหลดรายการ TOR ที่ซ่อนไม่สำเร็จ" });
@@ -77,6 +93,9 @@ async function reload(userId: string): Promise<void> {
 
 function ensureLoaded(userId: string | null) {
   if (state.userId === userId && (state.ready || inflight)) return;
+  // A different user (or logout): nothing from the previous session carries over.
+  hiddenThisVisit.clear();
+  pending.clear();
   setState({ ...EMPTY, userId, ready: userId === null });
   if (!userId) return;
   inflight = reload(userId).finally(() => {
@@ -84,27 +103,35 @@ function ensureLoaded(userId: string | null) {
   });
 }
 
-async function setHidden(torId: string, hidden: boolean) {
+function setHidden(torId: string, hidden: boolean): Promise<void> {
   const userId = state.userId;
-  if (!userId || state.ids.has(torId) === hidden) return;
+  if (!userId || state.ids.has(torId) === hidden) return Promise.resolve();
 
-  const ids = new Set(state.ids);
-  if (hidden) {
-    ids.add(torId);
-    hiddenThisVisit.add(torId);
-  } else {
-    ids.delete(torId);
-  }
-  setState({ ids, items: hidden ? state.items : state.items.filter((i) => i.tor.id !== torId), error: null });
+  if (hidden) hiddenThisVisit.add(torId);
+  pending.set(torId, hidden);
+  setState({ ...withPending(state.items), error: null });
 
-  try {
-    const res = await apiFetch(`/api/vendor/hidden-tors/${torId}`, { method: hidden ? "PUT" : "DELETE" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const send = async () => {
+    try {
+      const res = await apiFetch(`/api/vendor/hidden-tors/${torId}`, { method: hidden ? "PUT" : "DELETE" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch {
+      if (pending.get(torId) === hidden) pending.delete(torId);
+      if (state.userId === userId) setState({ error: hidden ? "ซ่อน TOR ไม่สำเร็จ" : "เลิกซ่อน TOR ไม่สำเร็จ" });
+      await reload(userId); // roll back to the server's truth
+      return;
+    }
+    // Settle only if no newer toggle of this TOR is queued behind this one.
+    if (pending.get(torId) === hidden) pending.delete(torId);
     if (hidden) await reload(userId); // pick up the TOR row for the settings list
-  } catch {
-    setState({ error: hidden ? "ซ่อน TOR ไม่สำเร็จ" : "เลิกซ่อน TOR ไม่สำเร็จ" });
-    await reload(userId); // roll back to the server's truth
-  }
+  };
+
+  const next = (writes.get(torId) ?? Promise.resolve()).then(send);
+  writes.set(torId, next);
+  void next.finally(() => {
+    if (writes.get(torId) === next) writes.delete(torId);
+  });
+  return next;
 }
 
 export function useHiddenTors() {
