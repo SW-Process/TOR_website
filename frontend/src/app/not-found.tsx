@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Clock, FileQuestion, FileSearch, Home, Search } from "lucide-react";
 import mascotLost from "@/components/picture/404.png";
+import { CLOSING_SOON_HREF } from "@/lib/torSearch";
 
 // Root not-found renders inside the root layout only (outside `(site)/layout`),
 // as a standalone full-screen page without the site Header/Footer. Covers both
@@ -9,7 +10,7 @@ import mascotLost from "@/components/picture/404.png";
 
 const shortcuts = [
   { href: "/tor", icon: Search, label: "ค้นหา TOR ทั้งหมด" },
-  { href: "/tor?sort=deadline", icon: Clock, label: "TOR ใกล้ปิดรับ" },
+  { href: CLOSING_SOON_HREF, icon: Clock, label: "TOR ใกล้ปิดรับ" },
 ];
 
 export default function NotFound() {

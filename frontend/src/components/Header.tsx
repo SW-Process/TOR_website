@@ -16,10 +16,11 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
+import { CLOSING_SOON_HREF } from "@/lib/torSearch";
 
 const publicLinks = [
   { href: "/tor", label: "ค้นหา TOR" },
-  { href: "/tor?sort=deadline", label: "ใกล้ปิดรับ" },
+  { href: CLOSING_SOON_HREF, label: "ใกล้ปิดรับ" },
 ];
 
 // Vendor-only pages: their APIs reject admins, so admins get the admin panel link instead.

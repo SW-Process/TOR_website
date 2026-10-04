@@ -25,6 +25,7 @@ import mascotHug from "@/components/picture/hug.png";
 import { formatBudget } from "@/lib/mockData";
 import { fetchAgencies, fetchOpenTorStats, fetchTorList } from "@/lib/torApi";
 import { isBiddable } from "@/lib/torStatus";
+import { CLOSING_SOON_HREF } from "@/lib/torSearch";
 
 /** "฿8.5M"-style budget for the compact hero card. */
 function formatCompactBaht(amount: number): string {
@@ -99,7 +100,7 @@ export default async function Home() {
                 </span>
               </Link>
               <Link
-                href="/tor?sort=deadline"
+                href={CLOSING_SOON_HREF}
                 className="btn-pill border border-[var(--color-border-strong)] bg-white px-5 py-3 text-sm text-[var(--color-text)] shadow-[var(--shadow-sm)] hover:border-[var(--color-ink)]/30 transition-colors"
               >
                 ดู TOR ใกล้ปิดรับ

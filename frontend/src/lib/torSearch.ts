@@ -139,6 +139,15 @@ export function parseTorFilters(params: RawSearchParams): TorFilters {
   };
 }
 
+/**
+ * The "ใกล้ปิดรับ" shortcut (header, homepage, 404): the search page with the
+ * ใกล้ปิดรับ status filter ticked, soonest deadline first.
+ */
+export const CLOSING_SOON_HREF = `/tor?${new URLSearchParams([
+  ["status", "ใกล้ปิดรับ"],
+  ["sort", "deadline"],
+]).toString()}`;
+
 /** Filters → page URL search params. Defaults/empties are omitted to keep URLs short. */
 export function toUrlParams(f: TorFilters): URLSearchParams {
   const p = new URLSearchParams();
