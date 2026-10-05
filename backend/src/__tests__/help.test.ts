@@ -164,6 +164,19 @@ describe("admin help API", () => {
     expect((await request(app).get(`/api/help/announcements/${id}`)).body.announcement.ended).toBe(false);
   });
 
+  it("404s, not 500s, when the announcement is deleted between the read and the write", async () => {
+    const admin = await adminAgent();
+    const { id } = (await admin.post("/api/admin/help/announcements").send({ title: "จะถูกลบ", body: "x" }).expect(201)).body
+      .announcement;
+    const original = Announcement.findByIdAndUpdate.bind(Announcement);
+    const spy = jest.spyOn(Announcement, "findByIdAndUpdate").mockImplementationOnce(((...args: Parameters<typeof original>) => {
+      // another admin deletes it right before this write lands
+      return { lean: async () => (await Announcement.deleteOne({ _id: id }), original(...args).lean()) };
+    }) as never);
+    await admin.patch(`/api/admin/help/announcements/${id}`).send({ title: "แก้ไข" }).expect(404);
+    spy.mockRestore();
+  });
+
   it("rejects bad input and unknown fields", async () => {
     const admin = await adminAgent();
     await admin.post("/api/admin/help/faqs").send({ question: "ok?", answer: "x", category: "nope" }).expect(400);
