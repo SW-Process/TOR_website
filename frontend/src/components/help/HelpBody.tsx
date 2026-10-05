@@ -51,7 +51,8 @@ function parseBlocks(source: string): Block[] {
 const INLINE = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^)\s]+\))/g;
 
 function safeHref(href: string): { href: string; external: boolean } | null {
-  if (href.startsWith("/") && !href.startsWith("//")) return { href, external: false };
+  // Browsers read "/\host" like "//host" (another site), so a backslash never counts as a site path.
+  if (href.startsWith("/") && !href.startsWith("//") && !href.includes("\\")) return { href, external: false };
   if (/^https:\/\//i.test(href)) return { href, external: true };
   return null;
 }
