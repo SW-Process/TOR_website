@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { listAdminTors, updateAdminTor, hideAdminTor } from "../controllers/adminTorController";
+import { listReportedTors } from "../controllers/adminReportedTorController";
 import { getAdminStats } from "../controllers/adminStatsController";
 import { listReports, updateReport } from "../controllers/adminReportController";
 import { listLogs } from "../controllers/adminLogController";
@@ -22,6 +23,7 @@ router.use(requireAuth, requireRole("admin"));
 
 router.get("/stats", getAdminStats);
 router.get("/tors", listAdminTors);
+router.get("/tors/reported", listReportedTors);
 router.patch("/tors/:id", updateAdminTor);
 router.delete("/tors/:id", hideAdminTor);
 router.get("/reports", listReports);
