@@ -3,6 +3,7 @@ import { listAdminTors, updateAdminTor, hideAdminTor } from "../controllers/admi
 import { listReportedTors } from "../controllers/adminReportedTorController";
 import { getAdminStats } from "../controllers/adminStatsController";
 import { listReports, updateReport } from "../controllers/adminReportController";
+import { listAdminNotifications, markAdminNotificationRead } from "../controllers/adminNotificationController";
 import { listLogs } from "../controllers/adminLogController";
 import { listChats, getChatMessages, replyToChat, markChatRead, updateChat } from "../controllers/adminChatController";
 import {
@@ -22,6 +23,8 @@ const router = Router();
 router.use(requireAuth, requireRole("admin"));
 
 router.get("/stats", getAdminStats);
+router.get("/notifications", listAdminNotifications);
+router.patch("/notifications/:id/read", markAdminNotificationRead);
 router.get("/tors", listAdminTors);
 router.get("/tors/reported", listReportedTors);
 router.patch("/tors/:id", updateAdminTor);

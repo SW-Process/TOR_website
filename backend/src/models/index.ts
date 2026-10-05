@@ -10,6 +10,7 @@
  *   errorreports   — public/vendor-submitted TOR error reports
  *   ingestionruns  — sync run history
  *   systemlogs     — diagnostic logs
+ *   adminnotifications — in-app pipeline alerts for admins
  *   chatconversations — site "chat with admin" threads (one per visitor)
  *   chatmessages   — messages within a chat conversation
  */
@@ -27,6 +28,7 @@ export { ChatMessage } from "./ChatMessage";
 export { Session } from "./Session";
 export { Announcement } from "./Announcement";
 export { Faq } from "./Faq";
+export { AdminNotification } from "./AdminNotification";
 
 export type { IUser, UserRole, UserDocument } from "./User";
 export type { ITor, IAiSummary, IFairnessFlag, ISourceDocument, SourceTextLayer, TorPipelineStatus, IClassification, ProcurementStage, AnnouncementKind, IProcurementAnnouncement, IBidDeadline, BidDeadlinePrecision, DeadlineAttemptOutcome, IDeadlineAttempt, IProcurement } from "./Tor";
@@ -42,3 +44,4 @@ export type { IChatMessage } from "./ChatMessage";
 export type { ISession, SessionMethod } from "./Session";
 export type { IAnnouncement, AnnouncementKind as HelpAnnouncementKind, HelpStatus } from "./Announcement";
 export type { IFaq } from "./Faq";
+export type { IAdminNotification, AdminNotificationType } from "./AdminNotification";

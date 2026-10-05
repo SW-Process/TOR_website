@@ -1,5 +1,6 @@
 import type { EmailSender } from "./email.types";
 import { LogEmailSender } from "./logEmailSender";
+import { sendGridFromEnv } from "./sendgridEmailSender";
 
 export type { EmailMessage, EmailSender } from "./email.types";
 
@@ -8,6 +9,7 @@ let instance: EmailSender | null = null;
 function build(): EmailSender {
   const driver = process.env.EMAIL_DRIVER ?? "log";
   if (driver === "log") return new LogEmailSender();
+  if (driver === "sendgrid") return sendGridFromEnv();
   throw new Error(`unknown email driver: ${driver}`);
 }
 
