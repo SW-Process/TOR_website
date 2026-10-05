@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { ArrowUpRight, Lock, Mail } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
 import { useAuth } from "@/lib/useAuth";
@@ -14,21 +14,19 @@ const OAUTH_ERRORS: Record<string, string> = {
   google_unavailable: "การเข้าสู่ระบบด้วย Google ไม่พร้อมใช้งานในขณะนี้",
 };
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const { login, startGoogleLogin, isLoggedIn, ready: authReady } = useAuth();
   const [signingIn, setSigningIn] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [nextPath, setNextPath] = useState("/dashboard");
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setNextPath(params.get("next") || "/dashboard");
-    const oauthError = params.get("error");
-    if (oauthError) setError(OAUTH_ERRORS[oauthError] || "เข้าสู่ระบบด้วย Google ไม่สำเร็จ");
-  }, []);
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next") || "/dashboard";
+  // An error bounced back from Google arrives in the URL; show it once on load.
+  const [error, setError] = useState(() => {
+    const oauthError = searchParams.get("error");
+    return oauthError ? OAUTH_ERRORS[oauthError] || "เข้าสู่ระบบด้วย Google ไม่สำเร็จ" : "";
+  });
 
   useEffect(() => {
     if (authReady && isLoggedIn && !signingIn) router.replace("/dashboard");
@@ -174,5 +172,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
