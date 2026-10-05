@@ -9,6 +9,7 @@ import { mergeProcurement } from "./procurementStage";
 import { writeProcurementIfUnchanged } from "./procurementWrite";
 import { fetchAndStoreTorPdf } from "./fetchAndStoreTorPdf";
 import { logIngestionEvent } from "./log";
+import { logFailedRuns } from "./failedRunLog";
 import type { PdfParseFn } from "./pdfInspect";
 import { parseAgencyAllowlist, isAgencyAllowed } from "./agencyFilter";
 import { looksSoftwareRelated } from "./softwareKeywordGate";
@@ -249,15 +250,21 @@ const STALE_RUN_MS = 35 * 60_000; // longer than the Cloud Run Job 30-min task t
  * recent one may still be a live crawl, so the age guard leaves it alone.
  * Returns the number of rows updated.
  */
-export async function markInterruptedRunsFailed(): Promise<number> {
+export async function markInterruptedRunsFailed(now: Date = new Date()): Promise<number> {
+  const stale = await IngestionRun.find({
+    status: "running",
+    phase: "discovery",
+    startedAt: { $lt: new Date(now.getTime() - STALE_RUN_MS) },
+  })
+    .select("_id phase startedAt updatedAt")
+    .lean();
+  if (stale.length === 0) return 0;
+
   const res = await IngestionRun.updateMany(
-    {
-      status: "running",
-      phase: "discovery",
-      startedAt: { $lt: new Date(Date.now() - STALE_RUN_MS) },
-    },
-    { $set: { status: "failed", completedAt: new Date(), outcomeSummary: "interrupted by a server restart" } }
+    { _id: { $in: stale.map((r) => r._id) }, status: "running" },
+    { $set: { status: "failed", completedAt: now, outcomeSummary: "interrupted by a server restart" } }
   );
+  await logFailedRuns(stale, "interrupted by a server restart", now);
   return res.modifiedCount;
 }
 

@@ -2,6 +2,7 @@
 import { IngestionRun } from "../../models";
 import type { IngestionPhase } from "../../models/IngestionRun";
 import { LEASE_MS } from "./enrichmentJobRepo";
+import { logFailedRuns } from "../failedRunLog";
 
 /** Runs older than this while still "running" are treated as interrupted. */
 export const STALE_RUN_MS = 35 * 60_000;
@@ -14,15 +15,20 @@ export const IDLE_RUN_MS = LEASE_MS;
 
 /** Mark runs of `phase` left "running" by a dead worker as failed. Returns how many. */
 export async function sweepStaleRuns(phase: IngestionPhase, now: Date = new Date()): Promise<number> {
+  const stale = await IngestionRun.find({
+    status: "running",
+    phase,
+    $or: [
+      { startedAt: { $lt: new Date(now.getTime() - STALE_RUN_MS) } },
+      { updatedAt: { $lt: new Date(now.getTime() - IDLE_RUN_MS) } },
+    ],
+  })
+    .select("_id phase startedAt updatedAt")
+    .lean();
+  if (stale.length === 0) return 0;
+
   const res = await IngestionRun.updateMany(
-    {
-      status: "running",
-      phase,
-      $or: [
-        { startedAt: { $lt: new Date(now.getTime() - STALE_RUN_MS) } },
-        { updatedAt: { $lt: new Date(now.getTime() - IDLE_RUN_MS) } },
-      ],
-    },
+    { _id: { $in: stale.map((r) => r._id) }, status: "running" },
     {
       $set: {
         status: "failed",
@@ -31,6 +37,7 @@ export async function sweepStaleRuns(phase: IngestionPhase, now: Date = new Date
       },
     }
   );
+  await logFailedRuns(stale, "no progress within the expected window", now);
   return res.modifiedCount;
 }
 

@@ -13,7 +13,8 @@
     "seed:help": "tsx src/scripts/seedHelp.ts",
     "job:discovery": "node dist/jobs/discovery.js",
     "job:enrichment": "node dist/jobs/enrichment.js",
-    "job:lifecycle": "node dist/jobs/lifecycle.js"
+    "job:lifecycle": "node dist/jobs/lifecycle.js",
+    "job:stalled-runs": "node dist/jobs/stalledRuns.js"
   },
   "keywords": [],
   "author": "",
