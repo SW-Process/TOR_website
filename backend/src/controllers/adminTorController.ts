@@ -9,6 +9,7 @@ import { httpError } from "../utils/httpError";
 import { bangkokEndOfDay } from "../utils/bidDeadline";
 import { withDisplayStatus, type StatusInput } from "../utils/torStatus";
 import { DEFAULT_ORDER, LIST_PROJECTION, buildFilter, parseQuery, sortStages } from "./torController";
+import { logIngestionEvent } from "../ingestion/log";
 
 /**
  * Admin data-quality review of public TORs (UC-5): the same filters as the
@@ -83,6 +84,24 @@ function torIdParam(req: Request): string {
   return id;
 }
 
+const BID_DEADLINE_PATH = "procurement.bidDeadline.date";
+
+/** Stable comparison key, so two equal Dates or two equal nulls compare equal. */
+function valueKey(v: unknown): string {
+  return v instanceof Date ? `date:${v.toISOString()}` : JSON.stringify(v ?? null);
+}
+
+/** Only the paths whose value actually changed, as { path: { from, to } }. */
+function changedPaths(before: Record<string, unknown>, after: Record<string, unknown>) {
+  const changes: Record<string, { from: unknown; to: unknown }> = {};
+  for (const path of Object.keys(before)) {
+    if (valueKey(before[path]) !== valueKey(after[path])) {
+      changes[path] = { from: before[path] ?? null, to: after[path] ?? null };
+    }
+  }
+  return changes;
+}
+
 /** PATCH /api/admin/tors/:id — correct extracted fields and/or mark flags reviewed. */
 export async function updateAdminTor(req: Request, res: Response): Promise<void> {
   const id = torIdParam(req);
@@ -103,6 +122,14 @@ export async function updateAdminTor(req: Request, res: Response): Promise<void>
     }
     if (!tor.procurement) throw httpError(409, "TOR has no procurement data yet; wait for the next lifecycle refresh");
   }
+
+  // Snapshot the fields this request may touch, so the audit log records what actually changed.
+  const watched = [...Object.keys(fields), "budget", "submissionDeadline"];
+  if (bidDeadline !== undefined) watched.push(BID_DEADLINE_PATH);
+  const before: Record<string, unknown> = Object.fromEntries(
+    watched.map((path) => [path, path === BID_DEADLINE_PATH ? tor.procurement?.bidDeadline?.date : tor.get(path)])
+  );
+  const openFlagsBefore = tor.fairnessFlags.filter((f) => f.status === "open").length;
 
   tor.set(fields);
   // null clears the field (e.g. a deadline the model got wrong and the TOR doesn't state).
@@ -126,6 +153,24 @@ export async function updateAdminTor(req: Request, res: Response): Promise<void>
       },
       { timestamps: false }
     );
+  }
+
+  const after: Record<string, unknown> = Object.fromEntries(
+    watched.map((path) => [path, path === BID_DEADLINE_PATH ? bidDeadlineValue : tor.get(path)])
+  );
+  const changes = changedPaths(before, after);
+  const openFlagsAfter = tor.fairnessFlags.filter((f) => f.status === "open").length;
+  if (openFlagsBefore !== openFlagsAfter) {
+    changes["fairnessFlags.open"] = { from: openFlagsBefore, to: openFlagsAfter };
+  }
+  if (Object.keys(changes).length > 0) {
+    await logIngestionEvent({
+      source: "application",
+      component: "admin.tor-edit",
+      severity: "info",
+      message: `TOR ${id} edited by admin ${req.user!.id}: ${Object.keys(changes).join(", ")}`,
+      context: { torId: id, editedBy: req.user!.id, changes },
+    });
   }
 
   const saved = await Tor.findById(id).select(ADMIN_PROJECT_STAGE).lean();
