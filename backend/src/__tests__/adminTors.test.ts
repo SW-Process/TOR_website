@@ -6,7 +6,7 @@ process.env.JWT_SECRET = "test-secret";
 process.env.JWT_EXPIRES_IN = "7d";
 
 import app from "../app";
-import { Tor, User } from "../models";
+import { SystemLog, Tor, User } from "../models";
 
 let mongod: MongoMemoryServer;
 
@@ -115,6 +115,28 @@ describe("/api/admin/tors", () => {
     // null clears a wrongly extracted deadline.
     await admin.patch(`/api/admin/tors/${flagged}`).send({ submissionDeadline: null });
     expect((await Tor.findById(flagged).lean())!.submissionDeadline).toBeUndefined();
+  });
+
+  it("records what an admin changed in SystemLog, and nothing when the values are unchanged", async () => {
+    const { flagged } = await seed();
+    const admin = await agentWithRole("admin");
+    await SystemLog.deleteMany({});
+
+    await admin.patch(`/api/admin/tors/${flagged}`).send({ budget: 900_000, resolveFlags: true });
+    const logs = await SystemLog.find({ component: "admin.tor-edit" }).lean();
+    expect(logs).toHaveLength(1);
+    const [log] = logs;
+    expect(log?.severity).toBe("info");
+    expect(log?.context).toMatchObject({
+      torId: flagged,
+      changes: {
+        budget: { from: 9_000_000, to: 900_000 },
+        "fairnessFlags.open": { from: 1, to: 0 },
+      },
+    });
+
+    await admin.patch(`/api/admin/tors/${flagged}`).send({ budget: 900_000 });
+    expect(await SystemLog.countDocuments({ component: "admin.tor-edit" })).toBe(1);
   });
 
   it("rejects bad edits", async () => {
