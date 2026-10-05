@@ -11,8 +11,13 @@ import adminRoutes from "./routes/adminRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import helpRoutes from "./routes/helpRoutes";
 import { notFound, errorHandler } from "./middleware/errorHandler";
+import { parseTrustProxy } from "./utils/trustProxy";
 
 const app = express();
+
+// Real client IPs behind a load balancer (session list); see utils/trustProxy.
+const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+if (trustProxy !== undefined) app.set("trust proxy", trustProxy);
 
 app.use(
   cors({

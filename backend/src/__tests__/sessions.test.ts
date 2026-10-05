@@ -9,6 +9,7 @@ process.env.JWT_EXPIRES_IN = "7d";
 import app from "../app";
 import { Session, Tor, User, VendorProfile } from "../models";
 import { parseUserAgent } from "../utils/userAgent";
+import { parseTrustProxy } from "../utils/trustProxy";
 
 let mongod: MongoMemoryServer;
 
@@ -262,5 +263,80 @@ describe("parseUserAgent", () => {
     ["", { type: "desktop", browser: null, os: null }],
   ])("%s", (ua, expected) => {
     expect(parseUserAgent(ua)).toEqual(expected);
+  });
+});
+
+describe("review fixes", () => {
+  async function legacyCookie() {
+    const laptop = request.agent(app);
+    await laptop.post("/api/auth/register").send(creds).expect(201);
+    const user = (await User.findOne({ email: creds.email }))!;
+    const legacy = jwt.sign({ role: "vendor", tv: 0 }, "test-secret", { subject: String(user._id), expiresIn: "7d" });
+    return { laptop, user, legacy };
+  }
+  const sidOf = (res: request.Response) => {
+    const token = String(res.headers["set-cookie"] ?? "").match(/token=([^;]+)/)?.[1];
+    return token ? (jwt.decode(token) as { sid?: string }).sid : undefined;
+  };
+
+  it("adopts a legacy cookie into ONE session even when a page fires requests at once", async () => {
+    await Session.syncIndexes();
+    const { user, legacy } = await legacyCookie();
+    const responses = await Promise.all(
+      ["/api/auth/me", "/api/auth/me", "/api/vendor/bookmarks", "/api/vendor/hidden-tors", "/api/auth/sessions"].map((p) =>
+        request(app).get(p).set("Cookie", `token=${legacy}`)
+      )
+    );
+    expect(responses.map((r) => r.status)).toEqual([200, 200, 200, 200, 200]);
+    const sids = new Set(responses.map(sidOf).filter(Boolean));
+    expect(sids.size).toBe(1);
+    expect(await Session.countDocuments({ userId: user._id })).toBe(2); // the register session + the adopted one
+  });
+
+  it("keeps a signed-out legacy device signed out instead of re-adopting it", async () => {
+    await Session.syncIndexes();
+    const { laptop, user, legacy } = await legacyCookie();
+    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(200);
+    const adopted = (await laptop.get("/api/auth/sessions")).body.data.find((s: { current: boolean }) => !s.current);
+
+    await laptop.delete(`/api/auth/sessions/${adopted.id}`).expect(204);
+    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(401);
+    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(401);
+    // the tombstone isn't listed, and revoking it again is a 404
+    expect((await laptop.get("/api/auth/sessions")).body.data).toHaveLength(1);
+    await laptop.delete(`/api/auth/sessions/${adopted.id}`).expect(404);
+    expect(await Session.countDocuments({ userId: user._id, revokedAt: null })).toBe(1);
+  });
+
+  it("logging out an adopted legacy device keeps its old cookie dead", async () => {
+    await Session.syncIndexes();
+    const { legacy } = await legacyCookie();
+    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(200);
+    await request(app).post("/api/auth/logout").set("Cookie", `token=${legacy}`).expect(200);
+    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(401);
+  });
+
+  it("gives this device's session row a fresh expiry when the cookie is re-issued", async () => {
+    const { laptop } = await twoDevices();
+    const mine = (await laptop.get("/api/auth/sessions")).body.data.find((s: { current: boolean }) => s.current);
+    await Session.updateOne({ _id: mine.id }, { expiresAt: new Date(Date.now() + 60_000) }); // about to lapse
+    await laptop.post("/api/auth/logout-others").expect(200);
+    const row = await Session.findById(mine.id).lean();
+    expect(row!.expiresAt.getTime()).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
+  });
+});
+
+describe("parseTrustProxy", () => {
+  it.each([
+    [undefined, undefined],
+    ["", undefined],
+    ["  ", undefined],
+    ["1", 1],
+    ["2", 2],
+    ["true", true],
+    ["false", false],
+    ["loopback, 10.0.0.0/8", "loopback, 10.0.0.0/8"],
+  ])("%p → %p", (raw, expected) => {
+    expect(parseTrustProxy(raw)).toEqual(expected);
   });
 });

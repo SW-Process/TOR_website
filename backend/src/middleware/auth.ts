@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { isValidObjectId } from "mongoose";
 import { Session, User } from "../models";
 import { verifyToken, COOKIE_NAME } from "../utils/token";
-import { LAST_SEEN_RESOLUTION_MS, startSession } from "../services/sessions";
+import { LAST_SEEN_RESOLUTION_MS, adoptLegacySession, legacyKeyOf } from "../services/sessions";
 import type { UserRole } from "../models/User";
 import type { AuthUser } from "../types/http";
 
@@ -12,7 +12,8 @@ import type { AuthUser } from "../types/http";
  * (one device revoked) or its token version behind the user's (everything revoked;
  * see User.tokenVersion). The role comes from the database, not the token, so a
  * role change applies at once. A token from before session rows existed has no
- * `sid`; it still works and is reported with no sessionId.
+ * `sid`; it's matched to its adopted row by hash, or reported with no sessionId
+ * until requireAuth adopts it.
  */
 export async function sessionUser(token: string | undefined): Promise<AuthUser | null> {
   if (!token) return null;
@@ -25,11 +26,14 @@ export async function sessionUser(token: string | undefined): Promise<AuthUser |
   if (!isValidObjectId(payload.sub)) return null;
   if (payload.sid !== undefined && !isValidObjectId(payload.sid)) return null;
 
+  // A legacy cookie (no sid) is found by its hash once it has been adopted.
+  const sessionFilter = payload.sid ? { _id: payload.sid } : { legacyKey: legacyKeyOf(token) };
   const [user, session] = await Promise.all([
     User.findById(payload.sub).select("role tokenVersion").lean(),
-    payload.sid ? Session.findOne({ _id: payload.sid, userId: payload.sub }).select("lastSeenAt").lean() : null,
+    Session.findOne({ ...sessionFilter, userId: payload.sub }).select("lastSeenAt revokedAt").lean(),
   ]);
   if (!user || (user.tokenVersion ?? 0) !== (payload.tv ?? 0)) return null;
+  if (session?.revokedAt) return null; // an adopted legacy session that was signed out
   if (payload.sid && !session) return null;
 
   if (session && Date.now() - session.lastSeenAt.getTime() > LAST_SEEN_RESOLUTION_MS) {
@@ -59,7 +63,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
   if (!user.sessionId) {
     const doc = await User.findById(user.id).select("+passwordHash");
-    if (doc) user.sessionId = await startSession(req, res, doc, doc.googleOAuthId && !doc.passwordHash ? "google" : "password");
+    const method = doc?.googleOAuthId && !doc.passwordHash ? "google" : "password";
+    const sessionId = doc ? await adoptLegacySession(req, res, doc, method, token) : null;
+    if (!sessionId) {
+      res.status(401).json({ message: "Invalid or expired session" });
+      return;
+    }
+    user.sessionId = sessionId;
   }
   req.user = user;
   next();

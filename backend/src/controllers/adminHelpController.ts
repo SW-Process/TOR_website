@@ -93,7 +93,8 @@ export async function adminUpdateAnnouncement(req: Request, res: Response): Prom
     { $set: { ...toDoc(body), ...publishStamp(body.status, current), updatedBy: req.user!.id } },
     { returnDocument: "after", runValidators: true }
   ).lean();
-  res.status(200).json({ announcement: { ...doc!, id: String(doc!._id) } });
+  if (!doc) throw httpError(404, "Announcement not found"); // deleted between the read and the write
+  res.status(200).json({ announcement: { ...doc, id: String(doc._id) } });
 }
 
 /** DELETE /api/admin/help/announcements/:id */
