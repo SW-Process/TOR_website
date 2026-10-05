@@ -1,5 +1,6 @@
 import type { IVendorProfile } from "../models/VendorProfile";
 import type { ITor } from "../models/Tor";
+import { canonicalTech } from "../config/techAliases";
 
 /**
  * Rule-based vendor↔TOR match score (FR-24/FR-25). Deterministic, no AI call —
@@ -37,7 +38,7 @@ function scoreCategory(profile: IVendorProfile, tor: ITor): SignalScore {
 }
 
 function normalize(values: string[]): Set<string> {
-  return new Set(values.map((v) => v.trim().toLowerCase()).filter(Boolean));
+  return new Set(values.map((v) => canonicalTech(v.trim())).filter(Boolean));
 }
 
 function scoreTechnologyStack(profile: IVendorProfile, tor: ITor): SignalScore {

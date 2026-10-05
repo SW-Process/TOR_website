@@ -108,9 +108,9 @@ describe("computeMatch", () => {
       expect(computeMatch(p, tor({ technologyStack: ["React", "react"] })).score).toBe(100);
     });
 
-    it("requires an exact name match — no substring or alias matching", () => {
+    it("requires an exact name match after normalization — no substring matching", () => {
       const p = profile({ technologyStack: ["React", "NodeJS"] });
-      const result = computeMatch(p, tor({ technologyStack: ["React Native", "Node.js"] }));
+      const result = computeMatch(p, tor({ technologyStack: ["React Native", "Svelte"] }));
       expect(result.score).toBe(0);
       expect(result.matchedCriteria).toEqual([]);
     });
@@ -250,5 +250,21 @@ describe("computeMatch", () => {
       expect(JSON.stringify(p)).toBe(pCopy);
       expect(JSON.stringify(t)).toBe(tCopy);
     });
+  });
+
+  it("matches technology spellings that differ only by case, dots or aliases", () => {
+    const p = profile({ technologyStack: ["ReactJS", "node", "Postgres"] });
+    const t = tor({ technologyStack: ["React", "Node.js", "PostgreSQL"] });
+
+    const result = computeMatch(p, t);
+    expect(result.score).toBe(100);
+    expect(result.matchedCriteria).toEqual(["technologyStack"]);
+  });
+
+  it("still treats unrelated technologies as different", () => {
+    const p = profile({ technologyStack: ["Java"] });
+    const t = tor({ technologyStack: ["JavaScript"] });
+
+    expect(computeMatch(p, t).matchedCriteria).toEqual([]);
   });
 });
