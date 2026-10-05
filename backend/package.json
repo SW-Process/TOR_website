@@ -23,6 +23,7 @@
   "dependencies": {
     "@google-cloud/storage": "^7.22.0",
     "@google/genai": "^0.14.1",
+    "@sendgrid/mail": "^8.1.6",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
