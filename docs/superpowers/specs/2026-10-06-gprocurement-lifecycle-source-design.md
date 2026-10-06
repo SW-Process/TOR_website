@@ -2,6 +2,7 @@
 
 Date: 2026-10-06. Branch: `feat/tor-gproc-lifecycle` (stacked on `feat/tor-procurement-deadline`).
 Builds on `2026-10-03-tor-procurement-lifecycle-design.md`.
+Status: Implemented by `docs/superpowers/plans/2026-10-06-gprocurement-lifecycle-source.md`.
 
 ## Problem
 
@@ -153,6 +154,10 @@ process5 are not stored in v1).
 3. No data is deleted. If process5 misbehaves, set `GPROC_ENABLED=false`.
 
 ## Open items
+
+- **First-run re-read**: the first process5 run re-reads each invitation once, because the invitation
+  ids change (`gproc-…` instead of the egp2 uuid); the existing deadline is kept until that read
+  succeeds, and `MAX_DEADLINE_EXTRACTIONS_PER_RUN` bounds the spend.
 
 - **Several invitations per project** (re-issued / amended): v1 trusts the single `buildName2`. Verify
   with a real project that has more than one `D0`.

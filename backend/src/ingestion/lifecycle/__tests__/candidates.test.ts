@@ -66,6 +66,21 @@ describe("projectIdFromListingUrl", () => {
   });
 });
 
+describe("lifecycleFilter reach rule", () => {
+  const url = (id: string) => `https://egp.test/project-detail/${id}`;
+  it("also selects an enriched TOR with an 11-digit projectCode and no listing URL when process5 is on", async () => {
+    await Tor.create([
+      { title: "no url", projectCode: "69099318020", pipelineStatus: "enriched" },
+      { title: "no url bad code", projectCode: "code-x", pipelineStatus: "enriched" },
+      { title: "with url", projectCode: "code-y", pipelineStatus: "enriched", sourceListingUrl: url("y") },
+    ] as any);
+    const on = (await Tor.find(lifecycleFilter({ gproc: true }) as any).sort({ title: 1 }).lean()).map((t) => t.title);
+    expect(on).toEqual(["no url", "with url"]);
+    const off = (await Tor.find(lifecycleFilter({ gproc: false }) as any).lean()).map((t) => t.title);
+    expect(off).toEqual(["with url"]);
+  });
+});
+
 describe("lifecycleFilter", () => {
   const url = (id: string) => `https://egp.test/project-detail/${id}`;
   const procurement = (stage: string, contractStatus?: string) => ({

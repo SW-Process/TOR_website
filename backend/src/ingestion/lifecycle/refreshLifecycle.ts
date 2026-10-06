@@ -4,9 +4,11 @@ import { IngestionRun, Tor } from "../../models";
 import type { IProcurement } from "../../models";
 import { EgpClient, egpConfigFromEnv } from "../../scraper/egpClient";
 import type { EgpClientLike } from "../../scraper/egpClient.types";
+import { GprocClient, gprocConfigFromEnv, gprocEnabled } from "../../scraper/gprocClient";
+import type { GprocClientLike } from "../../scraper/gprocClient.types";
 import { sweepStaleRuns } from "../enrichment/sweepStaleRuns";
 import { logIngestionEvent } from "../log";
-import { buildProcurement, mergeProcurement } from "../procurementStage";
+import { mergeProcurement } from "../procurementStage";
 import { writeProcurementIfUnchanged } from "../procurementWrite";
 import { getStorage } from "../../storage";
 import type { BlobStorage } from "../../storage/storage.types";
@@ -15,12 +17,15 @@ import {
   lifecycleFilter,
   maxDeadlineExtractionsPerRun,
   maxLifecycleRefreshPerRun,
-  projectIdFromListingUrl,
 } from "./candidates";
 import { runDeadlineStep } from "./deadlineStep";
+import type { DeadlineStepOutcome } from "./deadlineStep";
+import { loadFreshProcurement } from "./loadFresh";
 
 export interface RefreshLifecycleDeps {
   client?: EgpClientLike;
+  /** The national e-GP (process5) source; defaults to a real client when GPROC_ENABLED, otherwise none. */
+  gprocClient?: GprocClientLike;
   /** Max TORs to check this run; defaults to MAX_LIFECYCLE_REFRESH_PER_RUN. */
   maxTors?: number;
   now?: () => Date;
@@ -66,12 +71,14 @@ export function procurementChanged(
 ): boolean {
   if (!before) return true;
   if (before.stage !== after.stage) return true;
+  if ((before.source ?? "egp2") !== (after.source ?? "egp2")) return true;
   if ((before.contractStatus ?? null) !== (after.contractStatus ?? null)) return true;
   return announcementSignature(before) !== announcementSignature(after);
 }
 
 /**
- * Re-check existing TORs against e-GP and refresh their `procurement`. Never touches the
+ * Re-check existing TORs and refresh their `procurement`: decides the stage from the national e-GP
+ * (process5) with the BMA portal as fallback. Never touches the
  * source hash or pipeline status and never enqueues AI work — a status check itself costs no
  * Gemini call. The one exception is the optional deadline step: for a TOR with an invitation
  * (any stage) it reads the latest invitation PDF with one small, separate Gemini call, once per invitation id and
@@ -82,6 +89,7 @@ export async function refreshLifecycle(
 ): Promise<RefreshLifecycleResult> {
   const client = deps.client ?? new EgpClient(egpConfigFromEnv());
   const now = deps.now ?? (() => new Date());
+  const gproc = deps.gprocClient ?? (gprocEnabled() ? new GprocClient(gprocConfigFromEnv()) : undefined);
   const cap = deps.maxTors ?? (deps.torIds ? deps.torIds.length : maxLifecycleRefreshPerRun());
   let extractor = deps.deadlineExtractor;
   const deadlineCap = deps.maxDeadlineExtractions ?? maxDeadlineExtractionsPerRun();
@@ -100,12 +108,16 @@ export async function refreshLifecycle(
   let deadlinesRead = 0;
   let deadlinesUnreadable = 0;
   let deadlinesFailed = 0;
+  const gprocStage = { ok: 0, "not-found": 0, error: 0 };
+  const emptyTally = () => ({ read: 0, unreadable: 0, errors: 0 });
+  const bySource = { gproc: emptyTally(), egp2: emptyTally() };
+  const SOURCE_LABEL = { gproc: "process5", egp2: "BMA portal" } as const;
 
   await sweepStaleRuns("lifecycle");
 
   // A missing lastCheckedAt sorts before any date, so never-checked TORs come first.
   const tors = await Tor.find(
-    deps.torIds ? { $and: [lifecycleFilter(), { _id: { $in: [...deps.torIds] } }] } : lifecycleFilter()
+    deps.torIds ? { $and: [lifecycleFilter({ gproc: Boolean(gproc) }), { _id: { $in: [...deps.torIds] } }] } : lifecycleFilter({ gproc: Boolean(gproc) })
   )
     .sort({ "procurement.lastCheckedAt": 1, _id: 1 })
     .limit(cap)
@@ -133,6 +145,34 @@ export async function refreshLifecycle(
     });
   }
 
+  /** One info line per open (inviting) TOR: which source gave its bid deadline, and whether it worked. */
+  const logOpenTorDeadline = async (
+    tor: { _id: Types.ObjectId; projectCode?: string | null },
+    merged: IProcurement,
+    source: "gproc" | "egp2",
+    outcome: DeadlineStepOutcome | "error" | "capped",
+    err?: Error
+  ) => {
+    if (merged.stage !== "inviting") return;
+    if (outcome === "skipped") return; // already read for this invitation: nothing happened this run
+    const label = tor.projectCode ?? String(tor._id);
+    let text: string;
+    if (outcome === "read" || outcome === "cleared") {
+      const saved = await Tor.findById(tor._id).select("procurement.bidDeadline").lean();
+      const d = saved?.procurement?.bidDeadline;
+      text = d ? `read ok, ${d.precision === "month" ? "month only" : "day"} ${d.date.toISOString()}` : "no deadline stored";
+    } else if (outcome === "unreadable") text = "PDF read but no deadline found";
+    else if (outcome === "conflict") text = "not stored (TOR changed meanwhile), retry next run";
+    else if (outcome === "capped") text = "not attempted (MAX_DEADLINE_EXTRACTIONS_PER_RUN reached)";
+    else text = `failed (${err?.message ?? "error"})`;
+    await logIngestionEvent({
+      severity: outcome === "error" ? "warning" : "info",
+      message: `open TOR ${label}: bid deadline from ${SOURCE_LABEL[source]}: ${text}`,
+      component: COMPONENT,
+      ingestionRunId: runId,
+    });
+  };
+
   let changed = 0;
   let unchanged = 0;
   let skipped = 0;
@@ -154,20 +194,27 @@ export async function refreshLifecycle(
     for (const tor of tors) {
       const label = tor.projectCode ?? String(tor._id);
       try {
-        const projectId = projectIdFromListingUrl(tor.sourceListingUrl);
-        if (!projectId) {
+        const loaded = await loadFreshProcurement({
+          tor,
+          egp: client,
+          gproc,
+          now,
+          warn: (message) =>
+            logIngestionEvent({ severity: "warning", message, component: COMPONENT, ingestionRunId: runId }),
+          report: (attempt) => {
+            gprocStage[attempt] += 1;
+          },
+        });
+        if (loaded === "skip") {
           skipped += 1;
           await logIngestionEvent({
             severity: "warning",
-            message: `lifecycle refresh skipped TOR ${label}: no e-GP project id in its listing URL`,
+            message: `lifecycle refresh skipped TOR ${label}: no e-GP project id (no listing URL and process5 could not answer)`,
             component: COMPONENT,
             ingestionRunId: runId,
           });
         } else {
-          const detail = await client.projectDetail(projectId);
-          const announcements = await client.announcements(projectId);
-          const fresh = buildProcurement(announcements, detail.masterContractAvailableName, now());
-          const merged = mergeProcurement(tor.procurement, fresh);
+          const merged = mergeProcurement(tor.procurement, loaded.fresh);
           const didChange = procurementChanged(tor.procurement, merged);
           const written = await writeProcurementIfUnchanged(tor._id, tor.procurement, merged);
           if (!written) {
@@ -183,6 +230,7 @@ export async function refreshLifecycle(
             else unchanged += 1;
 
             if (extractor && storage && deadlinesRead + deadlinesUnreadable + deadlinesFailed < deadlineCap) {
+              const tally = bySource[loaded.source];
               try {
                 const outcome = await runDeadlineStep(
                   {
@@ -190,15 +238,18 @@ export async function refreshLifecycle(
                     projectCode: tor.projectCode,
                     title: tor.title,
                     procurement: merged,
-                    filenames: new Map(
-                      announcements.flatMap((a) => (a.id && a.projectAnnouncementPath ? [[a.id, a.projectAnnouncementPath] as const] : []))
-                    ),
+                    filenames: loaded.filenames,
+                    loadPdf: loaded.loadPdf,
                   },
                   { client, storage, extractor, now }
                 );
-                if (outcome === "read") deadlinesRead += 1;
-                else if (outcome === "unreadable") deadlinesUnreadable += 1;
-                else if (outcome === "conflict") {
+                if (outcome === "read") {
+                  deadlinesRead += 1;
+                  tally.read += 1;
+                } else if (outcome === "unreadable") {
+                  deadlinesUnreadable += 1;
+                  tally.unreadable += 1;
+                } else if (outcome === "conflict") {
                   await logIngestionEvent({
                     severity: "warning",
                     message: `bid deadline for TOR ${label} not stored: it changed while being read; will retry next run`,
@@ -206,8 +257,10 @@ export async function refreshLifecycle(
                     ingestionRunId: runId,
                   });
                 }
+                await logOpenTorDeadline(tor, merged, loaded.source, outcome);
               } catch (err) {
                 deadlinesFailed += 1;
+                tally.errors += 1;
                 await logIngestionEvent({
                   severity: "error",
                   message: `bid deadline read failed for TOR ${label}: ${(err as Error).message}`,
@@ -215,7 +268,10 @@ export async function refreshLifecycle(
                   context: { torId: String(tor._id), stack: (err as Error).stack },
                   ingestionRunId: runId,
                 });
+                await logOpenTorDeadline(tor, merged, loaded.source, "error", err as Error);
               }
+            } else if (merged.stage === "inviting" && extractor && storage) {
+              await logOpenTorDeadline(tor, merged, loaded.source, "capped");
             }
           }
         }
@@ -234,11 +290,19 @@ export async function refreshLifecycle(
 
     const status =
       failed === 0 ? "success" : changed + unchanged + skipped === 0 ? "failed" : "partial";
+    const t = bySource;
+    const bySourceText = (s: "gproc" | "egp2") =>
+      `${SOURCE_LABEL[s]} read ${t[s].read}, unreadable ${t[s].unreadable}, errors ${t[s].errors}`;
     const deadlineSummary =
       deadlinesRead + deadlinesUnreadable + deadlinesFailed > 0
-        ? `; bid deadlines: read ${deadlinesRead}, unreadable ${deadlinesUnreadable}, errors ${deadlinesFailed}`
+        ? `; bid deadlines: read ${deadlinesRead}, unreadable ${deadlinesUnreadable}, errors ${deadlinesFailed}` +
+          (gproc ? ` (${bySourceText("gproc")}; ${bySourceText("egp2")})` : "")
         : "";
-    const outcomeSummary = `checked ${tors.length}, changed ${changed}, unchanged ${unchanged}, skipped ${skipped}, failed ${failed}${deadlineSummary}`;
+    const fellBack = gprocStage["not-found"] + gprocStage.error;
+    const stageSummary = gproc
+      ? `; stage source: process5 ok ${gprocStage.ok}, fell back to BMA portal ${fellBack} (project unknown to process5 ${gprocStage["not-found"]}, process5 error ${gprocStage.error})`
+      : "";
+    const outcomeSummary = `checked ${tors.length}, changed ${changed}, unchanged ${unchanged}, skipped ${skipped}, failed ${failed}${stageSummary}${deadlineSummary}`;
     await IngestionRun.updateOne(
       { _id: runId },
       { $set: { completedAt: new Date(), status, outcomeSummary } }
