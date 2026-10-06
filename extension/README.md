@@ -25,7 +25,7 @@ The API URL defaults to `http://localhost:8000`. To point at the deployed API, e
 
 ## Tests
 
-`cd extension && npm test` (or `node --test test/`) runs the parser tests only. The rest is verified by hand:
+`cd extension && npm test` (or `node --test test/*.test.js`) runs the parser tests only. The rest is verified by hand:
 
 ## Manual verification checklist
 
