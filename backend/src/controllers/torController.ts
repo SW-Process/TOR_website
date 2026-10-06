@@ -286,7 +286,7 @@ export async function recordView(req: Request, res: Response): Promise<void> {
 export async function getTor(req: Request, res: Response): Promise<void> {
   const tor = await Tor.findOne({ _id: req.params.id, pipelineStatus: "enriched" })
     .select(
-      "-sourceContentHash -classification -ingestionRunId -__v -sourceDocument.storageKey -sourceDocument.sha256 -procurement.announcements.storageKey -procurement.deadlineAttempt"
+      "-sourceContentHash -classification -ingestionRunId -__v -sourceDocument.storageKey -sourceDocument.sha256 -procurement.announcements.storageKey -procurement.deadlineAttempt -procurement.source"
     )
     .lean();
   if (!tor) throw httpError(404, "TOR not found");

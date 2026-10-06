@@ -33,6 +33,7 @@ export async function writeProcurementIfUnchanged(
     "procurement.announcements": merged.announcements,
     "procurement.lastCheckedAt": merged.lastCheckedAt,
   };
+  if (merged.source) $set["procurement.source"] = merged.source;
   const $unset: Record<string, 1> = {};
   if (merged.contractStatus === undefined) $unset["procurement.contractStatus"] = 1;
   else $set["procurement.contractStatus"] = merged.contractStatus;
