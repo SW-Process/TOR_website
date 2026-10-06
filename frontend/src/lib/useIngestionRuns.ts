@@ -93,9 +93,13 @@ export function useIngestionRuns() {
     }
   }, []);
 
+  // The "only open TORs" checkbox: the queue count must follow the same filter the run would use.
+  const lifecycleOnlyOpenRef = useRef(false);
   const refreshLifecycleQueue = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/ingestion/lifecycle/pending");
+      const res = await apiFetch(
+        `/api/ingestion/lifecycle/pending${lifecycleOnlyOpenRef.current ? "?onlyOpen=1" : ""}`
+      );
       if (!res.ok) return;
       setLifecycleQueue((await res.json()) as LifecycleQueueInfo);
     } catch {
@@ -233,7 +237,15 @@ export function useIngestionRuns() {
     }
   }, [pollUntilSettled]);
 
-  const triggerLifecycle = useCallback(async (params?: { maxTors?: number; maxDeadlineExtractions?: number }) => {
+  const setLifecycleOnlyOpen = useCallback(
+    (onlyOpen: boolean) => {
+      lifecycleOnlyOpenRef.current = onlyOpen;
+      void refreshLifecycleQueue();
+    },
+    [refreshLifecycleQueue]
+  );
+
+  const triggerLifecycle = useCallback(async (params?: { maxTors?: number; maxDeadlineExtractions?: number; onlyOpen?: boolean }) => {
     setError(null);
     setLifecyclePending(true);
     try {
@@ -276,6 +288,7 @@ export function useIngestionRuns() {
     triggerIngestion,
     triggerEnrichment,
     triggerLifecycle,
+    setLifecycleOnlyOpen,
     lastRunFor,
   };
 }
