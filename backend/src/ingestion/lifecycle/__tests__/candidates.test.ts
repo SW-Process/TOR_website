@@ -195,8 +195,8 @@ describe("lifecycleFilter onlyOpen", () => {
       { title: "inviting finished contract, no backfill", pipelineStatus: "enriched", sourceListingUrl: url("g"), procurement: proc("inviting", { contractStatus: "ส่งงานครบถ้วน" }) },
     ] as any);
     const titles = (await Tor.find(lifecycleFilter({ onlyOpen: true }) as any).sort({ title: 1 }).lean()).map((t) => t.title);
-    expect(titles).toEqual(["inviting"]);
-    expect(await countLifecycleCandidates({ onlyOpen: true })).toBe(1);
+    expect(titles).toEqual(["inviting", "inviting finished contract, no backfill"]);
+    expect(await countLifecycleCandidates({ onlyOpen: true })).toBe(2);
   });
 
   it("does not widen via the backfill or month-only branches, but an inviting TOR in them still qualifies", async () => {

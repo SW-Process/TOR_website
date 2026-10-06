@@ -40,7 +40,7 @@ export function maxDeadlineExtractionsPerRun(env: NodeJS.ProcessEnv = process.en
  * finished or cancelled included, so the file keeps being re-checked until a day is known or an
  * admin overrides the value.
  *
- * `onlyOpen` (manual runs only) additionally requires `procurement.stage === "inviting"`.
+ * `onlyOpen` (manual runs only) selects enriched, reachable TORs with `procurement.stage === "inviting"` and nothing else.
  */
 export function lifecycleFilter(opts: { gproc?: boolean; onlyOpen?: boolean } = {}): QueryFilter<ITor> {
   const useGproc = opts.gproc ?? gprocEnabled();
@@ -53,7 +53,12 @@ export function lifecycleFilter(opts: { gproc?: boolean; onlyOpen?: boolean } = 
         ],
       }
     : { sourceListingUrl: { $type: "string", $ne: "" } };
-  const filter: QueryFilter<ITor> = {
+  // Manual "only open TORs": the stored stage replaces the finished/cancelled rules, so a stale
+  // "inviting" TOR whose contract status already reads finished is still re-checked.
+  if (opts.onlyOpen) {
+    return { pipelineStatus: "enriched", $and: [reachable], "procurement.stage": "inviting" };
+  }
+  return {
     pipelineStatus: "enriched",
     $and: [
       reachable,
@@ -73,9 +78,6 @@ export function lifecycleFilter(opts: { gproc?: boolean; onlyOpen?: boolean } = 
       },
     ],
   };
-  // Manual "only open TORs": ANDed on top, so the backfill and month-only branches cannot widen the set.
-  if (opts.onlyOpen) filter["procurement.stage"] = "inviting";
-  return filter;
 }
 
 export function countLifecycleCandidates(opts: { onlyOpen?: boolean } = {}): Promise<number> {
