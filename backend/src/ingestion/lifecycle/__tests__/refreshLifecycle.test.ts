@@ -592,12 +592,12 @@ async function seedCode(over: Record<string, unknown> = {}) {
 }
 
 describe("refreshLifecycle with process5", () => {
-  it("takes the stage from process5 (awarded), tags the source, and does not touch egp2", async () => {
+  it("takes the stage from process5 (awarded), tags the source, and uses egp2 only for the contract status", async () => {
     const tor = await seedCode({ sourceListingUrl: listing("g1"), procurement: { stage: "inviting", contractStatus: "ระหว่างดำเนินการ", announcements: [], lastCheckedAt: new Date("2026-09-01") } });
     const egp = fakeClient();
     const out = await refreshLifecycle(deps(egp, { gprocClient: fakeGproc() }));
     expect(out).toMatchObject({ selected: 1, changed: 1, failed: 0 });
-    expect(egp.detailCalls).toEqual([]);
+    expect(egp.detailCalls).toEqual(["g1"]);
     const saved = (await Tor.findById(tor.id).lean())?.procurement;
     expect(saved?.stage).toBe("awarded");
     expect(saved?.source).toBe("gproc");
@@ -649,6 +649,64 @@ describe("refreshLifecycle with process5", () => {
     const out = await refreshLifecycle(deps(fakeClient(), { gprocClient: fakeGproc({ rows }) }));
     const warns = await SystemLog.find({ severity: "warning", ingestionRunId: out.runId }).lean();
     expect(warns.filter((w) => w.message.includes("Z9"))).toHaveLength(1);
+  });
+
+  describe("contract status", () => {
+    const stored = { stage: "inviting", contractStatus: "ระหว่างดำเนินการ", announcements: [], lastCheckedAt: new Date("2026-09-01") };
+    it("uses the fresh egp2 contract status when process5 answered", async () => {
+      const tor = await seedCode({ sourceListingUrl: listing("c1"), procurement: stored });
+      await refreshLifecycle(deps(fakeClient({ contract: { c1: "ส่งงานครบถ้วน" } }), { gprocClient: fakeGproc() }));
+      const saved = (await Tor.findById(tor.id).lean())?.procurement;
+      expect(saved?.stage).toBe("awarded");
+      expect(saved?.contractStatus).toBe("ส่งงานครบถ้วน");
+    });
+    it("keeps the stored contract status when the egp2 lookup fails", async () => {
+      const tor = await seedCode({ sourceListingUrl: listing("c2"), procurement: stored });
+      const out = await refreshLifecycle(deps(fakeClient({ fail: new Set(["c2"]) }), { gprocClient: fakeGproc() }));
+      expect(out.failed).toBe(0);
+      const saved = (await Tor.findById(tor.id).lean())?.procurement;
+      expect(saved?.stage).toBe("awarded");
+      expect(saved?.contractStatus).toBe("ระหว่างดำเนินการ");
+    });
+    it("keeps the stored contract status when there is no listing URL", async () => {
+      const tor = await seedCode({ procurement: stored });
+      await refreshLifecycle(deps(fakeClient(), { gprocClient: fakeGproc() }));
+      expect((await Tor.findById(tor.id).lean())?.procurement?.contractStatus).toBe("ระหว่างดำเนินการ");
+    });
+  });
+
+  it("treats an empty process5 announcement list for a TOR that had announcements as an error and falls back", async () => {
+    await seedCode({
+      sourceListingUrl: listing("z1"),
+      procurement: { stage: "inviting", announcements: [{ announcementId: "x", kind: "invitation", hasFile: true }], lastCheckedAt: new Date("2026-09-01") },
+    });
+    const egp = fakeClient({ announcements: { z1: [TOR_DRAFT("z1"), INVITATION("z1")] } });
+    const out = await refreshLifecycle(deps(egp, { gprocClient: fakeGproc({ rows: [] }) }));
+    expect(out.failed).toBe(0);
+    const saved = (await Tor.findOne({ projectCode: CODE }).lean())?.procurement;
+    expect(saved?.source).toBe("egp2");
+    expect((await IngestionRun.findById(out.runId).lean())?.outcomeSummary).toContain("process5 error 1");
+  });
+
+  it("pauses process5 for the rest of the run after 3 consecutive errors", async () => {
+    for (let i = 0; i < 5; i += 1) {
+      await Tor.create({ title: `t${i}`, projectCode: `6909931802${i}`, pipelineStatus: "enriched", sourceContentHash: `h${i}`, sourceListingUrl: listing(`b${i}`) });
+    }
+    let calls = 0;
+    const g = fakeGproc({ detail: new Error("gprocurement 403") });
+    g.projectDetail = async () => {
+      calls += 1;
+      throw new Error("gprocurement 403");
+    };
+    const egp = fakeClient();
+    const out = await refreshLifecycle(deps(egp, { gprocClient: g }));
+    expect(calls).toBe(3);
+    expect(out).toMatchObject({ selected: 5, failed: 0 });
+    expect(egp.detailCalls).toHaveLength(5);
+    const summary = (await IngestionRun.findById(out.runId).lean())?.outcomeSummary ?? "";
+    expect(summary).toContain("process5 paused after 3 consecutive errors");
+    const paused = await SystemLog.find({ ingestionRunId: out.runId, message: /^process5 paused/ }).lean();
+    expect(paused).toHaveLength(1);
   });
 
   describe("bid deadline from the process5 PDF", () => {

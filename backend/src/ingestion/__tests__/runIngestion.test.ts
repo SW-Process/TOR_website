@@ -284,6 +284,41 @@ describe("runIngestion", () => {
     expect(t?.procurement?.contractStatus).toBe("ส่งงานครบถ้วน");
   });
 
+  describe("a TOR whose stage came from process5", () => {
+    const deps = { storage: fakeStorage(), parse, enqueueEnrichment: jest.fn() };
+    const checked = new Date("2026-10-02T00:00:00Z");
+    async function seedGproc() {
+      await (await runIngestion(baseOpts, { ...deps, client: fakeClient() })).done;
+      await Tor.updateOne(
+        { projectCode: "69000000001" },
+        { $set: { "procurement.source": "gproc", "procurement.stage": "awarded", "procurement.lastCheckedAt": checked } }
+      );
+    }
+    const prev = process.env.GPROC_ENABLED;
+    afterEach(() => {
+      process.env.GPROC_ENABLED = prev;
+    });
+
+    it("is left alone by discovery while process5 is enabled", async () => {
+      await seedGproc();
+      process.env.GPROC_ENABLED = "true";
+      await (await runIngestion(baseOpts, { ...deps, client: fakeClient({ contractStatus: "ส่งงานครบถ้วน" }) })).done;
+      const t = await Tor.findOne({ projectCode: "69000000001" }).lean();
+      expect(t?.procurement?.stage).toBe("awarded");
+      expect(t?.procurement?.lastCheckedAt).toEqual(checked);
+      expect(t?.procurement?.contractStatus).toBe("ระหว่างดำเนินการ");
+    });
+
+    it("is refreshed from egp2 as before when process5 is disabled", async () => {
+      await seedGproc();
+      process.env.GPROC_ENABLED = "false";
+      await (await runIngestion(baseOpts, { ...deps, client: fakeClient() })).done;
+      const t = await Tor.findOne({ projectCode: "69000000001" }).lean();
+      expect(t?.procurement?.stage).toBe("draft");
+      expect(t?.procurement?.lastCheckedAt?.getTime()).not.toBe(checked.getTime());
+    });
+  });
+
   it("adopts the new hash quietly when the stored hash is the legacy (contract-inclusive) form", async () => {
     const enqueue = jest.fn();
     const deps = { client: fakeClient(), storage: fakeStorage(), parse, enqueueEnrichment: enqueue };

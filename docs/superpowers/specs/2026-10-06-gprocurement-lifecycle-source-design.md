@@ -96,9 +96,17 @@ Nothing about month-only deadlines, admin override, caps or error classification
 ### Fallback and failure
 
 - Per TOR: process5 returns `null` (unknown project) or throws → use the egp2 path exactly as today and
-  keep `procurement.source` unchanged. A process5 outage degrades to today's behaviour, never to failures.
-- If `view-pdf`/`zip-info` fails for a TOR whose stage came from process5, the deadline step uses the
-  egp2 invitation file when one exists; otherwise it records nothing (retried next run).
+  set `procurement.source` to `egp2`. A process5 outage degrades to today's behaviour, never to failures.
+- A failed or absent `view-pdf`/`zip-info` does NOT fall back to the egp2 file: an error is retried next
+  run, a `null` (no bundle yet) is skipped and never clears a stored deadline.
+- Circuit breaker: after 3 consecutive process5 errors in a run (not "unknown project"), process5 is not
+  called for the rest of the run (one warning; the summary says so). A process5 response with a missing
+  announcement list, a detail without `announceType`/`methodId`, or zero announcements for a TOR that
+  had some is treated as an error (fallback to egp2).
+- Contract status: when process5 answered and the TOR has a listing URL, egp2 `projectDetail` is read
+  best-effort only for `masterContractAvailableName`; on error or without a URL the stored value is kept.
+- Discovery (`runIngestion`) skips the egp2 `procurement` write for an existing TOR whose
+  `procurement.source` is `gproc` while process5 is enabled, so it cannot revert the stage.
 - Config: `GPROC_ENABLED` (default `true`), `GPROC_BASE_URL` (default `https://process5.gprocurement.go.th`),
   `GPROC_DELAY_MS` (default 500), `GPROC_TIMEOUT_MS` (default 30000). Added to `.env.example`.
 - Politeness: one request at a time, delay between calls, descriptive User-Agent, stop the batch for
@@ -151,7 +159,8 @@ process5 are not stored in v1).
 1. Deploy backend with `GPROC_ENABLED=true` and the refresh as before.
 2. First manual lifecycle run with the two sliders raised; expect many stage changes (stale "inviting"
    TORs becoming awarded) and new deadlines for projects that were blank on egp2.
-3. No data is deleted. If process5 misbehaves, set `GPROC_ENABLED=false`.
+3. No data is deleted. If process5 misbehaves, set `GPROC_ENABLED=false`. With it off, TORs whose
+   `deadlineAttempt` id starts with `gproc-` get no egp2 deadline re-reads (accepted).
 
 ## Open items
 
@@ -159,6 +168,11 @@ process5 are not stored in v1).
   `deadlineAttempt.announcementId` starts with `gproc-`, the deadline step is skipped for that TOR (the
   egp2 invitation id differs and could overwrite a good process5 deadline). A process5 loader that
   returns no PDF never clears a stored deadline either.
+- **Invitation choice (M3)**: `invitationPdf` ignores which invitation it serves; a re-issued `D0` while
+  `buildName2` still points at the old bundle would read the old PDF. Guard idea: compare `buildName1`
+  date with the `D0` Bangkok day. Out of scope with multi-invitation support.
+- **Candidate-queue starvation**: unanswerable no-listing-URL TORs stay candidates and are re-checked
+  oldest-first every run; must be fixed before the extension flow (B).
 - **First-run re-read**: the first process5 run re-reads each invitation once, because the invitation
   ids change (`gproc-…` instead of the egp2 uuid); the existing deadline is kept until that read
   succeeds, and `MAX_DEADLINE_EXTRACTIONS_PER_RUN` bounds the spend.

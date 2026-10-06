@@ -35,7 +35,7 @@ export function buildGprocProcurement(
   const items: IProcurementAnnouncement[] = [];
   for (const a of input.announcements) {
     if (IGNORED.has(a.announceType)) continue;
-    const known = BY_CODE[a.announceType];
+    const known = Object.hasOwn(BY_CODE, a.announceType) ? BY_CODE[a.announceType] : undefined;
     if (!known && !unknownCodes.includes(a.announceType)) unknownCodes.push(a.announceType);
     const t = a.announceDate ? Date.parse(a.announceDate) : NaN;
     items.push({

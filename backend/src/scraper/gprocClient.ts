@@ -99,6 +99,10 @@ export class GprocClient implements GprocClientLike {
     });
     const d = body.data;
     if (!d || !d.projectId) return null;
+    // A project that answers without these has changed shape: fail loudly so the caller falls back.
+    if (!d.announceType || !d.methodId) {
+      throw new Error(`gprocurement project ${projectId}: detail lacks announceType/methodId (response shape changed?)`);
+    }
     return {
       projectId: String(d.projectId),
       projectStatus: d.projectStatus ?? null,
@@ -109,13 +113,19 @@ export class GprocClient implements GprocClientLike {
   }
 
   async announcements(projectId: string, detail: GprocProjectDetail): Promise<GprocAnnouncement[]> {
-    if (!detail.announceType || !detail.methodId) return [];
+    if (!detail.announceType || !detail.methodId) {
+      throw new Error(`gprocurement project ${projectId}: detail lacks announceType/methodId`);
+    }
     const body = await this.call<Envelope<{ greenBookAnnouncementTypeLinkDto?: Partial<GprocAnnouncement>[] | null }>>(
       "GET",
       `${ANNOUNCEMENT}/greenBook`,
       { mode: "LINK", methodId: detail.methodId, tempProjectId: projectId, pageAnnounceType: detail.announceType }
     );
-    return (body.data?.greenBookAnnouncementTypeLinkDto ?? [])
+    const list = body.data?.greenBookAnnouncementTypeLinkDto;
+    if (!Array.isArray(list)) {
+      throw new Error(`gprocurement project ${projectId}: announcement list missing (response shape changed?)`);
+    }
+    return list
       .filter((r): r is Partial<GprocAnnouncement> & { announceType: string } => typeof r?.announceType === "string")
       .map((r) => ({
         announceType: r.announceType,

@@ -109,6 +109,11 @@ export async function refreshLifecycle(
   let deadlinesUnreadable = 0;
   let deadlinesFailed = 0;
   const gprocStage = { ok: 0, "not-found": 0, error: 0 };
+  // Circuit breaker: after this many CONSECUTIVE process5 errors the rest of the run uses egp2 only.
+  const GPROC_BREAKER = 3;
+  let gprocConsecutiveErrors = 0;
+  let gprocPaused = false;
+  let gprocPauseLogged = false;
   const emptyTally = () => ({ read: 0, unreadable: 0, errors: 0 });
   const bySource = { gproc: emptyTally(), egp2: emptyTally() };
   const SOURCE_LABEL = { gproc: "process5", egp2: "BMA portal" } as const;
@@ -198,14 +203,27 @@ export async function refreshLifecycle(
         const loaded = await loadFreshProcurement({
           tor,
           egp: client,
-          gproc,
+          gproc: gprocPaused ? undefined : gproc,
           now,
           warn: (message) =>
             logIngestionEvent({ severity: "warning", message, component: COMPONENT, ingestionRunId: runId }),
           report: (attempt) => {
             gprocStage[attempt] += 1;
+            if (attempt === "error") {
+              gprocConsecutiveErrors += 1;
+              if (gprocConsecutiveErrors >= GPROC_BREAKER) gprocPaused = true;
+            } else gprocConsecutiveErrors = 0;
           },
         });
+        if (gprocPaused && !gprocPauseLogged) {
+          gprocPauseLogged = true;
+          await logIngestionEvent({
+            severity: "warning",
+            message: `process5 paused for the rest of this run after ${GPROC_BREAKER} consecutive errors; using the BMA portal`,
+            component: COMPONENT,
+            ingestionRunId: runId,
+          });
+        }
         if (loaded === "skip") {
           skipped += 1;
           await logIngestionEvent({
@@ -315,7 +333,7 @@ export async function refreshLifecycle(
         : "";
     const fellBack = gprocStage["not-found"] + gprocStage.error;
     const stageSummary = gproc
-      ? `; stage source: process5 ok ${gprocStage.ok}, fell back to BMA portal ${fellBack} (project unknown to process5 ${gprocStage["not-found"]}, process5 error ${gprocStage.error})`
+      ? `; stage source: process5 ok ${gprocStage.ok}, fell back to BMA portal ${fellBack} (project unknown to process5 ${gprocStage["not-found"]}, process5 error ${gprocStage.error})${gprocPaused ? `; process5 paused after ${GPROC_BREAKER} consecutive errors` : ""}`
       : "";
     const outcomeSummary = `checked ${tors.length}, changed ${changed}, unchanged ${unchanged}, skipped ${skipped}, failed ${failed}${stageSummary}${deadlineSummary}`;
     await IngestionRun.updateOne(

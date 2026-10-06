@@ -45,10 +45,24 @@ export async function loadFreshProcurement(args: {
       const detail = await gproc.projectDetail(code);
       if (detail) {
         const rows = await gproc.announcements(code, detail);
-        // process5's calls do not expose the contract status: carry the stored one over.
+        // An empty list for a project that had announcements means process5 changed shape: use egp2.
+        if (rows.length === 0 && (tor.procurement?.announcements?.length ?? 0) > 0) {
+          throw new Error("process5 returned no announcements for a project that had some");
+        }
+        // process5 does not expose the contract status: read it best-effort from egp2, else carry the stored one.
+        let contractStatus = tor.procurement?.contractStatus ?? undefined;
+        const egpProjectId = projectIdFromListingUrl(tor.sourceListingUrl);
+        if (egpProjectId) {
+          try {
+            const d = await egp.projectDetail(egpProjectId);
+            if (d.masterContractAvailableName) contractStatus = d.masterContractAvailableName;
+          } catch {
+            // best-effort only
+          }
+        }
         const { procurement, unknownCodes } = buildGprocProcurement(
           { detail, announcements: rows },
-          tor.procurement?.contractStatus,
+          contractStatus,
           now()
         );
         report?.("ok");

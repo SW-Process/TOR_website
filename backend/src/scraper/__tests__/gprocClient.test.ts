@@ -72,6 +72,10 @@ describe("GprocClient.projectDetail", () => {
     );
     expect(calls[0]!.method).toBe("GET");
   });
+  it("throws when the detail lacks announceType or methodId (shape change)", async () => {
+    const { client } = harness(() => ({ body: { data: { projectId: "1", projectStatus: "A" } } }));
+    await expect(client.projectDetail("1")).rejects.toThrow(/announceType/);
+  });
   it("returns null when e-GP has no such project", async () => {
     const { client } = harness(() => ({ body: { data: null } }));
     await expect(client.projectDetail("69000000000")).resolves.toBeNull();
@@ -98,14 +102,20 @@ describe("GprocClient.announcements", () => {
       pageAnnounceType: "W0",
     });
   });
-  it("returns [] without a request when the detail has no announceType or methodId", async () => {
+  it("throws without a request when the detail has no announceType or methodId", async () => {
     const { client, calls } = harness(() => ({ body: GREEN }));
-    expect(await client.announcements("1", { ...detail, announceType: null })).toEqual([]);
-    expect(await client.announcements("1", { ...detail, methodId: null })).toEqual([]);
+    await expect(client.announcements("1", { ...detail, announceType: null })).rejects.toThrow(/announceType/);
+    await expect(client.announcements("1", { ...detail, methodId: null })).rejects.toThrow(/announceType/);
     expect(calls).toHaveLength(0);
   });
-  it("tolerates a null list", async () => {
-    const { client } = harness(() => ({ body: { data: { greenBookAnnouncementTypeLinkDto: null } } }));
+  it("throws when the announcement list key is missing or null (shape change)", async () => {
+    const nul = harness(() => ({ body: { data: { greenBookAnnouncementTypeLinkDto: null } } }));
+    await expect(nul.client.announcements("1", detail)).rejects.toThrow(/announcement list missing/);
+    const gone = harness(() => ({ body: { data: {} } }));
+    await expect(gone.client.announcements("1", detail)).rejects.toThrow(/announcement list missing/);
+  });
+  it("accepts an empty list", async () => {
+    const { client } = harness(() => ({ body: { data: { greenBookAnnouncementTypeLinkDto: [] } } }));
     expect(await client.announcements("1", detail)).toEqual([]);
   });
 });
