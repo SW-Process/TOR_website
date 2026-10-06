@@ -56,6 +56,13 @@ Out (separate work):
   (announcement) and `doc_*.pdf` (bidding document).
 - `getProjectDetail` returns `projectName`, `deptName`, `deptSubName`, `budgetYear`, `announceType`,
   `methodId`, `projectStatus`: enough to create a TOR without any egp2 data.
+- **Search results (recorded by the user from the page's own request):**
+  `GET egp-oann10-service/pb/a-egp-allt-project/announcement?budgetYear=2570&moiId=100000&announceType=2&announcementTodayFlag=false&page=<n>`
+  returns `{ data: [...], response: { responseCode: 0 } }`, 10 rows per page (`sumProjectMoneyAndCount`
+  on the same path reports `totalPages` / `recordsTotal`). A row has `projectId` (the 11-digit project number),
+  `projectName`, `deptName`, `deptSubName`, `announceType` (`D0` for the invitation list), `announceDate`,
+  `priceBuild`, `projectMoney`, `projectStatus`, `methodId`, `stepId`. That is all the extension needs.
+  The page's search URL is `…/egp-agpc01-web/announcement?keywordSearch=&advancedSearch=true`.
 - The greenBook rows carry `priceBuild` (the reference price) on the draft row.
 
 ## Design
@@ -75,20 +82,28 @@ Out (separate work):
 ### Extension
 
 - MV3. Content script runs only on `https://process5.gprocurement.go.th/egp-agpc01-web/announcement*`.
-  It listens to the responses the page's own search request receives and extracts project numbers. It does
+  It observes the responses of the page's own request to
+  `…/egp-oann10-service/pb/a-egp-allt-project/announcement?…&page=<n>` (the path ends in `/announcement`;
+  `…/announcement/sumProjectMoneyAndCount` and other sub-paths are ignored) and extracts the rows. It does
   not issue the search itself and never touches the Turnstile token.
-- Popup: "found N projects on this page", a **Send** button, and the result of the last send
-  (created / already known / skipped with the reason / failed). Nothing is sent without the click.
+- Pages hold only 10 rows, so the extension **accumulates** rows across the pages the admin visits
+  (extension storage, deduplicated by project number) until they press Send, then clears them.
+- Popup: "collected N projects", a **Send** button (at most 100 per send), **Clear**, and the result of the
+  last send (created / already known / skipped with the reason / failed). Nothing is sent without the click.
 - Background worker sends `POST /api/ingestion/capture` with `credentials: "include"` and the API
-  host permission. Batches are capped at 100 project numbers. If the admin is not logged in the popup says so.
+  host permission. If the admin is not logged in the popup says so.
+- Parser: pure `parseSearchResults(body)` returns `{ projectCode, title, agency }[]` for rows whose
+  `projectId` matches `^\d{11}$`; any other shape returns `[]` (never throws). Tested against the recorded sample.
 - Cookie caveat: the session cookie is `HttpOnly; SameSite=Lax`. Whether Chrome sends it from the
   extension's worker must be verified first (first task of the plan). Fallback if it does not: a short-lived
   token the admin generates from the admin page (still admin-only). Decide then; not designed here.
 
 ### Capture endpoint
 
-`POST /api/ingestion/capture` body `{ projectCodes: string[] }` (admin only, `requireAuth` + `requireRole("admin")`).
-- Validation: array, 1..100 entries, each `^\d{11}$`; duplicates removed; otherwise `400`.
+`POST /api/ingestion/capture` (admin only, `requireAuth` + `requireRole("admin")`).
+- Body: `{ projects: [{ projectCode, title?, agency? }] }` (the bare `projectCodes: string[]` form is not used).
+- Validation: 1..100 entries, `projectCode` matches `^\d{11}$`, `title`/`agency` optional strings (<= 500 chars); duplicates removed; otherwise `400`.
+- `title`/`agency` are a **skip-only hint** (step 3 of the per-project steps): they may avoid a process5 call, never create or change stored data.
 - One capture run at a time (`409` if one is running), like the lifecycle run. Stale runs are swept.
 - Creates an `IngestionRun` (`phase: "capture"`, `trigger: "manual"`, `stats.torsFound` = count) and
   returns `202 { runId }`. Progress (`torsCreated`, `torsUnchanged` = already known, `torsSkipped`,
@@ -102,24 +117,27 @@ Out (separate work):
 
 1. Existing TOR with this `projectCode` → count as already known; do nothing (the lifecycle refresh
    keeps it current).
-2. `gproc.projectDetail(code)`: `null` → skipped (unknown to process5); error → failed (counts toward the
+2. Skip-only pre-filter with the client's hint (agency allowlist and keyword gate): a hint that clearly fails
+   both gates skips the project without calling process5 (a wrong or lying hint can only cause a skip, never
+   a write). Without a hint, or when the hint passes, continue.
+3. `gproc.projectDetail(code)`: `null` → skipped (unknown to process5); error → failed (counts toward the
    breaker: 3 consecutive process5 errors stop the run, remaining codes reported as not processed).
-3. Agency allowlist (`parseAgencyAllowlist(INGEST_AGENCIES)` against `deptName`/`deptSubName`): no
+4. Agency allowlist (`parseAgencyAllowlist(INGEST_AGENCIES)` against the server's `deptName`/`deptSubName`): no
    match → skipped. Software keyword gate (`looksSoftwareRelated(title + …)`): no match → skipped, the
    same gate discovery uses. (A skipped project is not stored; capturing it again re-checks it.)
-4. `gproc.announcements(...)` → `buildGprocProcurement` for `procurement`.
-5. Create the `Tor`: `title`, `agency`, `department`, `budget`/`referencePrice` where available,
+5. `gproc.announcements(...)` → `buildGprocProcurement` for `procurement`.
+6. Create the `Tor`: `title`, `agency`, `department`, `budget`/`referencePrice` where available,
    `projectCode`, `procurement` (with `source: "gproc"`), `pipelineStatus` default,
    `sourceContentHash` = hash of the canonical detail, `ingestionRunId`. No `sourceListingUrl`.
    The announcement date is the earliest announcement date.
-6. TOR file: `documentBundle(code, { draft: true })`, falling back to the published bundle, then
+7. TOR file: `documentBundle(code, { draft: true })`, falling back to the published bundle, then
    `downloadBundle` (cap: 50 MB), then `torFromBundle` picks the TOR PDF and stores it through the same
    `BlobStorage` path and `sourceDocument` fields as `fetchAndStoreTorPdf`
    (`tor-pdfs/<code>/<name>.pdf`, `pdfInspect` text layer). No TOR file found, or any file error →
    `sourceDocument.textLayer: "missing"` and the TOR is created but not enqueued; it stays invisible
    (`pipelineStatus` not enriched) and a later capture of the same code retries the file only. (Rule: a TOR
    without a stored file is never sent to enrichment.)
-7. `enqueueEnrichmentJob(torId, sourceContentHash)`: the existing batch classifies and summarises it.
+8. `enqueueEnrichmentJob(torId, sourceContentHash)`: the existing batch classifies and summarises it.
    The lifecycle refresh then fills the real bid deadline (it already handles TORs with no listing URL).
 
 Politeness: strictly serial, `GPROC_DELAY_MS` between calls, the existing timeout/retry rules, a polite
@@ -144,9 +162,11 @@ public detail from the stored datasource:
 `procurement.source` itself stays hidden from the public API. A TOR created by capture has no stored
 listing URL, so the button now appears for it too. The link follows the last stored source (a run that fell
 back to egp2 flips it; accepted).
-- **Open:** the exact process5 project-page URL is not known yet (the SPA entry is
-  `…/egp-agpc01-web/announcement`; the page the "ดูข้อมูล" button opens has to be captured). Until it is
-  confirmed the implementation uses that SPA entry (search page) as a placeholder behind one constant.
+- The process5 link is `https://process5.gprocurement.go.th/egp-agpc01-web/announcement?keywordSearch=<projectCode>`
+  (the search page with the project number as the keyword), built in one place (`gprocProjectUrl(projectCode)`).
+  **Open:** the page has no known per-project URL; whether `keywordSearch=<number>` pre-fills and runs the search
+  has to be confirmed in a browser (it may need Turnstile once). If a real project-page URL turns up, only
+  `gprocProjectUrl` changes.
 
 ### Data model
 
@@ -184,9 +204,9 @@ back to egp2 flips it; accepted).
 
 ## Open items (need input or a spike)
 
-1. **Search-results sample:** one recorded response of the process5 search (from DevTools → Network), to
-   write the parser and fixture. Without it the extension parser cannot be implemented.
-2. **Process5 project-page URL** for the original-link button (see above).
+1. ~~Search-results sample~~ received (see Findings); it becomes the parser fixture.
+2. **Original-link URL:** confirm `…/announcement?keywordSearch=<projectCode>` opens the right project in a
+   browser, or capture the real project-page URL (see "Source-aware original link").
 3. **Cookie from the extension:** verify `HttpOnly; SameSite=Lax` works from the worker; else add the
    admin-generated token.
 4. **TOR file names in bundles:** confirm `Attach_TOR_*` across several projects; collect any other
