@@ -15,7 +15,7 @@
   window.fetch = function (...args) {
     const p = origFetch.apply(this, args);
     try {
-      const url = typeof args[0] === "string" ? args[0] : args[0] && args[0].url;
+      const url = args[0] instanceof Request ? args[0].url : String(args[0]);
       if (isSearch(url)) {
         p.then((res) => res.clone().json()).then((body) => window.postMessage({ mark: MARK, body }, "*")).catch(() => {});
       }
@@ -27,7 +27,10 @@
     try {
       if (isSearch(String(url))) {
         this.addEventListener("load", () => {
-          try { window.postMessage({ mark: MARK, body: JSON.parse(this.responseText) }, "*"); } catch {}
+          try {
+            const body = this.responseType === "json" ? this.response : JSON.parse(this.responseText);
+            window.postMessage({ mark: MARK, body }, "*");
+          } catch {}
         });
       }
     } catch {}

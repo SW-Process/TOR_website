@@ -27,3 +27,10 @@ test("skips rows whose projectId is not an 11-digit number and keeps the good on
 test("tolerates missing title/agency", () => {
   assert.deepEqual(parseSearchResults({ data: [{ projectId: "69099314442" }] }), [{ projectCode: "69099314442", title: "", agency: "" }]);
 });
+
+test("truncates title and agency to 500 chars and still returns the row", () => {
+  const rows = parseSearchResults({ data: [{ projectId: "69099314442", projectName: "ก".repeat(600), deptSubName: "ข".repeat(700) }] });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].title.length, 500);
+  assert.equal(rows[0].agency.length, 500);
+});

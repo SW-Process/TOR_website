@@ -1,6 +1,4 @@
 const MAX_PER_SEND = 100;
-const POLL_MS = 3000;
-const POLL_LIMIT = 200; // ~10 minutes
 
 async function apiBase() {
   const { apiBase } = await chrome.storage.sync.get({ apiBase: "http://localhost:8000" });
@@ -19,22 +17,37 @@ async function send() {
     body: JSON.stringify({ projects }),
   });
   if (res.status === 401 || res.status === 403) return { ok: false, error: "ต้องล็อกอินเป็นแอดมินในเว็บก่อน" };
+  if (res.status === 409) return { ok: false, error: "มีการส่งข้อมูลที่กำลังประมวลผลอยู่ รอให้เสร็จก่อน" };
   if (!res.ok) return { ok: false, error: `ส่งไม่สำเร็จ (${res.status})` };
-  const { runId } = await res.json();
-  for (let i = 0; i < POLL_LIMIT; i += 1) {
-    await new Promise((r) => setTimeout(r, POLL_MS));
-    const r = await fetch(`${base}/api/ingestion/runs/${runId}`, { credentials: "include" });
-    if (!r.ok) continue;
-    const { run } = await r.json();
-    if (run.status !== "running") {
-      const done = projects.map((p) => p.projectCode);
-      const left = Object.fromEntries(Object.entries(collected).filter(([code]) => !done.includes(code)));
-      await chrome.storage.local.set({ collected: left });
-      updateBadge(Object.keys(left).length);
-      return { ok: true, status: run.status, summary: run.outcomeSummary, stats: run.stats };
-    }
+  let runId;
+  try {
+    ({ runId } = await res.json());
+  } catch {
+    runId = undefined;
   }
-  return { ok: false, error: "ยังประมวลผลไม่เสร็จ ลองดูผลในหน้าแอดมิน" };
+  if (!runId) return { ok: false, error: "ส่งแล้ว แต่ไม่ได้รับรหัสการประมวลผล ลองดูผลในหน้าแอดมิน" };
+  // Re-read at removal time and delete only the sent codes, so rows collected meanwhile are kept.
+  const fresh = (await chrome.storage.local.get({ collected: {} })).collected;
+  for (const p of projects) delete fresh[p.projectCode];
+  await chrome.storage.local.set({ collected: fresh, lastRunId: runId });
+  updateBadge(Object.keys(fresh).length);
+  return { ok: true, runId };
+}
+
+// One status fetch; the popup does the polling (the worker may be killed during a long wait).
+async function status(runId) {
+  if (!runId || typeof runId !== "string") return { ok: false, error: "ไม่มีรหัสการประมวลผล" };
+  const base = await apiBase();
+  const r = await fetch(`${base}/api/ingestion/runs/${encodeURIComponent(runId)}`, { credentials: "include" });
+  if (!r.ok) return { ok: false, fatal: r.status >= 400 && r.status < 500, error: `ตรวจสอบสถานะไม่สำเร็จ (${r.status})` };
+  let run;
+  try {
+    ({ run } = await r.json());
+  } catch {
+    run = undefined;
+  }
+  if (!run || typeof run !== "object") return { ok: false, error: "ผลตอบกลับไม่ถูกต้อง" };
+  return { ok: true, status: run.status, summary: run.outcomeSummary, stats: run.stats };
 }
 
 function updateBadge(count) {
@@ -43,9 +56,15 @@ function updateBadge(count) {
 
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   if (msg.type === "collected") updateBadge(msg.count);
+  if (msg.type === "status") {
+    status(msg.runId).then(reply).catch((e) => reply({ ok: false, error: String(e && e.message ? e.message : e) }));
+    return true;
+  }
   if (msg.type === "send") {
     send().then(reply).catch((e) => reply({ ok: false, error: String(e && e.message ? e.message : e) }));
     return true; // async reply
   }
 });
-chrome.runtime.onStartup.addListener(() => chrome.storage.local.get({ collected: {} }, ({ collected }) => updateBadge(Object.keys(collected).length)));
+const restoreBadge = () => chrome.storage.local.get({ collected: {} }, ({ collected }) => updateBadge(Object.keys(collected).length));
+chrome.runtime.onStartup.addListener(restoreBadge);
+chrome.runtime.onInstalled.addListener(restoreBadge);

@@ -11,8 +11,8 @@
         if (!/^\d{11}$/.test(id)) continue;
         out.push({
           projectCode: id,
-          title: typeof row.projectName === "string" ? row.projectName.trim() : "",
-          agency: typeof row.deptSubName === "string" ? row.deptSubName.trim() : "",
+          title: typeof row.projectName === "string" ? row.projectName.trim().slice(0, 500) : "",
+          agency: typeof row.deptSubName === "string" ? row.deptSubName.trim().slice(0, 500) : "",
         });
       }
       return out;
