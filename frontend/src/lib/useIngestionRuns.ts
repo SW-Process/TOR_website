@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { requestAdminStatsRefresh } from "@/lib/adminStats";
 
 export type IngestionRunStatus = "running" | "success" | "partial" | "failed";
-export type IngestionPhase = "discovery" | "enrichment" | "lifecycle";
+export type IngestionPhase = "discovery" | "enrichment" | "lifecycle" | "capture";
 
 export interface IngestionRunStats {
   torsFound: number;
@@ -56,6 +56,7 @@ const POLL_TIMEOUT_MS: Record<IngestionPhase, number> = {
   discovery: 3 * 60_000,
   enrichment: 40 * 60_000,
   lifecycle: 40 * 60_000,
+  capture: 3 * 60_000,
 };
 
 /** Real admin controls for the ingestion/enrichment pipeline (FR-35, FR-36). */

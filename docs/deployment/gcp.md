@@ -92,6 +92,8 @@ gcloud run deploy tor-api \
   --allow-unauthenticated
 ```
 
+Capture runs (`POST /api/ingestion/capture`, used by admins through the Chrome extension) happen inside this API service, not in a Cloud Run job. Each project may download a bundle of about 10 MB, so give the service memory headroom; no request timeout is involved because the route answers 202 and works in the background. `CAPTURE_AGENCIES` is optional (empty captures every software-related project), and `GPROC_ENABLED=false` disables capture (the route answers 503).
+
 ## Jobs
 
 ```sh

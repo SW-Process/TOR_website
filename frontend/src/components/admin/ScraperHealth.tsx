@@ -17,6 +17,7 @@ const PHASE_LABEL: Record<IngestionPhase, string> = {
   discovery: "ดึงข้อมูล (Ingestion)",
   enrichment: "วิเคราะห์ด้วย AI (Enrichment)",
   lifecycle: "ตรวจสถานะการจัดซื้อ (Lifecycle)",
+  capture: "ดึงผ่าน extension",
 };
 
 const DAYS_PER_MONTH = 30;

@@ -115,6 +115,15 @@ their stage and bid deadline at once; `MAX_DEADLINE_EXTRACTIONS_PER_RUN` applies
 first and the BMA portal second; the invitation PDF for the deadline comes from `infoProcureDocAnnounZip` →
 `view-pdf` (POST); `procurement.source` records which source wrote the stage; `GPROC_ENABLED=false` disables it.
 
+### Capture from process5 (Chrome extension)
+Admins load `extension/` (MV3, unpacked) to pick projects on process5.gprocurement.go.th and send them to
+`POST /api/ingestion/capture` (admin, at most 100 projects, answers 202 and creates an `IngestionRun` with phase
+`capture`, worked in the background). The code is `ingestion/capture/` (`captureProjects`, `mapGprocTor`,
+`torFromBundle`). TOR-file rule: the TOR PDF is picked from the project's document bundle, falling back to the
+invitation PDF when there is no TOR file yet. `CAPTURE_AGENCIES` optionally filters by the project's body/unit names
+(empty = every software-related project). The original-listing link is resolved by `resolveSourceListingUrl`.
+`GPROC_ENABLED=false` makes the route answer 503.
+
 ## Environment
 
 - `backend/.env` — needs `MONGODB_URI` (and `PORT`). `backend/.env.example` lists every required key; `MONGODB_URI` is the one the app throws without.

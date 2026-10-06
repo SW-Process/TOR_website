@@ -20,6 +20,11 @@ jest.mock("../ingestion/lifecycle/refreshLifecycle", () => ({
   refreshLifecycle: (...args: unknown[]) => refreshLifecycleMock(...args),
 }));
 
+const captureProjectsMock = jest.fn();
+jest.mock("../ingestion/capture/captureProjects", () => ({
+  captureProjects: (...args: unknown[]) => captureProjectsMock(...args),
+}));
+
 const selectExtractorMock = jest.fn();
 jest.mock("../jobs/enrichment", () => ({
   selectExtractor: () => selectExtractorMock(),
@@ -547,5 +552,80 @@ describe("GET /api/ingestion/runs", () => {
     const agent = await adminAgent();
     const res = await agent.get(`/api/ingestion/runs/${new mongoose.Types.ObjectId().toString()}`);
     expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /api/ingestion/capture", () => {
+  const body = { projects: [{ projectCode: "69099312832", title: "ระบบสารสนเทศ", agency: "สำนักดิจิทัล" }, { projectCode: "69099314442" }] };
+  const prev = process.env.GPROC_ENABLED;
+  beforeEach(() => { process.env.GPROC_ENABLED = "true"; captureProjectsMock.mockResolvedValue(undefined); });
+  afterAll(() => { process.env.GPROC_ENABLED = prev; });
+
+  it("401 without a session and 403 for a non-admin", async () => {
+    expect((await request(app).post("/api/ingestion/capture").send(body)).status).toBe(401);
+    const a = request.agent(app);
+    await a.post("/api/auth/register").send({ email: "v@test.com", password: "secret123" });
+    expect((await a.post("/api/ingestion/capture").send(body)).status).toBe(403);
+  });
+
+  it("202, creates a running capture run and hands the projects to captureProjects", async () => {
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/capture").send(body);
+    expect(res.status).toBe(202);
+    const run = await IngestionRun.findById(res.body.runId).lean();
+    expect(run).toMatchObject({ phase: "capture", trigger: "manual", status: "running" });
+    expect(run?.stats.torsFound).toBe(2);
+    await waitFor(() => captureProjectsMock.mock.calls.length === 1);
+    expect(captureProjectsMock.mock.calls[0]?.[1]).toEqual(body.projects);
+  });
+
+  it.each([
+    ["no body", undefined],
+    ["projects not an array", { projects: "69099312832" }],
+    ["empty projects", { projects: [] }],
+    ["a bad code", { projects: [{ projectCode: "1234" }] }],
+    ["a non-object entry", { projects: ["69099312832"] }],
+    ["a long title", { projects: [{ projectCode: "69099312832", title: "x".repeat(501) }] }],
+    ["a non-string agency", { projects: [{ projectCode: "69099312832", agency: 5 }] }],
+    ["more than 100", { projects: Array.from({ length: 101 }, (_, i) => ({ projectCode: String(10000000000 + i) })) }],
+  ])("400 for %s", async (_name, payload) => {
+    const agent = await adminAgent();
+    expect((await agent.post("/api/ingestion/capture").send(payload as object)).status).toBe(400);
+    expect(captureProjectsMock).not.toHaveBeenCalled();
+  });
+
+  it("drops duplicate project numbers", async () => {
+    const agent = await adminAgent();
+    await agent.post("/api/ingestion/capture").send({ projects: [{ projectCode: "69099312832" }, { projectCode: "69099312832", title: "ซ้ำ" }] });
+    await waitFor(() => captureProjectsMock.mock.calls.length === 1);
+    expect(captureProjectsMock.mock.calls[0]?.[1]).toEqual([{ projectCode: "69099312832" }]);
+  });
+
+  it("409 while a capture run is running", async () => {
+    const agent = await adminAgent();
+    await IngestionRun.create({ trigger: "manual", phase: "capture", status: "running" });
+    expect((await agent.post("/api/ingestion/capture").send(body)).status).toBe(409);
+  });
+
+  it("503 when the process5 source is switched off", async () => {
+    process.env.GPROC_ENABLED = "false";
+    const agent = await adminAgent();
+    expect((await agent.post("/api/ingestion/capture").send(body)).status).toBe(503);
+  });
+
+  it("marks the run failed when captureProjects rejects", async () => {
+    captureProjectsMock.mockRejectedValue(new Error("boom"));
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/capture").send(body);
+    const run = await (async () => {
+      for (let i = 0; i < 100; i += 1) {
+        const r = await IngestionRun.findById(res.body.runId).lean();
+        if (r?.status === "failed") return r;
+        await new Promise((x) => setTimeout(x, 10));
+      }
+      return IngestionRun.findById(res.body.runId).lean();
+    })();
+    expect(run?.status).toBe("failed");
+    expect(run?.outcomeSummary).toContain("boom");
   });
 });
