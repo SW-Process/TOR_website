@@ -39,8 +39,10 @@ export function maxDeadlineExtractionsPerRun(env: NodeJS.ProcessEnv = process.en
  * Month-only deadlines (`bidDeadline.precision: "month"`, read from the PDF) are ALWAYS candidates,
  * finished or cancelled included, so the file keeps being re-checked until a day is known or an
  * admin overrides the value.
+ *
+ * `onlyOpen` (manual runs only) additionally requires `procurement.stage === "inviting"`.
  */
-export function lifecycleFilter(opts: { gproc?: boolean } = {}): QueryFilter<ITor> {
+export function lifecycleFilter(opts: { gproc?: boolean; onlyOpen?: boolean } = {}): QueryFilter<ITor> {
   const useGproc = opts.gproc ?? gprocEnabled();
   // process5 needs only the 11-digit project number, so a TOR without a listing URL is reachable too.
   const reachable: QueryFilter<ITor> = useGproc
@@ -51,7 +53,7 @@ export function lifecycleFilter(opts: { gproc?: boolean } = {}): QueryFilter<ITo
         ],
       }
     : { sourceListingUrl: { $type: "string", $ne: "" } };
-  return {
+  const filter: QueryFilter<ITor> = {
     pipelineStatus: "enriched",
     $and: [
       reachable,
@@ -71,10 +73,13 @@ export function lifecycleFilter(opts: { gproc?: boolean } = {}): QueryFilter<ITo
       },
     ],
   };
+  // Manual "only open TORs": ANDed on top, so the backfill and month-only branches cannot widen the set.
+  if (opts.onlyOpen) filter["procurement.stage"] = "inviting";
+  return filter;
 }
 
-export function countLifecycleCandidates(): Promise<number> {
-  return Tor.countDocuments(lifecycleFilter());
+export function countLifecycleCandidates(opts: { onlyOpen?: boolean } = {}): Promise<number> {
+  return Tor.countDocuments(lifecycleFilter({ onlyOpen: opts.onlyOpen }));
 }
 
 /**

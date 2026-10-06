@@ -41,6 +41,8 @@ export interface RefreshLifecycleDeps {
    * then defaults to the list length instead of MAX_LIFECYCLE_REFRESH_PER_RUN.
    */
   torIds?: ReadonlyArray<string | Types.ObjectId>;
+  /** Manual option: check only TORs whose stored stage is "inviting" (open for bids). */
+  onlyOpen?: boolean;
 }
 
 export interface RefreshLifecycleResult {
@@ -120,7 +122,7 @@ export async function refreshLifecycle(
 
   await sweepStaleRuns("lifecycle");
 
-  const candidateFilter = lifecycleFilter({ gproc: Boolean(gproc) });
+  const candidateFilter = lifecycleFilter({ gproc: Boolean(gproc), onlyOpen: deps.onlyOpen });
   // A missing lastCheckedAt sorts before any date, so never-checked TORs come first.
   const tors = await Tor.find(
     deps.torIds ? { $and: [candidateFilter, { _id: { $in: [...deps.torIds] } }] } : candidateFilter
@@ -335,7 +337,7 @@ export async function refreshLifecycle(
     const stageSummary = gproc
       ? `; stage source: process5 ok ${gprocStage.ok}, fell back to BMA portal ${fellBack} (project unknown to process5 ${gprocStage["not-found"]}, process5 error ${gprocStage.error})${gprocPaused ? `; process5 paused after ${GPROC_BREAKER} consecutive errors` : ""}`
       : "";
-    const outcomeSummary = `checked ${tors.length}, changed ${changed}, unchanged ${unchanged}, skipped ${skipped}, failed ${failed}${stageSummary}${deadlineSummary}`;
+    const outcomeSummary = `checked ${tors.length}, changed ${changed}, unchanged ${unchanged}, skipped ${skipped}, failed ${failed}${stageSummary}${deadlineSummary}${deps.onlyOpen ? "; only open TORs" : ""}`;
     await IngestionRun.updateOne(
       { _id: runId },
       { $set: { completedAt: new Date(), status, outcomeSummary } }

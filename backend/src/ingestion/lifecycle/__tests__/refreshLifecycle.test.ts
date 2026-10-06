@@ -117,6 +117,32 @@ const withDownload = (c: ReturnType<typeof fakeClient>) =>
   Object.assign(c, { async downloadFile() { return Buffer.from("%PDF-1.4 fake"); } });
 
 describe("refreshLifecycle", () => {
+  it("with onlyOpen checks only inviting TORs and suffixes the summary; without it, no suffix", async () => {
+    await seedTor("open", { procurement: { stage: "inviting", announcements: [], lastCheckedAt: new Date("2026-09-01T00:00:00Z") } });
+    await seedTor("draft", { procurement: oldProcurement("2026-09-01T00:00:00Z") });
+    await seedTor("fresh");
+    const client = fakeClient();
+    const out = await refreshLifecycle(deps(client, { onlyOpen: true }));
+    expect(out.selected).toBe(1);
+    expect(client.detailCalls).toEqual(["open"]);
+    const run = await IngestionRun.findById(out.runId).lean();
+    expect(run?.outcomeSummary).toMatch(/; only open TORs$/);
+
+    const all = await refreshLifecycle(deps(fakeClient()));
+    expect(all.selected).toBe(3);
+    const run2 = await IngestionRun.findById(all.runId).lean();
+    expect(run2?.outcomeSummary).not.toContain("only open");
+  });
+
+  it("with onlyOpen and torIds still restricts to inviting TORs", async () => {
+    const open = await seedTor("open", { procurement: { stage: "inviting", announcements: [], lastCheckedAt: new Date("2026-09-01T00:00:00Z") } });
+    const draft = await seedTor("draft", { procurement: oldProcurement("2026-09-01T00:00:00Z") });
+    const client = fakeClient();
+    const out = await refreshLifecycle(deps(client, { onlyOpen: true, torIds: [open.id, draft.id] }));
+    expect(out.selected).toBe(1);
+    expect(client.detailCalls).toEqual(["open"]);
+  });
+
   it("fills procurement for a TOR that has none and records a successful lifecycle run", async () => {
     const tor = await seedTor("p1");
     const out = await refreshLifecycle(

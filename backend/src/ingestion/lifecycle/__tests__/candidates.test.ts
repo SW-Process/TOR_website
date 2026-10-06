@@ -167,3 +167,58 @@ describe("lifecycleFilter", () => {
     });
   });
 });
+
+describe("lifecycleFilter onlyOpen", () => {
+  const url = (id: string) => `https://egp.test/project-detail/${id}`;
+  const filed = [{ announcementId: "inv", kind: "invitation", hasFile: true }];
+  const proc = (stage: string, over: Record<string, unknown> = {}) => ({
+    stage,
+    announcements: [],
+    lastCheckedAt: new Date("2026-09-01T00:00:00Z"),
+    ...over,
+  });
+  const month = {
+    date: new Date("2026-10-31T16:59:00Z"),
+    source: "invitation-pdf",
+    precision: "month",
+    extractedAt: new Date("2026-09-02T00:00:00Z"),
+  };
+
+  it("selects only inviting TORs and drops draft, awarded, cancelled and never-checked ones", async () => {
+    await Tor.create([
+      { title: "inviting", pipelineStatus: "enriched", sourceListingUrl: url("a"), procurement: proc("inviting") },
+      { title: "draft", pipelineStatus: "enriched", sourceListingUrl: url("b"), procurement: proc("draft") },
+      { title: "awarded", pipelineStatus: "enriched", sourceListingUrl: url("c"), procurement: proc("awarded", { contractStatus: "ระหว่างดำเนินการ" }) },
+      { title: "cancelled", pipelineStatus: "enriched", sourceListingUrl: url("d"), procurement: proc("cancelled") },
+      { title: "never checked", pipelineStatus: "enriched", sourceListingUrl: url("e") },
+      { title: "inviting not enriched", pipelineStatus: "pending", sourceListingUrl: url("f"), procurement: proc("inviting") },
+      { title: "inviting finished contract, no backfill", pipelineStatus: "enriched", sourceListingUrl: url("g"), procurement: proc("inviting", { contractStatus: "ส่งงานครบถ้วน" }) },
+    ] as any);
+    const titles = (await Tor.find(lifecycleFilter({ onlyOpen: true }) as any).sort({ title: 1 }).lean()).map((t) => t.title);
+    expect(titles).toEqual(["inviting"]);
+    expect(await countLifecycleCandidates({ onlyOpen: true })).toBe(1);
+  });
+
+  it("does not widen via the backfill or month-only branches, but an inviting TOR in them still qualifies", async () => {
+    await Tor.create([
+      { title: "awarded backfill", pipelineStatus: "enriched", sourceListingUrl: url("a"), procurement: proc("awarded", { contractStatus: "ส่งงานครบถ้วน", announcements: filed }) },
+      { title: "cancelled month", pipelineStatus: "enriched", sourceListingUrl: url("b"), procurement: proc("cancelled", { announcements: filed, bidDeadline: month }) },
+      { title: "inviting backfill", pipelineStatus: "enriched", sourceListingUrl: url("c"), procurement: proc("inviting", { contractStatus: "ส่งงานครบถ้วน", announcements: filed }) },
+      { title: "inviting month", pipelineStatus: "enriched", sourceListingUrl: url("d"), procurement: proc("inviting", { announcements: filed, bidDeadline: month, deadlineAttempt: { announcementId: "inv", at: new Date(), outcome: "read" } }) },
+    ] as any);
+    const titles = (await Tor.find(lifecycleFilter({ onlyOpen: true }) as any).sort({ title: 1 }).lean()).map((t) => t.title);
+    expect(titles).toEqual(["inviting backfill", "inviting month"]);
+  });
+
+  it("leaves the default filter unchanged when onlyOpen is absent or false", async () => {
+    await Tor.create([
+      { title: "inviting", pipelineStatus: "enriched", sourceListingUrl: url("a"), procurement: proc("inviting") },
+      { title: "draft", pipelineStatus: "enriched", sourceListingUrl: url("b"), procurement: proc("draft") },
+    ] as any);
+    for (const f of [lifecycleFilter(), lifecycleFilter({ onlyOpen: false })]) {
+      const titles = (await Tor.find(f as any).sort({ title: 1 }).lean()).map((t) => t.title);
+      expect(titles).toEqual(["draft", "inviting"]);
+    }
+    expect(await countLifecycleCandidates()).toBe(2);
+  });
+});
