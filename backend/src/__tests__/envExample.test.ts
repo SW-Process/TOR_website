@@ -18,6 +18,13 @@ describe(".env.example covers the enrichment pipeline vars", () => {
     expect(envExample).toMatch(new RegExp(`^#?\\s*${key}=`, "m"));
   });
 
+  it.each(["GPROC_ENABLED", "GPROC_BASE_URL", "GPROC_DELAY_MS", "GPROC_TIMEOUT_MS", "GPROC_MAX_RETRIES"])(
+    "documents %s",
+    (key) => {
+      expect(envExample).toMatch(new RegExp(`^#?\\s*${key}=`, "m"));
+    }
+  );
+
   it("pins the model default to gemini-2.5-flash", () => {
     expect(envExample).toMatch(/^VERTEX_MODEL=gemini-2\.5-flash$/m);
   });

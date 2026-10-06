@@ -126,6 +126,14 @@ gcloud run jobs deploy tor-lifecycle \
 > env (`STORAGE_DRIVER=gcs`, `GCS_BUCKET`, the Vertex vars) before or together with the image
 > update; otherwise storage defaults to local disk on an ephemeral container and the stored keys
 > point to blobs that do not exist.
+>
+> `tor-lifecycle` and `tor-enrichment` (its chained refresh) both call the national e-GP
+> (outbound HTTPS to `process5.gprocurement.go.th`, no credentials) before the BMA portal. The
+> `GPROC_*` variables are optional (defaults: `GPROC_ENABLED=true`,
+> `GPROC_BASE_URL=https://process5.gprocurement.go.th`, `GPROC_DELAY_MS=500`, `GPROC_TIMEOUT_MS=30000`,
+> `GPROC_MAX_RETRIES=3`); set `GPROC_ENABLED=false` to use the BMA portal only. The first run after
+> enabling re-reads each candidate's invitation once from process5 (invitation ids change), bounded
+> by `MAX_DEADLINE_EXTRACTIONS_PER_RUN`.
 
 > All the job commands use gcloud's alternate-delimiter form `--set-env-vars "^::^k=v::k=v..."`
 > because `INGEST_AGENCIES` is itself a comma-separated list: with the default separator

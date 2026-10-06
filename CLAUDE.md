@@ -110,7 +110,10 @@ or an admin sets one (admin values are `precision: "day"` and always win); an ad
 (`source: "admin"`) always wins. Both `procurement` writers go through
 `ingestion/procurementWrite.ts` (optimistic precondition on `lastCheckedAt`). The enrichment batch also ends by running this
 refresh for exactly the TORs it just enriched (`lifecycle/afterEnrichment.ts`), so new TORs get
-their stage and bid deadline at once; `MAX_DEADLINE_EXTRACTIONS_PER_RUN` applies to that chained run.
+their stage and bid deadline at once; `MAX_DEADLINE_EXTRACTIONS_PER_RUN` applies to that chained run. The manual `POST /api/ingestion/lifecycle/runs` also accepts `onlyOpen: true` (and `GET .../lifecycle/pending?onlyOpen=1` counts the same set) to check only TORs whose stored stage is `inviting`; the scheduled job and the post-enrichment chain always check all stages. The refresh asks the national e-GP
+(`scraper/gprocClient.ts`, mapped by `ingestion/gprocMap.ts`, per-TOR fallback in `lifecycle/loadFresh.ts`)
+first and the BMA portal second; the invitation PDF for the deadline comes from `infoProcureDocAnnounZip` →
+`view-pdf` (POST); `procurement.source` records which source wrote the stage; `GPROC_ENABLED=false` disables it.
 
 ## Environment
 

@@ -7,6 +7,9 @@ export type TorPipelineStatus = "pending" | "processing" | "enriched" | "rejecte
 
 export type ProcurementStage = "draft" | "inviting" | "awarded" | "cancelled";
 
+/** Which e-GP source produced the last stage write (absent = the BMA portal, egp2). Internal. */
+export type ProcurementSource = "egp2" | "gproc";
+
 export const ANNOUNCEMENT_KINDS = [
   "tor-draft",
   "bidding-draft",
@@ -78,6 +81,7 @@ export interface IProcurement {
   bidDeadline?: IBidDeadline | null;
   deadlineAttempt?: IDeadlineAttempt | null;
   lastCheckedAt: Date;
+  source?: ProcurementSource;
 }
 
 export interface IEvaluationCriterion {
@@ -278,6 +282,7 @@ const procurementSchema = new Schema<IProcurement>(
     bidDeadline: { type: bidDeadlineSchema, default: null },
     deadlineAttempt: { type: deadlineAttemptSchema, default: null },
     lastCheckedAt: { type: Date, required: true },
+    source: { type: String, enum: ["egp2", "gproc"] },
   },
   { _id: false }
 );

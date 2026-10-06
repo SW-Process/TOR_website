@@ -1,6 +1,7 @@
 // backend/src/ingestion/lifecycle/candidates.ts
 import type { QueryFilter } from "mongoose";
 import { Tor, type ITor } from "../../models";
+import { gprocEnabled } from "../../scraper/gprocClient";
 
 /**
  * Contract statuses after which a project no longer changes, so it is no longer refreshed:
@@ -25,7 +26,8 @@ export function maxDeadlineExtractionsPerRun(env: NodeJS.ProcessEnv = process.en
 }
 
 /**
- * TORs worth re-checking: publicly visible (enriched), reachable (has a listing URL) and not
+ * TORs worth re-checking: publicly visible (enriched), reachable (has a listing URL, or, with
+ * process5 on, an 11-digit project code) and not
  * finished (not cancelled, work not yet delivered). `$ne` / `$nin` also match a missing field, so
  * TORs that have never been checked are included.
  *
@@ -37,28 +39,49 @@ export function maxDeadlineExtractionsPerRun(env: NodeJS.ProcessEnv = process.en
  * Month-only deadlines (`bidDeadline.precision: "month"`, read from the PDF) are ALWAYS candidates,
  * finished or cancelled included, so the file keeps being re-checked until a day is known or an
  * admin overrides the value.
+ *
+ * `onlyOpen` (manual runs only) selects enriched, reachable TORs with `procurement.stage === "inviting"` and nothing else.
  */
-export function lifecycleFilter(): QueryFilter<ITor> {
+export function lifecycleFilter(opts: { gproc?: boolean; onlyOpen?: boolean } = {}): QueryFilter<ITor> {
+  const useGproc = opts.gproc ?? gprocEnabled();
+  // process5 needs only the 11-digit project number, so a TOR without a listing URL is reachable too.
+  const reachable: QueryFilter<ITor> = useGproc
+    ? {
+        $or: [
+          { sourceListingUrl: { $type: "string", $ne: "" } },
+          { projectCode: { $regex: /^\d{11}$/ } },
+        ],
+      }
+    : { sourceListingUrl: { $type: "string", $ne: "" } };
+  // Manual "only open TORs": the stored stage replaces the finished/cancelled rules, so a stale
+  // "inviting" TOR whose contract status already reads finished is still re-checked.
+  if (opts.onlyOpen) {
+    return { pipelineStatus: "enriched", $and: [reachable], "procurement.stage": "inviting" };
+  }
   return {
     pipelineStatus: "enriched",
-    sourceListingUrl: { $type: "string", $ne: "" },
-    $or: [
+    $and: [
+      reachable,
       {
-        "procurement.stage": { $ne: "cancelled" },
-        "procurement.contractStatus": { $nin: FINISHED_CONTRACT_STATUSES },
-      },
-      // A month-only AI deadline is re-checked until a day is known (or an admin sets one).
-      { "procurement.bidDeadline.precision": "month", "procurement.bidDeadline.source": "invitation-pdf" },
-      {
-        "procurement.deadlineAttempt": null,
-        "procurement.announcements": { $elemMatch: { kind: "invitation", hasFile: true } },
+        $or: [
+          {
+            "procurement.stage": { $ne: "cancelled" },
+            "procurement.contractStatus": { $nin: FINISHED_CONTRACT_STATUSES },
+          },
+          // A month-only AI deadline is re-checked until a day is known (or an admin sets one).
+          { "procurement.bidDeadline.precision": "month", "procurement.bidDeadline.source": "invitation-pdf" },
+          {
+            "procurement.deadlineAttempt": null,
+            "procurement.announcements": { $elemMatch: { kind: "invitation", hasFile: true } },
+          },
+        ],
       },
     ],
   };
 }
 
-export function countLifecycleCandidates(): Promise<number> {
-  return Tor.countDocuments(lifecycleFilter());
+export function countLifecycleCandidates(opts: { onlyOpen?: boolean } = {}): Promise<number> {
+  return Tor.countDocuments(lifecycleFilter({ onlyOpen: opts.onlyOpen }));
 }
 
 /**

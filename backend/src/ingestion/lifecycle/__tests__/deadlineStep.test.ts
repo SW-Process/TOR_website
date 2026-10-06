@@ -501,3 +501,61 @@ describe("runDeadlineStep", () => {
     expect(((await Tor.findById(tor._id).lean())?.procurement?.deadlineAttempt ?? null)).toBeNull();
   });
 });
+
+describe("runDeadlineStep with a PDF loader (process5)", () => {
+  const GPROC_ID = "gproc-D0-20261005";
+  const gprocProcurement = (over: Partial<IProcurement> = {}): IProcurement =>
+    procurementOf({
+      announcements: [{ announcementId: GPROC_ID, kind: "invitation", hasFile: true, publishedAt: PUBLISHED, storageKey: null }],
+      ...over,
+    });
+  const loaded = { content: Buffer.from("%PDF-1.7 gproc"), fileName: "69099318020-invitation.pdf" };
+
+  it("reads the PDF given by the loader, never calls the egp2 download, and stores a colon-free key", async () => {
+    const p = gprocProcurement();
+    const tor = await seed(p);
+    const h = harness();
+    const out = await runDeadlineStep({ ...args(p, tor._id), filenames: undefined, loadPdf: async () => loaded }, h);
+    expect(out).toBe("read");
+    expect(h.downloads).toEqual([]);
+    expect(h.puts).toEqual([`tor-pdfs/code-1/${GPROC_ID}.pdf`]);
+    const saved = (await Tor.findById(tor._id).lean())?.procurement;
+    expect(saved?.deadlineAttempt?.announcementId).toBe(GPROC_ID);
+    expect(saved?.bidDeadline?.source).toBe("invitation-pdf");
+  });
+
+  it("keeps a stored AI deadline, records no attempt and reads nothing when the loader has no PDF", async () => {
+    const stale = { date: new Date("2026-10-10T16:59:00Z"), source: "invitation-pdf" as const, extractedAt: PUBLISHED };
+    const p = gprocProcurement({ bidDeadline: stale, deadlineAttempt: { announcementId: "old-egp2-id", at: PUBLISHED, outcome: "read" } });
+    const tor = await seed(p);
+    const h = harness();
+    const out = await runDeadlineStep({ ...args(p, tor._id), loadPdf: async () => null }, h);
+    expect(out).toBe("skipped");
+    expect(h.extractCalls).toHaveLength(0);
+    const saved = (await Tor.findById(tor._id).lean())?.procurement;
+    expect(saved?.bidDeadline?.date).toEqual(stale.date);
+    expect(saved?.deadlineAttempt?.announcementId).toBe("old-egp2-id");
+  });
+
+  it("does not call the loader for an invitation flagged without a file", async () => {
+    const p = procurementOf({
+      announcements: [{ announcementId: GPROC_ID, kind: "invitation", hasFile: false, publishedAt: PUBLISHED, storageKey: null }],
+    });
+    const tor = await seed(p);
+    const loadPdf = jest.fn();
+    expect(await runDeadlineStep({ ...args(p, tor._id), loadPdf }, harness())).toBe("skipped");
+    expect(loadPdf).not.toHaveBeenCalled();
+  });
+
+  it("re-checks a month-only deadline through the loader by file hash: unchanged skips Gemini", async () => {
+    const sha = createHash("sha256").update(loaded.content).digest("hex");
+    const p = gprocProcurement({
+      bidDeadline: { date: new Date("2026-10-31T16:59:00Z"), source: "invitation-pdf", precision: "month", extractedAt: PUBLISHED },
+      deadlineAttempt: { announcementId: GPROC_ID, at: PUBLISHED, outcome: "read", fileSha256: sha },
+    });
+    const tor = await seed(p);
+    const h = harness();
+    expect(await runDeadlineStep({ ...args(p, tor._id), loadPdf: async () => loaded }, h)).toBe("skipped");
+    expect(h.extractCalls).toHaveLength(0);
+  });
+});

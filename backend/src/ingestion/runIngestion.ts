@@ -1,6 +1,7 @@
 import type { Types } from "mongoose";
 import { Tor, IngestionRun } from "../models";
 import { EgpClient, egpConfigFromEnv, listingUrl } from "../scraper/egpClient";
+import { gprocEnabled } from "../scraper/gprocClient";
 import { TOR_TYPE_ID, type EgpClientLike } from "../scraper/egpClient.types";
 import { getStorage } from "../storage";
 import type { BlobStorage } from "../storage/storage.types";
@@ -115,11 +116,16 @@ async function processProject(
     created = true;
     stats.torsCreated += 1;
   } else {
-    await writeProcurementIfUnchanged(
-      tor._id as Types.ObjectId,
-      readProcurement,
-      mergeProcurement(readProcurement, mapped.procurement)
-    );
+    // The lifecycle refresh owns `procurement` for a TOR whose stage came from process5: egp2 lags it,
+    // so writing here would revert the stage and bump lastCheckedAt. Leave it entirely alone.
+    const ownedByGproc = readProcurement?.source === "gproc" && gprocEnabled();
+    if (!ownedByGproc) {
+      await writeProcurementIfUnchanged(
+        tor._id as Types.ObjectId,
+        readProcurement,
+        mergeProcurement(readProcurement, mapped.procurement)
+      );
+    }
 
     // A hash stored before procurement stages existed also covered the contract status. Adopt
     // the new hash quietly (no update, PDF fetch or AI enqueue) when either:

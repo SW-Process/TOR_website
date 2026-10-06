@@ -187,6 +187,7 @@ export default function ScraperHealth() {
     triggerIngestion,
     triggerEnrichment,
     triggerLifecycle,
+    setLifecycleOnlyOpen,
     lastRunFor,
   } = useIngestionRuns();
 
@@ -203,6 +204,7 @@ export default function ScraperHealth() {
   const effectiveMaxTors = lifecycleMaxTors ?? lifecycleQueue?.maxTors ?? null;
   const [lifecycleMaxDeadlines, setLifecycleMaxDeadlines] = useState<number | null>(null);
   const effectiveMaxDeadlines = lifecycleMaxDeadlines ?? lifecycleQueue?.maxDeadlineExtractions ?? null;
+  const [lifecycleOnlyOpen, setLifecycleOnlyOpenChecked] = useState(false);
 
   function runIngestion() {
     triggerIngestion({
@@ -250,9 +252,10 @@ export default function ScraperHealth() {
                 pending: lifecyclePending,
                 onTrigger: () =>
                   triggerLifecycle(
-                    lifecycleMaxTors === null && lifecycleMaxDeadlines === null
+                    lifecycleMaxTors === null && lifecycleMaxDeadlines === null && !lifecycleOnlyOpen
                       ? undefined
                       : {
+                          ...(lifecycleOnlyOpen ? { onlyOpen: true } : {}),
                           ...(lifecycleMaxTors === null ? {} : { maxTors: lifecycleMaxTors }),
                           ...(lifecycleMaxDeadlines === null
                             ? {}
@@ -445,6 +448,18 @@ export default function ScraperHealth() {
                         />
                       </div>
                     )}
+                    <label className="mt-4 flex items-center gap-2 text-xs text-[var(--color-text-faint)]">
+                      <input
+                        type="checkbox"
+                        checked={lifecycleOnlyOpen}
+                        onChange={(e) => {
+                          setLifecycleOnlyOpenChecked(e.target.checked);
+                          setLifecycleOnlyOpen(e.target.checked);
+                        }}
+                        disabled={pending}
+                      />
+                      ตรวจเฉพาะ TOR ที่เปิดรับ
+                    </label>
                     <LifecycleStatus
                       pending={pending}
                       queue={lifecycleQueue}

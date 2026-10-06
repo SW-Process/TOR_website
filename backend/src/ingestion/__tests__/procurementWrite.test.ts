@@ -79,4 +79,12 @@ describe("writeProcurementIfUnchanged", () => {
     await writeProcurementIfUnchanged(tor._id, procurement(), procurement({ lastCheckedAt: T2 }));
     expect((await Tor.findById(tor._id).lean())?.updatedAt).toEqual(before);
   });
+
+  it("stores procurement.source when the merged value has one, and leaves it alone otherwise", async () => {
+    const tor = await Tor.create({ title: "a", procurement: procurement({ source: "egp2" }) });
+    await writeProcurementIfUnchanged(tor._id, procurement({ source: "egp2" }), procurement({ source: "gproc", lastCheckedAt: T2 }));
+    expect((await Tor.findById(tor._id).lean())?.procurement?.source).toBe("gproc");
+    await writeProcurementIfUnchanged(tor._id, procurement({ source: "gproc", lastCheckedAt: T2 }), procurement({ lastCheckedAt: new Date("2026-10-03T00:00:00Z") }));
+    expect((await Tor.findById(tor._id).lean())?.procurement?.source).toBe("gproc");
+  });
 });
