@@ -7,14 +7,21 @@ import type { BlobStorage } from "../../storage/storage.types";
 import { bangkokDay, resolveBidDeadline } from "../../utils/bidDeadline";
 import type { BidDeadlineExtractor, BidDeadlineResult } from "../enrichment/torExtractor";
 
+export interface LoadedInvitationPdf {
+  content: Buffer;
+  fileName: string;
+}
+
 export interface DeadlineStepArgs {
   torId: Types.ObjectId;
   projectCode?: string;
   title: string;
   /** What the refresh has just written (its `lastCheckedAt` is the write precondition). */
   procurement: IProcurement;
-  /** announcementId → e-GP file name, from the announcements the refresh just fetched. */
-  filenames: ReadonlyMap<string, string>;
+  /** announcementId → e-GP (egp2) file name; used when `loadPdf` is not given. */
+  filenames?: ReadonlyMap<string, string>;
+  /** Source-specific PDF loader (process5). Null = the invitation has no readable file (yet). */
+  loadPdf?: (invitation: IProcurementAnnouncement) => Promise<LoadedInvitationPdf | null>;
 }
 
 export interface DeadlineStepDeps {
@@ -77,6 +84,7 @@ function latestInvitation(p: IProcurement): IProcurementAnnouncement | null {
  * precision "month") is re-checked on every run by the invitation file's sha256: unchanged skips
  * without Gemini, a changed file or newer invitation is re-read and overwrites it. Gemini/e-GP/storage errors propagate (nothing
  * is recorded, so the next run retries); the caller isolates them per TOR.
+ * The PDF comes from `args.loadPdf` (process5) or, without it, from the egp2 download.
  */
 export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStepDeps): Promise<DeadlineStepOutcome> {
   const p = args.procurement;
@@ -88,8 +96,18 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
   // replace the announcement file later.
   const monthOnly = p.bidDeadline?.source === "invitation-pdf" && p.bidDeadline.precision === "month";
   if (attemptedThis && !monthOnly) return "skipped";
-  const filename = invitation.hasFile ? args.filenames.get(invitation.announcementId) : undefined;
-  if (!filename) {
+  let file: LoadedInvitationPdf | null = null;
+  if (invitation.hasFile) {
+    if (args.loadPdf) {
+      file = await args.loadPdf(invitation);
+    } else {
+      const filename = args.filenames?.get(invitation.announcementId);
+      if (filename) {
+        file = { content: await deps.client.downloadFile(invitation.announcementId, filename), fileName: filename };
+      }
+    }
+  }
+  if (!file) {
     if (attemptedThis) return "skipped"; // re-check of a month-only deadline: file gone, keep what we have
     // The current invitation has no readable file (yet). A deadline read from an OLDER invitation
     // is stale, so clear it; no attempt is recorded, so the read happens once the file appears.
@@ -105,8 +123,7 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
     );
     return res.matchedCount === 0 ? "conflict" : "cleared";
   }
-
-  const content = await deps.client.downloadFile(invitation.announcementId, filename);
+  const content = file.content;
   const fileSha256 = createHash("sha256").update(content).digest("hex");
   // Unchanged file for the same invitation: nothing new to read, no Gemini call, no write.
   if (monthOnly && attemptedThis && p.deadlineAttempt?.fileSha256 === fileSha256) return "skipped";
@@ -116,7 +133,7 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
   let result: BidDeadlineResult;
   try {
     result = await deps.extractor.extractBidDeadline({
-      pdf: { fileName: filename, content },
+      pdf: { fileName: file.fileName, content },
       meta: {
         projectCode: args.projectCode,
         title: args.title,
