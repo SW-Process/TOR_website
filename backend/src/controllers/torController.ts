@@ -6,6 +6,7 @@ import { Tor } from "../models";
 import type { ITor } from "../models";
 import { httpError } from "../utils/httpError";
 import { escapeRegExp } from "../utils/escapeRegExp";
+import { gprocProjectUrl } from "../ingestion/gprocUrl";
 import { hiddenTorIdsOf } from "./hiddenTorController";
 import { PROJECT_TYPES } from "../config/projectTypes";
 import { TOR_STATUSES, statusClause, withDisplayStatus, type StatusInput } from "../utils/torStatus";
@@ -279,15 +280,27 @@ export async function recordView(req: Request, res: Response): Promise<void> {
   res.status(204).end();
 }
 
+/** The "ดูประกาศต้นฉบับที่ e-GP" link follows the TOR's datasource: process5 for gproc, else the stored egp2 URL. */
+export function resolveSourceListingUrl(tor: {
+  projectCode?: string | null;
+  sourceListingUrl?: string | null;
+  procurement?: { source?: string | null } | null;
+}): string | null {
+  if (tor.procurement?.source === "gproc" && tor.projectCode) return gprocProjectUrl(tor.projectCode);
+  return tor.sourceListingUrl ?? null;
+}
+
 /** GET /api/tors/:id */
 export async function getTor(req: Request, res: Response): Promise<void> {
   const tor = await Tor.findOne({ _id: req.params.id, pipelineStatus: "enriched" })
     .select(
-      "-sourceContentHash -classification -ingestionRunId -__v -sourceDocument.storageKey -sourceDocument.sha256 -procurement.announcements.storageKey -procurement.deadlineAttempt -procurement.source"
+      "-sourceContentHash -classification -ingestionRunId -__v -sourceDocument.storageKey -sourceDocument.sha256 -procurement.announcements.storageKey -procurement.deadlineAttempt"
     )
     .lean();
   if (!tor) throw httpError(404, "TOR not found");
-  res.status(200).json({ tor: withDisplayStatus(tor) });
+  const sourceListingUrl = resolveSourceListingUrl(tor);
+  if (tor.procurement) delete (tor.procurement as { source?: unknown }).source;
+  res.status(200).json({ tor: withDisplayStatus({ ...tor, sourceListingUrl: sourceListingUrl ?? undefined }) });
 }
 
 function percentile(sorted: number[], p: number): number {
