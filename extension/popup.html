@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>TOR capture</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; width: 320px; margin: 12px; }
+    button { margin-right: 6px; }
+    input { width: 100%; box-sizing: border-box; margin: 4px 0; }
+    #result { margin: 8px 0; min-height: 1.5em; white-space: pre-wrap; }
+    fieldset { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <p id="count">เก็บไว้ 0 โครงการ</p>
+  <div>
+    <button id="send" type="button">ส่งเข้าระบบ</button>
+    <button id="clear" type="button">ล้าง</button>
+  </div>
+  <p id="result" role="status"></p>
+  <fieldset>
+    <legend>ตั้งค่า</legend>
+    <label for="apiBase">API URL</label>
+    <input id="apiBase" type="url" placeholder="http://localhost:8000">
+    <button id="save" type="button">บันทึก</button>
+  </fieldset>
+  <script src="popup.js"></script>
+</body>
+</html>
