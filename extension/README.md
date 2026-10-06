@@ -8,6 +8,7 @@ Lets an admin collect project numbers from the national e-GP search page
 
 - It only **observes** the responses of the page's own search request. It never issues the process5 search itself and never touches the Turnstile token.
 - It sends **nothing** until the admin presses the **ส่งเข้าระบบ** button (max 100 projects per send).
+- Page scripts on the process5 site can post rows to the collector, so only 11-digit project codes survive and nothing is sent until the admin presses Send.
 - It never reads cookies. Requests to the configured API base use `credentials: "include"`, so the browser attaches the admin session itself.
 
 ## Load it
