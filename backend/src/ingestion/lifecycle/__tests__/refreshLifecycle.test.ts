@@ -658,6 +658,23 @@ describe("refreshLifecycle with process5", () => {
     expect(out).toMatchObject({ selected: 1, skipped: 1, failed: 0 });
   });
 
+  it("a skipped TOR (no listing URL, process5 cannot answer) gets lastCheckedAt bumped so it does not stay first in the queue", async () => {
+    const old = new Date("2026-09-01T00:00:00Z");
+    const tor = await seedCode({ procurement: { stage: "inviting", announcements: [], lastCheckedAt: old, source: "gproc" } });
+    const out = await refreshLifecycle(deps(fakeClient(), { gprocClient: fakeGproc({ detail: null }) }));
+    expect(out).toMatchObject({ skipped: 1, failed: 0 });
+    const saved = (await Tor.findById(tor.id).lean())?.procurement;
+    expect(saved?.lastCheckedAt.getTime()).toBeGreaterThan(old.getTime());
+    expect(saved?.stage).toBe("inviting"); // nothing else touched
+    expect(saved?.source).toBe("gproc");
+  });
+
+  it("does not invent a procurement for a skipped TOR that has none", async () => {
+    const tor = await seedCode();
+    await refreshLifecycle(deps(fakeClient(), { gprocClient: fakeGproc({ detail: null }) }));
+    expect((await Tor.findById(tor.id).lean())?.procurement ?? null).toBeNull();
+  });
+
   it("processes a TOR that has only a projectCode (no listing URL) through process5", async () => {
     const tor = await seedCode();
     const out = await refreshLifecycle(deps(fakeClient(), { gprocClient: fakeGproc() }));
