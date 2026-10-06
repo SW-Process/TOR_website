@@ -25,7 +25,7 @@ and the lifecycle refresh (stage + real bid deadline).
 | Who uses it | Admins only, manually, when they search. Authenticated by the existing admin session. No automatic or scheduled capture (it would contradict "a human passes Turnstile"). |
 | What the extension sends | Only 11-digit project numbers (plus the title/agency already on screen, for display only). The backend never stores client-supplied fields. |
 | Where details come from | The backend asks process5 itself, with the existing polite `GprocClient`. |
-| TOR file for enrichment | The draft TOR PDF inside the document bundle (zip): `Attach_TOR_*.pdf`. The bid deadline still comes from the `view-pdf` invitation PDF (unchanged). |
+| Source document for enrichment | The draft TOR PDF inside the document bundle (zip), matched by name (`Attach_TOR*`, else a PDF containing `TOR`). When the project has no TOR file yet (an invitation was published before the TOR was prepared), the signed invitation PDF (`view-pdf`) is used instead, marked `kind: "invitation"`: no fairness flags are produced from it, and a later capture upgrades it to the TOR file when one appears. The bid deadline still comes from the invitation PDF (unchanged). |
 | "ดูประกาศต้นฉบับที่ e-GP" button | Follows the TOR's datasource: `gproc` → process5, `egp2` → the egp2 listing URL. |
 
 ## Scope
@@ -115,8 +115,12 @@ Out (separate work):
 
 ### `captureProjects` (per project, serial)
 
-1. Existing TOR with this `projectCode` → count as already known; do nothing (the lifecycle refresh
-   keeps it current).
+1. Existing TOR with this `projectCode` → count as already known; the lifecycle refresh keeps it current.
+   Exceptions, only for a TOR whose `procurement.source` is `gproc`: (a) it is `pending` with no stored source
+   document → retry step 7 and enqueue; (b) its document is `kind: "invitation"` and it is not being processed →
+   look for the TOR file in the bundles, and if found replace the document, set a new `sourceContentHash`
+   and re-queue enrichment (the summary and fairness flags are then produced from the real TOR). Anything else
+   (egp2-sourced, rejected, TOR-sourced) is left alone.
 2. Skip-only pre-filter with the client's hint (`CAPTURE_AGENCIES` and keyword gate): a hint that fails either gate
    skips the project without calling process5 (a wrong or lying hint can only cause a skip, never
    a write). Without a hint, or when the hint passes, continue.
@@ -132,13 +136,14 @@ Out (separate work):
    `projectCode`, `procurement` (with `source: "gproc"`), `pipelineStatus` default,
    `sourceContentHash` = hash of the canonical detail, `ingestionRunId`. No `sourceListingUrl`.
    The announcement date is the earliest announcement date.
-7. TOR file: `documentBundle(code, { draft: true })`, falling back to the published bundle, then
-   `downloadBundle` (cap: 50 MB), then `torFromBundle` picks the TOR PDF and stores it through the same
-   `BlobStorage` path and `sourceDocument` fields as `fetchAndStoreTorPdf`
-   (`tor-pdfs/<code>/<name>.pdf`, `pdfInspect` text layer). No TOR file found, or any file error →
-   `sourceDocument.textLayer: "missing"` and the TOR is created but not enqueued; it stays invisible
-   (`pipelineStatus` not enriched) and a later capture of the same code retries the file only. (Rule: a TOR
-   without a stored file is never sent to enrichment.)
+7. Source document, in this order: (a) the TOR PDF from the bundle: `documentBundle(code, { draft: true })`,
+   falling back to the published bundle, then `downloadBundle` (cap: 50 MB) and `torFromBundle`; stored through
+   the same `BlobStorage` path and `sourceDocument` fields as `fetchAndStoreTorPdf`
+   (`tor-pdfs/<code>/<name>.pdf`, `pdfInspect` text layer, `kind: "tor"`). (b) Otherwise the signed invitation
+   PDF (`invitationPdf`), stored as `tor-pdfs/<code>/invitation.pdf` with `kind: "invitation"` and filename
+   `<code>-invitation.pdf`. (c) With neither (no bundle, no invitation yet, or any file error), the TOR is created
+   but **not enqueued**: it stays invisible until a later capture of the same code finds a document.
+   (Rule: a TOR with no stored source document is never sent to enrichment.)
 8. `enqueueEnrichmentJob(torId, sourceContentHash)`: the existing batch classifies and summarises it.
    The lifecycle refresh then fills the real bid deadline (it already handles TORs with no listing URL).
 
@@ -174,7 +179,12 @@ back to egp2 flips it; accepted).
 ### Data model
 
 - `IngestionPhase` gains `capture`.
-- No new Tor fields. `Tor.sourceDocument` and `procurement.source` already exist.
+- `Tor.sourceDocument.kind`: `"tor"` (default, so every existing document reads as a TOR) | `"invitation"`.
+- Enrichment: `applyExtractionToTor` produces no fairness flags when `sourceDocument.kind === "invitation"`
+  (an invitation has no scope of work, and signals from it would be unreliable).
+- The public detail passes `sourceDocument.kind` through; the TOR page shows one muted line
+  "สรุปจากประกาศเชิญชวน (ยังไม่มีเอกสารขอบเขตงาน TOR)" for an invitation-sourced TOR. The
+  "ดาวน์โหลดเอกสารต้นฉบับ (PDF)" button then downloads the invitation.
 
 ### Security
 
@@ -190,7 +200,7 @@ back to egp2 flips it; accepted).
   TIS-620 names, no TOR entry, corrupt zip).
 - `captureProjects` with fake `GprocClientLike`, in-memory storage and a fake enqueue: existing TOR
   untouched; unknown project → skipped; agency mismatch and keyword gate → skipped; created TOR has
-  `source: "gproc"`, correct fields, stored file, enqueued once; missing TOR file → created, not enqueued;
+  `source: "gproc"`, correct fields, stored file, enqueued once; no TOR file → the invitation PDF is stored (`kind: invitation`) and the TOR is queued; no document at all → created, not enqueued; an invitation-sourced TOR is upgraded when a TOR file appears; enrichment gives an invitation-sourced TOR no fairness flags;
   process5 error isolation and the 3-error breaker; serial order; counters.
 - `POST /capture` route: admin only, `400` on invalid body/size, `409` while running, `202`, progress via
   the run.

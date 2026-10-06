@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let an admin send project numbers found on the national e-GP (process5) search page to the backend with a Chrome extension; the backend creates the missing TORs from process5 data (TOR PDF from the document bundle) and queues them into the existing enrichment + lifecycle pipeline.
+**Goal:** Let an admin send project numbers found on the national e-GP (process5) search page to the backend with a Chrome extension; the backend creates the missing TORs from process5 data (TOR PDF from the document bundle, or the invitation PDF when no TOR exists yet) and queues them into the existing enrichment + lifecycle pipeline.
 
-**Architecture:** The extension observes the search page's own JSON responses, accumulates `{projectCode,title,agency}` rows, and on click POSTs them to `POST /api/ingestion/capture` with the admin session cookie. The route starts a background `captureProjects` run (an `IngestionRun` with phase `capture`), which per project asks process5 (existing polite `GprocClient`, extended with the document bundle), creates the `Tor`, stores the `Attach_TOR*.pdf` found in the bundle, and queues enrichment. The public detail shows an original-link that follows the TOR's stored datasource.
+**Architecture:** The extension observes the search page's own JSON responses, accumulates `{projectCode,title,agency}` rows, and on click POSTs them to `POST /api/ingestion/capture` with the admin session cookie. The route starts a background `captureProjects` run (an `IngestionRun` with phase `capture`), which per project asks process5 (existing polite `GprocClient`, extended with the document bundle), creates the `Tor`, stores the `Attach_TOR*.pdf` found in the bundle (or, when there is no TOR yet, the signed invitation PDF, marked `kind: "invitation"`), and queues enrichment. The public detail shows an original-link that follows the TOR's stored datasource.
 
 **Tech Stack:** Express 5, Mongoose 9, TypeScript, Jest + mongodb-memory-server, `fflate` (zip), Chrome extension Manifest V3 (plain JS, tested with `node --test`).
 
@@ -15,8 +15,9 @@
 - Admin only: `requireAuth` + `requireRole("admin")` (the router already applies it). The extension never reads cookies; it uses `credentials: "include"`.
 - Body: `{ projects: [{ projectCode, title?, agency? }] }`, 1..100 entries, `projectCode` matches `^\d{11}$`, `title`/`agency` optional strings ≤ 500 chars. Nothing client-supplied is stored; `title`/`agency` are a **skip-only hint** (it may skip a project, never create or change data).
 - The process5 search page (Turnstile) is **never** called by the backend or the extension's code. The extension only observes the page's own responses. Calls from the backend: `getProjectDetail`, `greenBook`, `infoProcureDocAnnounZipTemp`, `infoProcureDocAnnounZip`, `GET egp-upload-service/v1/downloadFileTest?fileId=<zipId>`. Serial, `GPROC_DELAY_MS` apart, existing timeout/retry (retry only 429/5xx/network, never other 4xx).
-- Created TOR: `procurement.source: "gproc"`, no `sourceListingUrl`, `agency` = `deptSubName`, `department` = `deptName`, `projectCode` = the 11-digit number. A TOR **without a stored TOR file is never enqueued for enrichment**.
+- Created TOR: `procurement.source: "gproc"`, no `sourceListingUrl`, `agency` = `deptSubName`, `department` = `deptName`, `projectCode` = the 11-digit number. A TOR **without any stored source document is never enqueued for enrichment**.
 - TOR file rule: `.pdf` entries whose base name matches `/TOR/i`; prefer `/^Attach_TOR/i`; several → largest; none → no TOR. Download cap 50 MB, per-entry cap 50 MB. Extract only the chosen entry.
+- Source document: the TOR PDF from the bundle if there is one, otherwise the signed invitation PDF (`invitationPdf`; filename `<code>-invitation.pdf`). `sourceDocument.kind` (`"tor"` default | `"invitation"`) records which. A TOR with neither is created but not enqueued. A `kind: "invitation"` document gets **no fairness flags** (enrichment clears them; the invitation has no scope of work). A re-capture of a gproc TOR whose document is an invitation tries the bundle again; when a TOR file is found it replaces the document and re-queues enrichment under a new `sourceContentHash`.
 - Capture agency filter: optional env `CAPTURE_AGENCIES` (comma list, empty = allow all); an entry matches when it is contained in `deptName` or `deptSubName`. `INGEST_AGENCIES` is not used. Keyword gate = `looksSoftwareRelated(title)`.
 - Circuit breaker: 3 consecutive process5 errors stop asking process5 for the rest of the run (remaining projects counted as skipped, one warning).
 - One capture run at a time (`409`), stale runs swept (`sweepStaleRuns("capture")`); `GPROC_ENABLED=false` → `503`.
@@ -28,8 +29,9 @@
 ## Review Focus
 
 - A client that lies in `title`/`agency` can only cause a skip, never a write (Task 3 test).
-- A bundle that is corrupt, encrypted, huge, or has no TOR entry → the project is created but not enqueued, never an exception out of the project (Tasks 1, 3 tests).
-- A re-capture of a project that exists but never got its TOR file retries the file and enqueues; a project already enriched/rejected is left alone (Task 3 tests).
+- A bundle that is corrupt, encrypted, huge, or has no TOR entry → the invitation PDF is used instead; with no invitation either, the project is created but not enqueued; never an exception out of the project (Tasks 1, 3 tests).
+- An invitation-sourced TOR gets no fairness flags, and is upgraded to the real TOR file (document replaced, enrichment re-queued) when a later capture finds one (Tasks 3, 7 tests).
+- A re-capture of a project that exists but never got any source document retries and enqueues; one whose document is an invitation is upgraded when a TOR file appears; an egp2-sourced, rejected or TOR-sourced project is left alone (Task 3 tests).
 - The same `projectCode` captured twice in a row / concurrently creates one TOR (duplicate-key tolerated) (Task 3 test).
 - Process5 down or answering in a changed shape → per-project failures, breaker after 3, run still ends with a summary (Task 3 test).
 - The route rejects non-admins, bad bodies, over 100, and a second concurrent run (Task 4 tests); nothing from the body reaches the database.
@@ -48,7 +50,7 @@
 | `backend/src/scraper/gprocClient.ts` (modify) | read the extra detail fields, `documentBundle`, `downloadBundle` |
 | `backend/src/ingestion/capture/torFromBundle.ts` (create) | pick and extract the TOR PDF from a zip |
 | `backend/src/ingestion/gprocUrl.ts` (create) | `gprocProjectUrl(projectCode)` |
-| `backend/src/ingestion/storeTorPdf.ts` (create), `fetchAndStoreTorPdf.ts` (modify) | shared "store a TOR PDF buffer on a Tor" |
+| `backend/src/ingestion/storeTorPdf.ts` (create), `fetchAndStoreTorPdf.ts` (modify), `models/Tor.ts` (modify) | shared "store a source PDF buffer on a Tor"; `sourceDocument.kind` |
 | `backend/src/ingestion/capture/mapGprocTor.ts` (create) | pure: process5 detail + rows → Tor fields + procurement |
 | `backend/src/ingestion/capture/captureProjects.ts` (create) | per-project capture, run bookkeeping, breaker |
 | `backend/src/models/IngestionRun.ts` (modify) | phase `capture` |
@@ -57,6 +59,7 @@
 | `backend/src/ingestion/lifecycle/refreshLifecycle.ts` (modify) | bump `lastCheckedAt` on a skip |
 | `frontend/src/lib/useIngestionRuns.ts` (+ the runs list label) (modify) | `capture` phase type |
 | `backend/.env.example`, `docs/deployment/gcp.md`, `CLAUDE.md` (modify) | `CAPTURE_AGENCIES`, docs |
+| `backend/src/ingestion/enrichment/torExtractor.ts` (modify), `frontend/src/app/(site)/tor/[id]/page.tsx` (modify) | no fairness flags from an invitation; a one-line notice |
 | `extension/**` (create) | MV3 extension, pure parser + tests, README |
 
 ---
@@ -321,14 +324,15 @@ git commit -m "feat(backend): read the process5 document bundle and pick the TOR
 
 **Files:**
 - Create: `backend/src/ingestion/gprocUrl.ts`, `backend/src/ingestion/storeTorPdf.ts`, `backend/src/ingestion/capture/mapGprocTor.ts`
-- Modify: `backend/src/ingestion/fetchAndStoreTorPdf.ts`, `backend/src/controllers/torController.ts`
+- Modify: `backend/src/ingestion/fetchAndStoreTorPdf.ts`, `backend/src/controllers/torController.ts`, `backend/src/models/Tor.ts`
 - Test: `backend/src/ingestion/capture/__tests__/mapGprocTor.test.ts`, `backend/src/ingestion/__tests__/gprocUrl.test.ts`, `backend/src/ingestion/__tests__/storeTorPdf.test.ts`, `backend/src/__tests__/torProcurementExposure.test.ts` (extend)
 
 **Interfaces:**
 - Consumes: `buildGprocProcurement`, `GprocProjectDetail`, `GprocAnnouncement` (with the optional fields from Task 1).
 - Produces:
   - `gprocProjectUrl(projectCode: string, base?: string): string`
-  - `storeTorPdf(tor: HydratedDocument<ITor>, buf: Buffer, meta: { egpUrl: string; filename: string; key: string }, deps: { storage: BlobStorage; parse?: PdfParseFn }): Promise<void>` (sets `tor.sourceDocument` + `sourceDocumentUrl` and saves).
+  - `type SourceDocumentKind = "tor" | "invitation"` and `ISourceDocument.kind?: SourceDocumentKind` (schema: `kind: { type: String, enum: ["tor", "invitation"], default: "tor" }` on `sourceDocumentSchema`; existing documents read as `tor`).
+  - `storeTorPdf(tor: HydratedDocument<ITor>, buf: Buffer, meta: { egpUrl: string; filename: string; key: string; kind?: SourceDocumentKind }, deps: { storage: BlobStorage; parse?: PdfParseFn }): Promise<void>` (sets `tor.sourceDocument` + `sourceDocumentUrl` and saves; `kind` defaults to `"tor"`).
   - `mapGprocTor(input: { detail: GprocProjectDetail; announcements: GprocAnnouncement[] }, now: Date): MappedGprocTor | null` where `interface MappedGprocTor { set: { title: string; agency?: string; department?: string; budget?: number; referencePrice?: number; announcementDate?: Date }; sourceContentHash: string; procurement: IProcurement; unknownCodes: string[] }` (null when `projectName` is missing/blank).
   - `resolveSourceListingUrl(tor: { projectCode?: string | null; sourceListingUrl?: string | null; procurement?: { source?: string | null } | null }): string | null` exported from `torController.ts`.
 
@@ -428,12 +432,20 @@ afterAll(async () => {
 afterEach(() => Tor.deleteMany({}));
 
 describe("storeTorPdf", () => {
+  it("records an invitation document with kind invitation", async () => {
+    const storage = { async put(key: string, body: Buffer) { return { key, size: body.length }; }, publicUrl: () => null } as unknown as BlobStorage;
+    const tor = await Tor.create({ title: "t", projectCode: "69099312833" });
+    await storeTorPdf(tor, Buffer.from("%PDF-1.7 inv"), { egpUrl: "https://gp.test/x", filename: "69099312833-invitation.pdf", key: "tor-pdfs/69099312833/invitation.pdf", kind: "invitation" }, { storage, parse: async () => ({ numpages: 1, text: "x".repeat(500) }) });
+    expect((await Tor.findById(tor.id).lean())?.sourceDocument?.kind).toBe("invitation");
+  });
+
   it("stores the bytes, inspects the text layer and records sourceDocument", async () => {
     const puts: string[] = [];
     const storage = { async put(key: string, body: Buffer) { puts.push(key); return { key, size: body.length }; }, publicUrl: () => null } as unknown as BlobStorage;
     const tor = await Tor.create({ title: "t", projectCode: "69099312832" });
     const parse = async () => ({ numpages: 3, text: "x".repeat(1000) });
     await storeTorPdf(tor, Buffer.from("%PDF-1.7 data"), { egpUrl: "https://gp.test/x", filename: "Attach_TOR_1.pdf", key: "tor-pdfs/69099312832/Attach_TOR_1.pdf" }, { storage, parse });
+    expect((await Tor.findById(tor.id).lean())?.sourceDocument?.kind).toBe("tor");
     expect(puts).toEqual(["tor-pdfs/69099312832/Attach_TOR_1.pdf"]);
     const saved = await Tor.findById(tor.id).lean();
     expect(saved?.sourceDocument).toMatchObject({ egpUrl: "https://gp.test/x", filename: "Attach_TOR_1.pdf", storageKey: "tor-pdfs/69099312832/Attach_TOR_1.pdf", textLayer: "digital", pageCount: 3 });
@@ -468,23 +480,25 @@ export function gprocProjectUrl(projectCode: string, base: string = process.env.
 }
 ```
 
-- [ ] **Step 3: Implement `storeTorPdf.ts` and call it from `fetchAndStoreTorPdf.ts`**
+- [ ] **Step 3: Model + `storeTorPdf.ts`, and call it from `fetchAndStoreTorPdf.ts`**
+
+First, in `models/Tor.ts` add `export type SourceDocumentKind = "tor" | "invitation";`, `kind?: SourceDocumentKind;` to `ISourceDocument`, and `kind: { type: String, enum: ["tor", "invitation"], default: "tor" },` to `sourceDocumentSchema`. Export the type from `models/index.ts` if the other types are re-exported there.
 
 ```ts
 import { createHash } from "node:crypto";
 import type { HydratedDocument } from "mongoose";
-import type { ITor } from "../models/Tor";
+import type { ITor, SourceDocumentKind } from "../models/Tor";
 import type { BlobStorage } from "../storage/storage.types";
 import { pdfInspect, type PdfParseFn } from "./pdfInspect";
 
 /**
- * Store a TOR PDF's bytes and record everything on `tor.sourceDocument` (and `sourceDocumentUrl`).
+ * Store a source PDF's bytes (a TOR, or an invitation when no TOR exists yet) and record everything on `tor.sourceDocument` (and `sourceDocumentUrl`).
  * Shared by the egp2 download (`fetchAndStoreTorPdf`) and the process5 capture.
  */
 export async function storeTorPdf(
   tor: HydratedDocument<ITor>,
   buf: Buffer,
-  meta: { egpUrl: string; filename: string; key: string },
+  meta: { egpUrl: string; filename: string; key: string; kind?: SourceDocumentKind },
   deps: { storage: BlobStorage; parse?: PdfParseFn }
 ): Promise<void> {
   const sha256 = createHash("sha256").update(buf).digest("hex");
@@ -499,6 +513,7 @@ export async function storeTorPdf(
     byteSize: buf.length,
     sha256,
     fetchedAt: new Date(),
+    kind: meta.kind ?? "tor",
   };
   tor.sourceDocumentUrl = deps.storage.publicUrl(meta.key) ?? `/api/tors/${tor.id}/document`;
   await tor.save();
@@ -617,7 +632,7 @@ git commit -m "feat(backend): map process5 projects to TOR fields and link the o
 - Test: `backend/src/ingestion/capture/__tests__/captureProjects.test.ts`, `backend/src/ingestion/capture/__tests__/agencies.test.ts`
 
 **Interfaces:**
-- Consumes: `GprocCaptureClientLike` (Task 1), `mapGprocTor`, `gprocProjectUrl`, `storeTorPdf`, `torFromBundle`, `enqueue` from `enrichment/enrichmentJobRepo`, `looksSoftwareRelated`, `logIngestionEvent`.
+- Consumes: `GprocCaptureClientLike` (Task 1, incl. `invitationPdf`), `mapGprocTor`, `gprocProjectUrl`, `storeTorPdf` (with `kind`), `torFromBundle`, `enqueue` from `enrichment/enrichmentJobRepo`, `looksSoftwareRelated`, `logIngestionEvent`.
 - Produces:
   - `IngestionPhase` gains `"capture"` (type and schema enum).
   - `captureAgencies(env?: NodeJS.ProcessEnv): string[]` and `agencyMatches(list: string[], ...names: Array<string | null | undefined>): boolean` (empty `list` → true).
@@ -667,10 +682,12 @@ function fakeGproc(opts: {
   detail?: (code: string) => GprocProjectDetail | null | Error;
   bundle?: (code: string, draft: boolean) => { zipId: string; name: string | null } | null | Error;
   zip?: Buffer | Error;
-} = {}): GprocCaptureClientLike & { detailCalls: string[]; zipCalls: string[] } {
+  invitation?: Buffer | null | Error;
+} = {}): GprocCaptureClientLike & { detailCalls: string[]; zipCalls: string[]; invitationCalls: number } {
   const g = {
     detailCalls: [] as string[],
     zipCalls: [] as string[],
+    invitationCalls: 0,
     async projectDetail(code: string) {
       g.detailCalls.push(code);
       const d = opts.detail ? opts.detail(code) : detail(code);
@@ -678,7 +695,12 @@ function fakeGproc(opts: {
       return d;
     },
     async announcements() { return rows; },
-    async invitationPdf() { return null; },
+    async invitationPdf() {
+      g.invitationCalls += 1;
+      const i = opts.invitation === undefined ? null : opts.invitation;
+      if (i instanceof Error) throw i;
+      return i;
+    },
     async documentBundle(code: string, o: { draft: boolean }) {
       const b = opts.bundle ? opts.bundle(code, o.draft) : o.draft ? { zipId: "z-draft", name: "d.zip" } : null;
       if (b instanceof Error) throw b;
@@ -701,14 +723,16 @@ const storage = (puts: string[] = []) => ({
 ```
 Helper `run(projects, deps)`: creates an `IngestionRun` (`trigger: "manual", phase: "capture", status: "running", stats: { torsFound: projects.length }`), calls `captureProjects(run._id, projects, { storage: storage(), enqueueEnrichment: enq, parse: async () => ({ numpages: 2, text: "x".repeat(900) }), now: () => NOW, env: {}, ...deps })`, returns `{ run: await IngestionRun.findById(run._id).lean(), enq }` where `enq` is a `jest.fn()` recording calls. Tests (each must be written out in full):
 
-1. **creates, stores the TOR file, enqueues once**: capture `[{ projectCode: "69099312832" }]` → one `Tor` with `projectCode`, `title`, `agency: "สำนักดิจิทัล"`, `department: "กรุงเทพมหานคร"`, `referencePrice: 4890000`, `procurement.source: "gproc"`, `procurement.stage: "inviting"`, `sourceListingUrl` undefined, `sourceDocument.storageKey` starting `tor-pdfs/69099312832/`, `sourceDocument.filename: "Attach_TOR_1.pdf"`; `enq` called once with `(tor._id, tor.sourceContentHash)`; run `stats.torsCreated: 1`, `status: "success"`, `outcomeSummary` contains `created 1`.
+1. **creates, stores the TOR file, enqueues once**: capture `[{ projectCode: "69099312832" }]` → one `Tor` with `projectCode`, `title`, `agency: "สำนักดิจิทัล"`, `department: "กรุงเทพมหานคร"`, `referencePrice: 4890000`, `procurement.source: "gproc"`, `procurement.stage: "inviting"`, `sourceListingUrl` undefined, `sourceDocument.storageKey` starting `tor-pdfs/69099312832/`, `sourceDocument.filename: "Attach_TOR_1.pdf"`, `sourceDocument.kind: "tor"` (and `invitationCalls` is 0 because a TOR was found); `enq` called once with `(tor._id, tor.sourceContentHash)`; run `stats.torsCreated: 1`, `status: "success"`, `outcomeSummary` contains `created 1`.
 2. **existing TOR is left alone**: seed an enriched `Tor` with that code → `gproc.detailCalls` empty, `torsUnchanged: 1`, the TOR unchanged, `enq` not called.
-3. **existing gproc TOR without a stored file is retried**: seed `Tor` with `pipelineStatus: "pending"`, `procurement.source: "gproc"` (stage inviting, lastCheckedAt now), no `sourceDocument` → file is fetched and stored, `enq` called once, counted as `torsUnchanged: 1`; a seeded `rejected` TOR with the same shape is left alone.
+3. **an existing gproc TOR with no source document is retried**: seed `Tor` with `pipelineStatus: "pending"`, `procurement.source: "gproc"`, no `sourceDocument` -> a document is fetched and stored, `enq` called once, counted as `torsUnchanged: 1`; a seeded `rejected` TOR, an `enriched` TOR with a `kind: "tor"` document, and a TOR whose `procurement.source` is `"egp2"` (even with no document) are left alone (no process5 call).
+3b. **an invitation-sourced TOR is upgraded when a TOR file appears**: seed an `enriched` gproc `Tor` with `sourceDocument: { ..., storageKey: "tor-pdfs/69099312832/invitation.pdf", kind: "invitation" }` and `sourceContentHash: "old"`; capture with a bundle that now has `Attach_TOR_1.pdf` -> `sourceDocument.kind` becomes `"tor"` with the TOR's filename, `sourceContentHash` is no longer `"old"`, and `enq` is called once with the new hash (counted `known`). With a bundle that still has no TOR entry -> nothing changes, `enq` not called, `known`. An `invitation` document is never replaced by another invitation (`invitationPdf` is not called on this path).
 4. **title hint that fails the keyword gate skips without calling process5** (`title: "จ้างเหมาทำความสะอาด"`) → `detailCalls` empty, `torsSkipped: 1`, no Tor; a **lying hint** that passes (`title: "ซอฟต์แวร์"`) for a project whose real title fails the gate → still skipped (`not software related`), nothing stored from the hint.
 5. **keyword gate on the server title**: `detail` returns a non-software title → skipped, no Tor, no enqueue.
 6. **`CAPTURE_AGENCIES`**: `env: { CAPTURE_AGENCIES: "สำนักการแพทย์" }` with the detail's `deptName/deptSubName` not containing it → skipped; with a matching entry → created. An `agency` hint that does not match the list → skipped without a process5 call.
 7. **unknown to process5**: `detail` returns `null` → skipped (reason "unknown to process5"), no Tor.
-8. **no TOR file**: `zip` is a zip with only `doc_1.pdf`; also variants `documentBundle` → `null` for both drafts, a corrupt buffer (`Buffer.from("PK\u0003\u0004junk")`), and `downloadBundle` rejecting → in every case the Tor IS created (with `procurement`), has no `sourceDocument.storageKey`, `enq` is NOT called, run `torsCreated: 1`, and a warning log mentions the project code.
+8. **no TOR file -> the invitation PDF**: `zip` is a zip with only `doc_1.pdf` and `invitation` is a PDF buffer -> the Tor is created with `sourceDocument.kind: "invitation"`, `filename: "69099312832-invitation.pdf"`, a stored `storageKey` ending `/invitation.pdf`, and `enq` is called once. The same result when `documentBundle` returns `null` for both bundles, when the zip is corrupt (`Buffer.from("PK\u0003\u0004junk")`), and when `downloadBundle` rejects.
+8b. **no source document at all**: no TOR in the bundle and `invitation: null` (or `invitationPdf` rejecting) -> the Tor IS created (with `procurement`), has no `sourceDocument.storageKey`, `enq` is NOT called, `torsCreated: 1`, and a warning log mentions the project code.
 9. **falls back from the draft bundle to the published bundle**: `bundle: (c, draft) => (draft ? null : { zipId: "z-pub", name: "p.zip" })` → file stored from `z-pub` (`zipCalls` equals `["z-pub"]`).
 10. **process5 error isolation + breaker**: `detail` throws for every project, 5 projects → `detailCalls.length === 3`, `torsFailed: 3`, `torsSkipped: 2`, `status: "failed"` (nothing created/known/skipped successfully? use the status rule below — verify the summary contains `process5 paused`), exactly one `SystemLog` warning containing `paused`. A project that throws followed by one that succeeds resets the counter (3 errors separated by a success never trips it).
 11. **duplicate code is tolerated**: pre-create a `Tor` with the code only AFTER `detail` resolves (use a `detail` function that inserts it as a side effect) → the project counts as `torsUnchanged` and no exception escapes.
@@ -737,6 +761,7 @@ export function agencyMatches(list: string[], ...names: Array<string | null | un
 - [ ] **Step 4: `captureProjects.ts`**
 
 ```ts
+import { createHash } from "node:crypto";
 import type { HydratedDocument, Types } from "mongoose";
 import { IngestionRun, Tor } from "../../models";
 import type { ITor } from "../../models/Tor";
@@ -775,7 +800,9 @@ type Outcome = { kind: "created" | "known" | "skipped" | "failed"; note?: string
 
 /**
  * Capture admin-selected process5 projects: create the missing TORs from process5 data, store the TOR PDF
- * found in the document bundle and queue enrichment. A TOR without a stored TOR file is never queued.
+ * found in the document bundle (or the signed invitation PDF when there is no TOR yet) and queue enrichment.
+ * A TOR with no stored source document is never queued; one summarised from its invitation is upgraded
+ * when a later capture finds the TOR file.
  * Serial; per-project errors never escape; 3 consecutive process5 errors pause process5 for the run.
  * The `title`/`agency` hints from the client can only SKIP a project, never create or change data.
  */
@@ -795,25 +822,45 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
   const log = (severity: "info" | "warning" | "error", message: string) =>
     logIngestionEvent({ severity, message, component: COMPONENT, ingestionRunId: runId });
 
-  async function attachTorFile(tor: HydratedDocument<ITor>, code: string): Promise<boolean> {
+  /** TOR file from the bundles first; otherwise the signed invitation PDF. Returns which kind was stored, or null. */
+  async function attachSourceFile(tor: HydratedDocument<ITor>, code: string): Promise<"tor" | "invitation" | null> {
     try {
-      for (const draft of [true, false]) {
-        const bundle = await deps.gproc.documentBundle(code, { draft });
-        if (!bundle) continue;
-        const zip = await deps.gproc.downloadBundle(bundle.zipId, MAX_BUNDLE_BYTES);
-        const file = torFromBundle(zip, { maxEntryBytes: MAX_BUNDLE_BYTES });
-        if (!file) continue;
-        const safe = (file.name.split(/[\\/]/).pop() ?? "tor.pdf").replace(/[^A-Za-z0-9._-]/g, "_");
-        await storeTorPdf(
-          tor,
-          file.content,
-          { egpUrl: gprocProjectUrl(code), filename: file.name, key: `tor-pdfs/${code}/${safe}` },
-          { storage: deps.storage, parse: deps.parse }
-        );
-        return true;
-      }
+      if (await attachTorFromBundle(tor, code)) return "tor";
     } catch (err) {
       await log("warning", `capture ${code}: TOR file not stored (${(err as Error).message})`);
+    }
+    try {
+      const inv = await deps.gproc.invitationPdf(code);
+      if (!inv) return null;
+      await storeTorPdf(
+        tor,
+        inv,
+        { egpUrl: gprocProjectUrl(code), filename: `${code}-invitation.pdf`, key: `tor-pdfs/${code}/invitation.pdf`, kind: "invitation" },
+        { storage: deps.storage, parse: deps.parse }
+      );
+      return "invitation";
+    } catch (err) {
+      await log("warning", `capture ${code}: invitation PDF not stored (${(err as Error).message})`);
+      return null;
+    }
+  }
+
+  /** The TOR PDF from the draft bundle, else the published one. Throws on a download problem; false when there is none. */
+  async function attachTorFromBundle(tor: HydratedDocument<ITor>, code: string): Promise<boolean> {
+    for (const draft of [true, false]) {
+      const bundle = await deps.gproc.documentBundle(code, { draft });
+      if (!bundle) continue;
+      const zip = await deps.gproc.downloadBundle(bundle.zipId, MAX_BUNDLE_BYTES);
+      const file = torFromBundle(zip, { maxEntryBytes: MAX_BUNDLE_BYTES });
+      if (!file) continue;
+      const safe = (file.name.split(/[\\/]/).pop() ?? "tor.pdf").replace(/[^A-Za-z0-9._-]/g, "_");
+      await storeTorPdf(
+        tor,
+        file.content,
+        { egpUrl: gprocProjectUrl(code), filename: file.name, key: `tor-pdfs/${code}/${safe}`, kind: "tor" },
+        { storage: deps.storage, parse: deps.parse }
+      );
+      return true;
     }
     return false;
   }
@@ -822,15 +869,31 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
     const code = p.projectCode;
     const existing = await Tor.findOne({ projectCode: code });
     if (existing) {
-      // A gproc TOR that never got its TOR file (and was never judged) is retried; anything else is left alone.
-      const stuck =
-        existing.procurement?.source === "gproc" &&
-        existing.pipelineStatus === "pending" &&
-        !existing.sourceDocument?.storageKey;
-      if (!stuck) return { kind: "known", note: "already in the database" };
-      if (!(await attachTorFile(existing, code))) return { kind: "known", note: "TOR file still not found" };
-      await enqueueEnrichment(existing._id as Types.ObjectId, existing.sourceContentHash ?? "");
-      return { kind: "known", note: "TOR file attached, queued for enrichment" };
+      if (existing.procurement?.source !== "gproc") return { kind: "known", note: "already in the database" };
+      const doc = existing.sourceDocument;
+      // (a) never got a source document and was never judged: retry, then queue.
+      if (existing.pipelineStatus === "pending" && !doc?.storageKey) {
+        if (!(await attachSourceFile(existing, code))) return { kind: "known", note: "no source document found yet" };
+        await enqueueEnrichment(existing._id as Types.ObjectId, existing.sourceContentHash ?? "");
+        return { kind: "known", note: "source document attached, queued for enrichment" };
+      }
+      // (b) summarised from the invitation only: look for the real TOR file and re-queue under a new hash.
+      if (doc?.kind === "invitation" && existing.pipelineStatus !== "processing") {
+        let upgraded = false;
+        try {
+          upgraded = await attachTorFromBundle(existing, code);
+        } catch (err) {
+          await log("warning", `capture ${code}: TOR file not stored (${(err as Error).message})`);
+        }
+        if (!upgraded) return { kind: "known", note: "still only the invitation (no TOR file yet)" };
+        existing.sourceContentHash = createHash("sha256")
+          .update(`${existing.sourceContentHash ?? ""}|tor|${existing.sourceDocument?.sha256 ?? ""}`)
+          .digest("hex");
+        await existing.save();
+        await enqueueEnrichment(existing._id as Types.ObjectId, existing.sourceContentHash);
+        return { kind: "known", note: "TOR file found, re-queued for enrichment" };
+      }
+      return { kind: "known", note: "already in the database" };
     }
 
     if (p.title && !looksSoftwareRelated(p.title)) return { kind: "skipped", note: "title hint is not software related" };
@@ -869,11 +932,12 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
       if ((err as { code?: number }).code === 11000) return { kind: "known", note: "created by someone else meanwhile", gproc: "ok" };
       throw err;
     }
-    if (!(await attachTorFile(tor, code))) {
-      return { kind: "created", note: "created, but no TOR file found yet; not queued for enrichment", gproc: "ok" };
+    const kind = await attachSourceFile(tor, code);
+    if (!kind) {
+      return { kind: "created", note: "created, but no TOR file or invitation found yet; not queued for enrichment", gproc: "ok" };
     }
     await enqueueEnrichment(tor._id as Types.ObjectId, mapped.sourceContentHash);
-    return { kind: "created", gproc: "ok" };
+    return { kind: "created", note: kind === "invitation" ? "summarised from the invitation (no TOR file yet)" : undefined, gproc: "ok" };
   }
 
   for (const p of unique) {
@@ -1391,9 +1455,63 @@ git commit -m "feat(extension): collect process5 search results and send them to
 
 ---
 
+### Task 7: No fairness flags from an invitation, and a notice on the detail page
+
+**Files:**
+- Modify: `backend/src/ingestion/enrichment/torExtractor.ts`, `frontend/src/app/(site)/tor/[id]/page.tsx` (and `frontend/src/lib/torApi.ts` if the detail type needs the field)
+- Test: `backend/src/ingestion/enrichment/__tests__/torExtractor.test.ts` (the existing test file for `applyExtractionToTor`; add to it)
+
+**Interfaces:**
+- Consumes: `ISourceDocument.kind` (Task 2).
+- Produces: `applyExtractionToTor` leaves `fairnessFlags` empty when `tor.sourceDocument?.kind === "invitation"`.
+
+- [ ] **Step 1: Failing test** — in the existing `applyExtractionToTor` tests add (use the file's existing helpers for a hydrated `Tor` and a software-related extraction result that includes at least one fairness signal):
+
+```ts
+it("produces no fairness flags when the source document is only the invitation", () => {
+  const tor = hydratedTor({ sourceDocument: { egpUrl: "x", filename: "69099312832-invitation.pdf", storageKey: "k", textLayer: "digital", pageCount: 1, byteSize: 1, sha256: "s", fetchedAt: new Date(), kind: "invitation" } });
+  applyExtractionToTor(tor, resultWithFairnessSignal(), { extractorId: "t", fallbackText: "" });
+  expect(tor.pipelineStatus).toBe("enriched");
+  expect(tor.fairnessFlags).toHaveLength(0);
+});
+
+it("keeps fairness flags for a TOR document (kind tor or unset)", () => {
+  const tor = hydratedTor({});
+  applyExtractionToTor(tor, resultWithFairnessSignal(), { extractorId: "t", fallbackText: "" });
+  expect(tor.fairnessFlags.length).toBeGreaterThan(0);
+});
+```
+(`hydratedTor` / `resultWithFairnessSignal` are the names to use for whatever the file already builds; adapt to its helpers.) Run → the first FAILS.
+
+- [ ] **Step 2: Implement** — in `applyExtractionToTor`, replace the final `tor.fairnessFlags = result.fairnessSignals.map(...)` assignment with:
+
+```ts
+  // An invitation announcement has no scope of work, so the model has nothing to judge fairness on:
+  // never publish signals from it. They appear when a later capture upgrades the document to the TOR.
+  const signals = tor.sourceDocument?.kind === "invitation" ? [] : result.fairnessSignals;
+  tor.fairnessFlags = signals.map((s) => ({
+    field: s.field,
+    severity: s.severity,
+    message: s.message,
+    detectedAt: now,
+    status: "open",
+  })) as unknown as typeof tor.fairnessFlags;
+```
+
+- [ ] **Step 3: Notice on the detail page** — the detail response already carries `sourceDocument` (only its `storageKey`/`sha256` are excluded). Add `sourceDocument?: { kind?: "tor" | "invitation" }` to the raw/detail type in `frontend/src/lib/torApi.ts` and pass it through to the TOR type used by the page. In `tor/[id]/page.tsx`, next to the AI summary heading (or the summary card) show, only when `tor.sourceDocument?.kind === "invitation"`, one muted line: `สรุปจากประกาศเชิญชวน (ยังไม่มีเอกสารขอบเขตงาน TOR)`, styled like the page's other muted notes (`text-[11px] leading-relaxed text-[var(--color-text-muted)]`). No other UI change.
+
+- [ ] **Step 4: Verify and commit** — `cd backend && npm run typecheck && npx jest src/ingestion/enrichment --runInBand && npm test`; `cd ../frontend && npx tsc --noEmit && npx eslint "src/app/(site)/tor/[id]/page.tsx" src/lib/torApi.ts`.
+
+```bash
+git add backend/src/ingestion/enrichment/torExtractor.ts backend/src/ingestion/enrichment/__tests__/torExtractor.test.ts "frontend/src/app/(site)/tor/[id]/page.tsx" frontend/src/lib/torApi.ts
+git commit -m "feat(backend): never publish fairness flags from an invitation-only summary"
+```
+
+---
+
 ## Self-Review (against the spec)
 
-- **Spec coverage:** extension behaviour (observe responses, accumulate, send ≤ 100 on click, popup, background with cookie) → Task 6; `POST /capture` contract, 202 + `IngestionRun` phase `capture`, 409, validation, admin only → Task 4; per-project flow incl. skip-only hints, `CAPTURE_AGENCIES`, keyword gate, create TOR, TOR file from bundle (draft then published), no enqueue without a file, retry of a stuck gproc TOR, breaker → Task 3 (+ Task 1 for the bundle, Task 2 for mapping/storing); TOR file rule and caps → Task 1; source-aware original link → Task 2; lifecycle queue fix → Task 5; docs/env → Task 4. Not built (as in the spec): admin-token fallback for the cookie (documented in the README checklist), several invitations, v2 TOR variants.
+- **Spec coverage:** (invitation fallback, upgrade and no-fairness: Tasks 2, 3, 7) extension behaviour (observe responses, accumulate, send ≤ 100 on click, popup, background with cookie) → Task 6; `POST /capture` contract, 202 + `IngestionRun` phase `capture`, 409, validation, admin only → Task 4; per-project flow incl. skip-only hints, `CAPTURE_AGENCIES`, keyword gate, create TOR, TOR file from bundle (draft then published), no enqueue without a file, retry of a stuck gproc TOR, breaker → Task 3 (+ Task 1 for the bundle, Task 2 for mapping/storing); TOR file rule and caps → Task 1; source-aware original link → Task 2; lifecycle queue fix → Task 5; docs/env → Task 4. Not built (as in the spec): admin-token fallback for the cookie (documented in the README checklist), several invitations, v2 TOR variants.
 - **Placeholders:** the "write it fully against the file's existing helpers" instruction in Task 2 (exposure test) and the popup description in Task 6 are the two places that describe rather than show; their assertions/elements are listed explicitly.
 - **Type consistency:** `GprocCaptureClientLike` (Task 1) is what `captureProjects` takes (Task 3) and what `GprocClient` is passed as (Task 4); `mapGprocTor` returns `{ set, sourceContentHash, procurement, unknownCodes }` as consumed in Task 3; `storeTorPdf(tor, buf, meta, deps)` is used identically in Task 2 and Task 3; `CaptureProject` (Task 3) is what the controller produces (Task 4) and the extension sends (`{ projectCode, title, agency }`, Task 6); `resolveSourceListingUrl` and `gprocProjectUrl` (Task 2) are defined once.
 - **Known cost, accepted:** every captured relevant project downloads one bundle (~10 MB) inside the API process; capped at 100 projects per run and 50 MB per bundle.
