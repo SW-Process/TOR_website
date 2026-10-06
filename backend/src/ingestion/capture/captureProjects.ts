@@ -108,11 +108,16 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
     if (existing) {
       if (existing.procurement?.source !== "gproc") return { kind: "known", note: "already in the database" };
       const doc = existing.sourceDocument;
-      // (a) never got a source document and was never judged: retry, then queue.
+      // (a) never judged: no document yet -> retry, then queue; a stored document but (maybe) no job (a failed
+      // enqueue earlier) -> just queue it (idempotent when the job exists with the same hash).
       if (existing.pipelineStatus === "pending" && !doc?.storageKey) {
         if (!(await attachSourceFile(existing, code))) return { kind: "known", note: "no source document found yet" };
         await enqueueEnrichment(existing._id as Types.ObjectId, existing.sourceContentHash ?? "");
         return { kind: "known", note: "source document attached, queued for enrichment" };
+      }
+      if (existing.pipelineStatus === "pending" && doc?.storageKey && doc.kind !== "invitation") {
+        await enqueueEnrichment(existing._id as Types.ObjectId, existing.sourceContentHash ?? "");
+        return { kind: "known", note: "queued for enrichment" };
       }
       // (b) summarised from the invitation only: look for the real TOR file and re-queue under a new hash.
       if (doc?.kind === "invitation" && (existing.pipelineStatus === "enriched" || existing.pipelineStatus === "pending")) {
@@ -122,7 +127,13 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
         } catch (err) {
           await log("warning", `capture ${code}: TOR file not stored (${(err as Error).message})`);
         }
-        if (!upgraded) return { kind: "known", note: "still only the invitation (no TOR file yet)" };
+        if (!upgraded) {
+          if (existing.pipelineStatus === "pending") {
+            await enqueueEnrichment(existing._id as Types.ObjectId, existing.sourceContentHash ?? "");
+            return { kind: "known", note: "still only the invitation (no TOR file yet), queued for enrichment" };
+          }
+          return { kind: "known", note: "still only the invitation (no TOR file yet)" };
+        }
         existing.sourceContentHash = createHash("sha256")
           .update(`${existing.sourceContentHash ?? ""}|tor|${existing.sourceDocument?.sha256 ?? ""}`)
           .digest("hex");

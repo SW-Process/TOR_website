@@ -35,6 +35,15 @@ describe("torFromBundle", () => {
     expect(torFromBundle(zip({ "files\\Attach_TOR_2.pdf": pdf("t"), "other_TOR_big.pdf": pdf("x".repeat(500)) }))?.name).toBe("files\\Attach_TOR_2.pdf");
   });
 
+  it("matches TOR only as a standalone word in the base name", () => {
+    for (const bad of ["Monitor_report.pdf", "Storage_plan.pdf", "director.pdf"]) {
+      expect(torFromBundle(zip({ [bad]: pdf("x") }))).toBeNull();
+    }
+    for (const ok of ["tor.pdf", "TOR-full-version.PDF", "ขอบเขต_tor_small.pdf", "Attach_TOR_1.pdf"]) {
+      expect(torFromBundle(zip({ [ok]: pdf("x") }))?.name).toBe(ok);
+    }
+  });
+
   it("returns null when no entry looks like a TOR, never guessing among the others", () => {
     expect(torFromBundle(zip({ "annoudoc_1.pdf": pdf("a"), "doc_1.pdf": pdf("b"), "tor.txt": Buffer.from("not a pdf") }))).toBeNull();
   });

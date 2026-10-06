@@ -186,7 +186,7 @@ export async function getLifecyclePending(req: Request, res: Response): Promise<
 /** GET /api/ingestion/runs — recent run history (FR-34). */
 export async function listRuns(req: Request, res: Response): Promise<void> {
   // so the admin UI sees a dead run as failed, not "running"
-  await Promise.all([sweepStaleEnrichmentRuns(), sweepStaleRuns("lifecycle")]);
+  await Promise.all([sweepStaleEnrichmentRuns(), sweepStaleRuns("lifecycle"), sweepStaleRuns("capture")]);
   const limitRaw = Number(req.query.limit);
   const limit = Number.isInteger(limitRaw) && limitRaw >= 1 && limitRaw <= 100 ? limitRaw : 20;
   const runs = await IngestionRun.find({}).sort({ startedAt: -1 }).limit(limit).lean();
@@ -256,10 +256,14 @@ export async function createCaptureRun(req: Request, res: Response): Promise<voi
   });
   void captureProjects(run._id, projects, { gproc: new GprocClient(gprocConfigFromEnv()), storage }).catch(async (err) => {
     console.error("capture run failed:", err);
-    await IngestionRun.updateOne(
-      { _id: run._id },
-      { $set: { status: "failed", completedAt: new Date(), outcomeSummary: `capture aborted: ${(err as Error).message}` } }
-    );
+    try {
+      await IngestionRun.updateOne(
+        { _id: run._id, status: "running" },
+        { $set: { status: "failed", completedAt: new Date(), outcomeSummary: `capture aborted: ${(err as Error).message}` } }
+      );
+    } catch (updateErr) {
+      console.error("capture run could not be marked failed:", updateErr);
+    }
   });
   res.status(202).json({ runId: String(run._id), status: "running" });
 }

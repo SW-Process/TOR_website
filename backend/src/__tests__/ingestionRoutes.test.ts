@@ -537,6 +537,17 @@ describe("GET /api/ingestion/runs", () => {
     expect(res.body.runs[0].status).toBe("failed");
   });
 
+  it("reports an idle capture run as failed rather than running", async () => {
+    const dead = await IngestionRun.create({ trigger: "manual", phase: "capture", status: "running" });
+    await IngestionRun.collection.updateOne(
+      { _id: dead._id },
+      { $set: { updatedAt: new Date(Date.now() - 11 * 60_000) } }
+    );
+    const agent = await adminAgent();
+    const res = await agent.get("/api/ingestion/runs");
+    expect(res.body.runs[0].status).toBe("failed");
+  });
+
   it("lists runs newest first for an admin", async () => {
     const agent = await adminAgent();
     await IngestionRun.create({ trigger: "manual", startedAt: new Date("2026-08-01"), status: "success" });

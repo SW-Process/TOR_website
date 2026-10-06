@@ -5,6 +5,7 @@ export interface StalledRunReport {
   discovery: number;
   enrichment: number;
   lifecycle: number;
+  capture: number;
   total: number;
 }
 
@@ -17,5 +18,6 @@ export async function detectStalledRuns(now: Date = new Date()): Promise<Stalled
   const discovery = await markInterruptedRunsFailed(now);
   const enrichment = await sweepStaleRuns("enrichment", now);
   const lifecycle = await sweepStaleRuns("lifecycle", now);
-  return { discovery, enrichment, lifecycle, total: discovery + enrichment + lifecycle };
+  const capture = await sweepStaleRuns("capture", now);
+  return { discovery, enrichment, lifecycle, capture, total: discovery + enrichment + lifecycle + capture };
 }

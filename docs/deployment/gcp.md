@@ -86,13 +86,14 @@ gcloud run deploy tor-api \
   --image <IMG> --region asia-southeast1 \
   --service-account tor-api-sa@<PROJECT>.iam.gserviceaccount.com \
   --min-instances 0 \
+  --memory 1Gi --no-cpu-throttling \
   --set-secrets MONGODB_URI=MONGODB_URI:latest \
   --set-env-vars STORAGE_DRIVER=gcs,GCS_BUCKET=<BUCKET>,CLIENT_ORIGIN=<FRONTEND_URL> \
   --command node --args dist/server.js \
   --allow-unauthenticated
 ```
 
-Capture runs (`POST /api/ingestion/capture`, used by admins through the Chrome extension) happen inside this API service, not in a Cloud Run job. Each project may download a bundle of about 10 MB, so give the service memory headroom; no request timeout is involved because the route answers 202 and works in the background. `CAPTURE_AGENCIES` is optional (empty captures every software-related project), and `GPROC_ENABLED=false` disables capture (the route answers 503).
+Capture runs (`POST /api/ingestion/capture`, used by admins through the Chrome extension) happen inside this API service, not in a Cloud Run job. Each project may download a bundle of about 10 MB, so give the service `--memory 1Gi`. The run continues after the 202 response, as a background task that is not bound to the request, so the service also needs CPU always allocated (`--no-cpu-throttling`); with request-only CPU, Cloud Run throttles the process once the response is sent and the run stalls. `CAPTURE_AGENCIES` is optional (empty captures every software-related project), and `GPROC_ENABLED=false` disables capture (the route answers 503).
 
 ## Jobs
 

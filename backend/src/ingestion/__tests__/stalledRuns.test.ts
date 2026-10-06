@@ -9,7 +9,7 @@ afterAll(async () => { await mongoose.disconnect(); await mongod.stop(); });
 afterEach(async () => { await Promise.all([IngestionRun.deleteMany({}), SystemLog.deleteMany({})]); });
 
 /** A "running" run that started `startedMin` minutes ago and last wrote `idleMin` minutes ago. */
-async function runningRun(phase: "discovery" | "enrichment" | "lifecycle", startedMin: number, idleMin: number) {
+async function runningRun(phase: "discovery" | "enrichment" | "lifecycle" | "capture", startedMin: number, idleMin: number) {
   const run = await IngestionRun.create({ trigger: "manual", phase, status: "running" });
   await IngestionRun.collection.updateOne(
     { _id: run._id },
@@ -28,7 +28,7 @@ describe("detectStalledRuns", () => {
     const run = await runningRun("discovery", 40, 0);
     const report = await detectStalledRuns();
 
-    expect(report).toEqual({ discovery: 1, enrichment: 0, lifecycle: 0, total: 1 });
+    expect(report).toEqual({ discovery: 1, enrichment: 0, lifecycle: 0, capture: 0, total: 1 });
     expect((await IngestionRun.findById(run._id).lean())?.status).toBe("failed");
     const logs = await SystemLog.find({ ingestionRunId: run._id }).lean();
     expect(logs).toHaveLength(1);
@@ -52,10 +52,17 @@ describe("detectStalledRuns", () => {
     expect(await SystemLog.countDocuments({ ingestionRunId: run._id, severity: "error" })).toBe(1);
   });
 
+  it("fails a capture run silent past the window and logs it", async () => {
+    const run = await runningRun("capture", 120, 120);
+    expect(await detectStalledRuns()).toMatchObject({ capture: 1, total: 1 });
+    expect((await IngestionRun.findById(run._id).lean())?.status).toBe("failed");
+    expect(await SystemLog.countDocuments({ ingestionRunId: run._id, severity: "error" })).toBe(1);
+  });
+
   it("leaves a healthy run alone and writes no log", async () => {
     const discovery = await runningRun("discovery", 10, 0);
     const enrichment = await runningRun("enrichment", 5, 2);
-    expect(await detectStalledRuns()).toEqual({ discovery: 0, enrichment: 0, lifecycle: 0, total: 0 });
+    expect(await detectStalledRuns()).toEqual({ discovery: 0, enrichment: 0, lifecycle: 0, capture: 0, total: 0 });
     expect((await IngestionRun.findById(discovery._id).lean())?.status).toBe("running");
     expect((await IngestionRun.findById(enrichment._id).lean())?.status).toBe("running");
     expect(await SystemLog.countDocuments({})).toBe(0);

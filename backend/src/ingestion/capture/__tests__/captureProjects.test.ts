@@ -211,6 +211,18 @@ describe("captureProjects", () => {
     expect(r?.stats.torsUnchanged).toBe(1);
   });
 
+  it("3c. a pending gproc TOR that already has a stored document is just queued (self-heal), once", async () => {
+    await seedTor({ pipelineStatus: "pending", sourceDocument: seedSource() });
+    const gproc = fakeGproc();
+    const first = await run([{ projectCode: CODE }], { gproc, enqueueEnrichment: undefined });
+    expect(first.run?.stats.torsUnchanged).toBe(1);
+    expect(gproc.zipCalls).toEqual([]);
+    expect(await EnrichmentJob.countDocuments()).toBe(1);
+    const second = await run([{ projectCode: CODE }], { gproc, enqueueEnrichment: undefined });
+    expect(second.run?.stats.torsUnchanged).toBe(1);
+    expect(await EnrichmentJob.countDocuments()).toBe(1);
+  });
+
   it("4. skips on a title hint that fails the gate, and on a lying hint", async () => {
     const gproc = fakeGproc();
     const { run: r } = await run([{ projectCode: CODE, title: "จ้างเหมาทำความสะอาด" }], { gproc });
