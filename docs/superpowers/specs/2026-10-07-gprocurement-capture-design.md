@@ -117,13 +117,15 @@ Out (separate work):
 
 1. Existing TOR with this `projectCode` → count as already known; do nothing (the lifecycle refresh
    keeps it current).
-2. Skip-only pre-filter with the client's hint (agency allowlist and keyword gate): a hint that clearly fails
+2. Skip-only pre-filter with the client's hint (`CAPTURE_AGENCIES` and keyword gate): a hint that clearly fails
    both gates skips the project without calling process5 (a wrong or lying hint can only cause a skip, never
    a write). Without a hint, or when the hint passes, continue.
 3. `gproc.projectDetail(code)`: `null` → skipped (unknown to process5); error → failed (counts toward the
    breaker: 3 consecutive process5 errors stop the run, remaining codes reported as not processed).
-4. Agency allowlist (`parseAgencyAllowlist(INGEST_AGENCIES)` against the server's `deptName`/`deptSubName`): no
-   match → skipped. Software keyword gate (`looksSoftwareRelated(title + …)`): no match → skipped, the
+4. Agency filter: optional env `CAPTURE_AGENCIES` (comma list, default empty = allow all). Process5 names
+   differ from egp2's (`deptName` is the ministry-level body, `deptSubName` the unit), so `INGEST_AGENCIES`
+   is NOT reused; an entry matches when it is contained in `deptName` or `deptSubName`. No match → skipped.
+   The admin already filters by body in the process5 search. Software keyword gate (`looksSoftwareRelated(title + …)`): no match → skipped, the
    same gate discovery uses. (A skipped project is not stored; capturing it again re-checks it.)
 5. `gproc.announcements(...)` → `buildGprocProcurement` for `procurement`.
 6. Create the `Tor`: `title`, `agency`, `department`, `budget`/`referencePrice` where available,
@@ -146,16 +148,18 @@ plus one ~10 MB download only for a new, relevant project.
 
 ### TOR file selection (`torFromBundle`)
 
-- Read the zip central directory first; never extract anything else; ignore entries over a size cap.
-- Prefer an entry whose name matches `/^Attach_TOR/i` (case-insensitive, `.pdf`); if several, take the
-  largest; if none, no TOR (do not guess among `annoudoc_*`/`doc_*`).
-- File names inside the zip may be TIS-620 encoded; match on the ASCII part only.
-- A corrupt or encrypted zip → "missing" (never throws out of the project).
+- Read the zip central directory first; never extract anything else; ignore entries over a size cap (50 MB).
+- Candidates are `.pdf` entries (case-insensitive). Prefer a name matching `/^Attach_TOR/i`; otherwise any
+  `.pdf` whose name contains `TOR` (`/TOR/i`, matched on the base name only). If several match, take the
+  largest. If none, there is no TOR (never guess among `annoudoc_*` / `doc_*`).
+- File names inside the zip may be TIS-620 encoded; matching uses the ASCII part only.
+- A corrupt or encrypted zip → no TOR file (never throws out of the project).
+- Dependency: `fflate` (pure JS, no native build) for listing and reading single entries.
 
 ### Source-aware original link
 
 `sourceListingUrl` (what the "ดูประกาศต้นฉบับที่ e-GP" button uses) is computed by the backend on the
-public detail from the stored datasource:
+public TOR detail (`GET /api/tors/:id`, the only place the button is shown) from the stored datasource:
 - `procurement.source === "gproc"` → the process5 project page for the `projectCode`;
 - otherwise → the stored egp2 `sourceListingUrl`, as today.
 
@@ -164,9 +168,8 @@ listing URL, so the button now appears for it too. The link follows the last sto
 back to egp2 flips it; accepted).
 - The process5 link is `https://process5.gprocurement.go.th/egp-agpc01-web/announcement?keywordSearch=<projectCode>`
   (the search page with the project number as the keyword), built in one place (`gprocProjectUrl(projectCode)`).
-  **Open:** the page has no known per-project URL; whether `keywordSearch=<number>` pre-fills and runs the search
-  has to be confirmed in a browser (it may need Turnstile once). If a real project-page URL turns up, only
-  `gprocProjectUrl` changes.
+  Confirmed by the user in a browser: it lists the project, and the user then presses "ดูข้อมูล" to open
+  it (the page has no per-project URL). If a real project-page URL turns up, only `gprocProjectUrl` changes.
 
 ### Data model
 
@@ -205,12 +208,10 @@ back to egp2 flips it; accepted).
 ## Open items (need input or a spike)
 
 1. ~~Search-results sample~~ received (see Findings); it becomes the parser fixture.
-2. **Original-link URL:** confirm `…/announcement?keywordSearch=<projectCode>` opens the right project in a
-   browser, or capture the real project-page URL (see "Source-aware original link").
+2. ~~Original-link URL~~ confirmed (see "Source-aware original link").
 3. **Cookie from the extension:** verify `HttpOnly; SameSite=Lax` works from the worker; else add the
    admin-generated token.
-4. **TOR file names in bundles:** confirm `Attach_TOR_*` across several projects; collect any other
-   naming seen in production logs.
+4. ~~TOR file names~~ decided: `Attach_TOR*` first, else any PDF containing `TOR` (see "TOR file selection").
 5. **Draft vs published bundle:** confirm the draft bundle stays downloadable after the invitation is out.
 6. **Cloud Run request time:** the background run is in-process like the other admin runs; confirm the
    same pattern is acceptable for ~100 projects (a few minutes of downloads) or cap the batch lower.
