@@ -70,7 +70,7 @@ function sdkStatusFromMessage(message: unknown): number {
 const timeOf = (a: IProcurementAnnouncement): number => a.publishedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
 
 /** Latest invitation (file or not, like stage derivation); on equal dates the later one in stored order wins. */
-function latestInvitation(p: IProcurement): IProcurementAnnouncement | null {
+export function latestInvitation(p: IProcurement): IProcurementAnnouncement | null {
   return p.announcements
     .filter((a) => a.kind === "invitation")
     .reduce<IProcurementAnnouncement | null>((best, a) => (best === null || timeOf(a) >= timeOf(best) ? a : best), null);
@@ -108,6 +108,8 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
     }
   }
   if (!file) {
+    // process5 may simply not have the bundle yet: a loader that returns nothing never clears a stored deadline.
+    if (invitation.hasFile && args.loadPdf) return "skipped";
     if (attemptedThis) return "skipped"; // re-check of a month-only deadline: file gone, keep what we have
     // The current invitation has no readable file (yet). A deadline read from an OLDER invitation
     // is stale, so clear it; no attempt is recorded, so the read happens once the file appears.

@@ -702,6 +702,51 @@ describe("refreshLifecycle with process5", () => {
       expect(out.failed).toBe(0);
     });
 
+    it("keeps a stored invitation-pdf deadline when process5 has no bundle for the invitation", async () => {
+      const old = { date: new Date("2026-10-15T09:00:00Z"), source: "invitation-pdf" as const, extractedAt: new Date("2026-09-30") };
+      const tor = await seedCode({
+        sourceListingUrl: listing("g7b"),
+        procurement: {
+          stage: "inviting",
+          announcements: [{ announcementId: "egp2-uuid-inv", kind: "invitation", hasFile: true, publishedAt: new Date("2026-09-30") }],
+          bidDeadline: old,
+          deadlineAttempt: { announcementId: "egp2-uuid-inv", at: new Date("2026-09-30"), outcome: "read" },
+          lastCheckedAt: new Date("2026-09-01"),
+        },
+      });
+      const calls: string[] = [];
+      await refreshLifecycle(deps(fakeClient(), { gprocClient: fakeGproc({ rows: invitingRows, pdf: null }), deadlineExtractor: extractor(calls), storage }));
+      expect(calls).toHaveLength(0);
+      const saved = (await Tor.findById(tor.id).lean())?.procurement;
+      expect(saved?.bidDeadline?.date).toEqual(old.date);
+      expect(saved?.deadlineAttempt?.announcementId).toBe("egp2-uuid-inv");
+    });
+
+    it("does not re-read the egp2 PDF or touch the deadline when falling back for a TOR read from process5", async () => {
+      const good = { date: new Date("2026-10-20T05:00:00Z"), source: "invitation-pdf" as const, extractedAt: new Date("2026-10-06") };
+      const tor = await seedCode({
+        sourceListingUrl: listing("g9"),
+        procurement: {
+          stage: "inviting",
+          source: "gproc",
+          announcements: [{ announcementId: "gproc-D0-20261006", kind: "invitation", hasFile: true, publishedAt: new Date("2026-10-06") }],
+          bidDeadline: good,
+          deadlineAttempt: { announcementId: "gproc-D0-20261006", at: new Date("2026-10-06"), outcome: "read" },
+          lastCheckedAt: new Date("2026-09-01"),
+        },
+      });
+      const calls: string[] = [];
+      const egp = fakeClient({ announcements: { g9: [TOR_DRAFT("g9"), INVITATION("g9")] } });
+      const out = await refreshLifecycle(deps(egp, { gprocClient: fakeGproc({ detail: new Error("gprocurement 403") }), deadlineExtractor: extractor(calls), storage }));
+      expect(egp.detailCalls).toEqual(["g9"]);
+      expect(calls).toHaveLength(0);
+      expect(out.failed).toBe(0);
+      const saved = (await Tor.findById(tor.id).lean())?.procurement;
+      expect(saved?.bidDeadline?.date).toEqual(good.date);
+      expect(saved?.deadlineAttempt?.announcementId).toBe("gproc-D0-20261006");
+      expect(await SystemLog.countDocuments({ ingestionRunId: out.runId, message: /^open TOR / })).toBe(0);
+    });
+
     it("a PDF download error is a per-TOR deadline error, not a failed refresh", async () => {
       await seedCode({ sourceListingUrl: listing("g8") });
       const out = await refreshLifecycle(deps(fakeClient(), { gprocClient: fakeGproc({ rows: invitingRows, pdf: new Error("gprocurement 503") }), deadlineExtractor: extractor([]), storage }));

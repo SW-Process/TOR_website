@@ -524,15 +524,17 @@ describe("runDeadlineStep with a PDF loader (process5)", () => {
     expect(saved?.bidDeadline?.source).toBe("invitation-pdf");
   });
 
-  it("clears a stale AI deadline and reads nothing when the loader has no PDF", async () => {
+  it("keeps a stored AI deadline, records no attempt and reads nothing when the loader has no PDF", async () => {
     const stale = { date: new Date("2026-10-10T16:59:00Z"), source: "invitation-pdf" as const, extractedAt: PUBLISHED };
     const p = gprocProcurement({ bidDeadline: stale, deadlineAttempt: { announcementId: "old-egp2-id", at: PUBLISHED, outcome: "read" } });
     const tor = await seed(p);
     const h = harness();
     const out = await runDeadlineStep({ ...args(p, tor._id), loadPdf: async () => null }, h);
-    expect(out).toBe("cleared");
+    expect(out).toBe("skipped");
     expect(h.extractCalls).toHaveLength(0);
-    expect(((await Tor.findById(tor._id).lean())?.procurement?.bidDeadline ?? null)).toBeNull();
+    const saved = (await Tor.findById(tor._id).lean())?.procurement;
+    expect(saved?.bidDeadline?.date).toEqual(stale.date);
+    expect(saved?.deadlineAttempt?.announcementId).toBe("old-egp2-id");
   });
 
   it("does not call the loader for an invitation flagged without a file", async () => {

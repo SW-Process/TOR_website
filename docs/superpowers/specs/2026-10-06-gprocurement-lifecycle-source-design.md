@@ -155,6 +155,10 @@ process5 are not stored in v1).
 
 ## Open items
 
+- **Fallback flapping**: when process5 fails and the run falls back to egp2 for a TOR whose stored
+  `deadlineAttempt.announcementId` starts with `gproc-`, the deadline step is skipped for that TOR (the
+  egp2 invitation id differs and could overwrite a good process5 deadline). A process5 loader that
+  returns no PDF never clears a stored deadline either.
 - **First-run re-read**: the first process5 run re-reads each invitation once, because the invitation
   ids change (`gproc-…` instead of the egp2 uuid); the existing deadline is kept until that read
   succeeds, and `MAX_DEADLINE_EXTRACTIONS_PER_RUN` bounds the spend.

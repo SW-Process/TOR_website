@@ -18,7 +18,7 @@ import {
   maxDeadlineExtractionsPerRun,
   maxLifecycleRefreshPerRun,
 } from "./candidates";
-import { runDeadlineStep } from "./deadlineStep";
+import { latestInvitation, runDeadlineStep } from "./deadlineStep";
 import type { DeadlineStepOutcome } from "./deadlineStep";
 import { loadFreshProcurement } from "./loadFresh";
 
@@ -115,9 +115,10 @@ export async function refreshLifecycle(
 
   await sweepStaleRuns("lifecycle");
 
+  const candidateFilter = lifecycleFilter({ gproc: Boolean(gproc) });
   // A missing lastCheckedAt sorts before any date, so never-checked TORs come first.
   const tors = await Tor.find(
-    deps.torIds ? { $and: [lifecycleFilter({ gproc: Boolean(gproc) }), { _id: { $in: [...deps.torIds] } }] } : lifecycleFilter({ gproc: Boolean(gproc) })
+    deps.torIds ? { $and: [candidateFilter, { _id: { $in: [...deps.torIds] } }] } : candidateFilter
   )
     .sort({ "procurement.lastCheckedAt": 1, _id: 1 })
     .limit(cap)
@@ -229,8 +230,16 @@ export async function refreshLifecycle(
             if (didChange) changed += 1;
             else unchanged += 1;
 
-            if (extractor && storage && deadlinesRead + deadlinesUnreadable + deadlinesFailed < deadlineCap) {
+            // Fell back to egp2 for a TOR whose deadline was read from process5: the egp2 invitation has a
+            // different id, so re-reading it could overwrite a good deadline. Leave the deadline alone.
+            const keepGprocDeadline =
+              loaded.source === "egp2" && Boolean(tor.procurement?.deadlineAttempt?.announcementId?.startsWith("gproc-"));
+            if (keepGprocDeadline) {
+              // nothing to do
+            } else if (extractor && storage && deadlinesRead + deadlinesUnreadable + deadlinesFailed < deadlineCap) {
               const tally = bySource[loaded.source];
+              let stepOutcome: DeadlineStepOutcome | "error";
+              let stepError: Error | undefined;
               try {
                 const outcome = await runDeadlineStep(
                   {
@@ -257,8 +266,10 @@ export async function refreshLifecycle(
                     ingestionRunId: runId,
                   });
                 }
-                await logOpenTorDeadline(tor, merged, loaded.source, outcome);
+                stepOutcome = outcome;
               } catch (err) {
+                stepOutcome = "error";
+                stepError = err as Error;
                 deadlinesFailed += 1;
                 tally.errors += 1;
                 await logIngestionEvent({
@@ -268,10 +279,14 @@ export async function refreshLifecycle(
                   context: { torId: String(tor._id), stack: (err as Error).stack },
                   ingestionRunId: runId,
                 });
-                await logOpenTorDeadline(tor, merged, loaded.source, "error", err as Error);
               }
+              await logOpenTorDeadline(tor, merged, loaded.source, stepOutcome, stepError);
             } else if (merged.stage === "inviting" && extractor && storage) {
-              await logOpenTorDeadline(tor, merged, loaded.source, "capped");
+              // only a TOR that would really have been read (no attempt for its latest invitation yet)
+              const inv = latestInvitation(merged);
+              if (inv && merged.deadlineAttempt?.announcementId !== inv.announcementId) {
+                await logOpenTorDeadline(tor, merged, loaded.source, "capped");
+              }
             }
           }
         }
