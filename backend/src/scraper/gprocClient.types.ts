@@ -7,6 +7,11 @@ export interface GprocProjectDetail {
   announceType: string | null;
   methodId: string | null;
   stepId: string | null;
+  projectName?: string | null;
+  deptName?: string | null;
+  deptSubName?: string | null;
+  budgetYear?: string | null;
+  projectMoney?: number | null;
 }
 
 /** One row of the "ดูข้อมูล" announcement list (`greenBook`). */
@@ -15,6 +20,7 @@ export interface GprocAnnouncement {
   /** ISO instant, e.g. "2026-10-05T17:00:00.000Z" (= 6 Oct in Bangkok). */
   announceDate: string | null;
   announceFlag: string | null;
+  priceBuild?: number | null;
 }
 
 export interface GprocClientLike {
@@ -23,4 +29,18 @@ export interface GprocClientLike {
   announcements(projectId: string, detail: GprocProjectDetail): Promise<GprocAnnouncement[]>;
   /** The signed invitation PDF, or null when the project has none (yet). */
   invitationPdf(projectId: string): Promise<Buffer | null>;
+}
+
+export interface GprocBundle {
+  zipId: string;
+  /** e.g. "69099312832_23092569.zip" (the bundle's date is in the name). */
+  name: string | null;
+}
+
+/** The extra calls the capture run needs (the lifecycle refresh does not). */
+export interface GprocCaptureClientLike extends GprocClientLike {
+  /** `draft: true` asks for the pre-invitation bundle (Temp endpoint), otherwise the published one. Null when none. */
+  documentBundle(projectId: string, opts: { draft: boolean }): Promise<GprocBundle | null>;
+  /** The zip bytes. Throws when larger than `maxBytes` or not a zip. */
+  downloadBundle(zipId: string, maxBytes: number): Promise<Buffer>;
 }
