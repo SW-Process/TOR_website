@@ -117,8 +117,8 @@ Out (separate work):
 
 1. Existing TOR with this `projectCode` → count as already known; do nothing (the lifecycle refresh
    keeps it current).
-2. Skip-only pre-filter with the client's hint (`CAPTURE_AGENCIES` and keyword gate): a hint that clearly fails
-   both gates skips the project without calling process5 (a wrong or lying hint can only cause a skip, never
+2. Skip-only pre-filter with the client's hint (`CAPTURE_AGENCIES` and keyword gate): a hint that fails either gate
+   skips the project without calling process5 (a wrong or lying hint can only cause a skip, never
    a write). Without a hint, or when the hint passes, continue.
 3. `gproc.projectDetail(code)`: `null` → skipped (unknown to process5); error → failed (counts toward the
    breaker: 3 consecutive process5 errors stop the run, remaining codes reported as not processed).
