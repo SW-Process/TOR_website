@@ -104,6 +104,20 @@ Nothing about month-only deadlines, admin override, caps or error classification
   the TOR (not the run) on repeated errors. Calls per TOR: 2 for the stage check, plus 2 only when a
   deadline read is needed.
 
+### Reporting (what the run says about its sources)
+
+The run's `outcomeSummary` (shown on the admin card) and `SystemLog` must make the source visible:
+
+- Stage source: `process5 ok N, fell back to BMA portal M (project unknown to process5 A, process5 error B)`.
+  Appended only when process5 is in use; with it off the summary is exactly today's string.
+- Bid deadlines: the existing totals plus a per-source breakdown
+  `(process5 read a, unreadable b, errors c; BMA portal read …)`.
+- One log line per **open (inviting) TOR** that had a deadline attempt: `open TOR <code>: bid deadline from
+  process5|BMA portal: read ok (day|month only <date>) | PDF read but no deadline found | failed (<reason>) |
+  not attempted (cap reached)`. Failures are `warning`, the rest `info`. TORs already read for their current
+  invitation produce no line.
+- Each process5 failure already logs a `warning` naming the TOR (fallback reason).
+
 ### Candidate selection
 
 Today a TOR is a lifecycle candidate only if it has a `sourceListingUrl` (needed to recover the egp2

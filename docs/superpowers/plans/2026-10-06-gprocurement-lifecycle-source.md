@@ -31,6 +31,7 @@
 - Announcement ids contain no `:` (Windows-safe storage key) (Task 2 test).
 - After the source switch every candidate's latest invitation id changes, so each is re-read once from process5; that is bounded by `MAX_DEADLINE_EXTRACTIONS_PER_RUN` and must not wipe the existing deadline before the new read succeeds (Task 4 test).
 - The suite never calls the real network (Task 4 step: `jest.setup.js`).
+- The admin can tell, per run, how many TORs process5 answered vs fell back to the BMA portal (project unknown vs error), and for each open TOR which source gave its bid deadline and whether the read worked; with process5 off the summary string is unchanged (Task 4 tests).
 
 ---
 
@@ -792,7 +793,8 @@ git commit -m "refactor(backend): let the deadline step read the invitation PDF 
 **Interfaces:**
 - Consumes: `GprocClientLike`, `gprocEnabled`, `gprocConfigFromEnv`, `GprocClient` (Task 1); `buildGprocProcurement` (Task 2); `LoadedInvitationPdf`, `DeadlineStepArgs.loadPdf` (Task 3).
 - Produces:
-  - `loadFreshProcurement(args: { tor: LoadFreshTor; egp: EgpClientLike; gproc?: GprocClientLike; now: () => Date; warn: (message: string) => Promise<void> }): Promise<FreshProcurement | "skip">`
+  - `type GprocAttempt = "ok" | "not-found" | "error"`
+  - `loadFreshProcurement(args: { tor: LoadFreshTor; egp: EgpClientLike; gproc?: GprocClientLike; now: () => Date; warn: (message: string) => Promise<void>; report?: (attempt: GprocAttempt) => void }): Promise<FreshProcurement | "skip">` — `report` is called exactly once per TOR for which process5 was asked (never when `gproc` is absent or the TOR has no 11-digit code).
   - `interface FreshProcurement { fresh: IProcurement; source: "gproc" | "egp2"; filenames?: Map<string, string>; loadPdf?: (inv: IProcurementAnnouncement) => Promise<LoadedInvitationPdf | null> }`
   - `RefreshLifecycleDeps.gprocClient?: GprocClientLike` (default: a real client when `gprocEnabled()`, otherwise none).
   - `lifecycleFilter(opts?: { gproc?: boolean })` (default `gprocEnabled()`).
@@ -1040,6 +1042,8 @@ import { buildProcurement } from "../procurementStage";
 import { projectIdFromListingUrl } from "./candidates";
 import type { LoadedInvitationPdf } from "./deadlineStep";
 
+export type GprocAttempt = "ok" | "not-found" | "error";
+
 export interface LoadFreshTor {
   projectCode?: string | null;
   sourceListingUrl?: string | null;
@@ -1066,8 +1070,10 @@ export async function loadFreshProcurement(args: {
   gproc?: GprocClientLike;
   now: () => Date;
   warn: (message: string) => Promise<void>;
+  /** Called once when process5 was asked: it answered, did not know the project, or failed. */
+  report?: (attempt: GprocAttempt) => void;
 }): Promise<FreshProcurement | "skip"> {
-  const { tor, egp, gproc, now, warn } = args;
+  const { tor, egp, gproc, now, warn, report } = args;
   const code = tor.projectCode ?? undefined;
 
   if (gproc && code && /^\d{11}$/.test(code)) {
@@ -1081,6 +1087,7 @@ export async function loadFreshProcurement(args: {
           tor.procurement?.contractStatus,
           now()
         );
+        report?.("ok");
         for (const c of unknownCodes) await warn(`TOR ${code}: unknown process5 announce type "${c}" (treated as unknown)`);
         return {
           fresh: procurement,
@@ -1091,7 +1098,9 @@ export async function loadFreshProcurement(args: {
           },
         };
       }
+      report?.("not-found");
     } catch (err) {
+      report?.("error");
       await warn(`TOR ${code}: process5 failed (${(err as Error).message}); using the BMA portal instead`);
     }
   }
@@ -1145,6 +1154,9 @@ and change the TOR query to `lifecycleFilter({ gproc: Boolean(gproc) })` (both o
           now,
           warn: (message) =>
             logIngestionEvent({ severity: "warning", message, component: COMPONENT, ingestionRunId: runId }),
+          report: (attempt) => {
+            gprocStage[attempt] += 1;
+          },
         });
         if (loaded === "skip") {
           skipped += 1;
@@ -1171,6 +1183,7 @@ and change the TOR query to `lifecycleFilter({ gproc: Boolean(gproc) })` (both o
             else unchanged += 1;
 
             if (extractor && storage && deadlinesRead + deadlinesUnreadable + deadlinesFailed < deadlineCap) {
+              const tally = bySource[loaded.source];
               try {
                 const outcome = await runDeadlineStep(
                   {
@@ -1183,16 +1196,132 @@ and change the TOR query to `lifecycleFilter({ gproc: Boolean(gproc) })` (both o
                   },
                   { client, storage, extractor, now }
                 );
-                /* the existing outcome handling (read / unreadable / conflict) and the catch block stay exactly as they are */
+                /* the existing outcome handling stays, and each counter bump also bumps `tally`
+                   (read → tally.read, unreadable → tally.unreadable); the catch block also does tally.errors += 1 */
+                await logOpenTorDeadline(tor, merged, loaded.source, outcome);
               } catch (err) {
-                /* unchanged */
+                /* unchanged, plus tally.errors += 1 and: */
+                await logOpenTorDeadline(tor, merged, loaded.source, "error", err as Error);
               }
+            } else if (merged.stage === "inviting" && extractor && storage) {
+              await logOpenTorDeadline(tor, merged, loaded.source, "capped");
             }
           }
         }
 ```
 
-The `/* … */` markers stand for the existing, unchanged `if (outcome === "read") …` chain and `catch` body already in the file; keep them verbatim. Update the function's doc comment: "…decides the stage from the national e-GP (process5) with the BMA portal as fallback".
+The `/* … */` markers stand for the existing `if (outcome === "read") …` chain and `catch` body already in the file; keep them and add only the tally bumps and `logOpenTorDeadline` calls described in them. Update the function's doc comment: "…decides the stage from the national e-GP (process5) with the BMA portal as fallback".
+
+**Reporting (what the admin sees).** Next to the existing counters (`let deadlinesRead = 0; …`) add:
+
+```ts
+  const gprocStage = { ok: 0, "not-found": 0, error: 0 };
+  const emptyTally = () => ({ read: 0, unreadable: 0, errors: 0 });
+  const bySource = { gproc: emptyTally(), egp2: emptyTally() };
+  const SOURCE_LABEL = { gproc: "process5", egp2: "BMA portal" } as const;
+
+  /** One info line per open (inviting) TOR: which source gave its bid deadline, and whether it worked. */
+  const logOpenTorDeadline = async (
+    tor: { _id: Types.ObjectId; projectCode?: string | null },
+    merged: IProcurement,
+    source: "gproc" | "egp2",
+    outcome: DeadlineStepOutcome | "error" | "capped",
+    err?: Error
+  ) => {
+    if (merged.stage !== "inviting") return;
+    if (outcome === "skipped") return; // already read for this invitation: nothing happened this run
+    const label = tor.projectCode ?? String(tor._id);
+    let text: string;
+    if (outcome === "read" || outcome === "cleared") {
+      const saved = await Tor.findById(tor._id).select("procurement.bidDeadline").lean();
+      const d = saved?.procurement?.bidDeadline;
+      text = d ? `read ok, ${d.precision === "month" ? "month only" : "day"} ${d.date.toISOString()}` : "no deadline stored";
+    } else if (outcome === "unreadable") text = "PDF read but no deadline found";
+    else if (outcome === "conflict") text = "not stored (TOR changed meanwhile), retry next run";
+    else if (outcome === "capped") text = "not attempted (MAX_DEADLINE_EXTRACTIONS_PER_RUN reached)";
+    else text = `failed (${err?.message ?? "error"})`;
+    await logIngestionEvent({
+      severity: outcome === "error" ? "warning" : "info",
+      message: `open TOR ${label}: bid deadline from ${SOURCE_LABEL[source]}: ${text}`,
+      component: COMPONENT,
+      ingestionRunId: runId,
+    });
+  };
+```
+
+(import `DeadlineStepOutcome` from `./deadlineStep`; `Types`, `Tor`, `IProcurement` are already imported in the file.) Define `logOpenTorDeadline` after `runId` exists (it uses it).
+
+Replace the summary construction (`deadlineSummary` / `outcomeSummary`) with the following. **When process5 is not in use (`gproc` undefined) the string must stay byte-identical to today's**, because existing tests compare it exactly:
+
+```ts
+    const t = bySource;
+    const bySourceText = (s: "gproc" | "egp2") =>
+      `${SOURCE_LABEL[s]} read ${t[s].read}, unreadable ${t[s].unreadable}, errors ${t[s].errors}`;
+    const deadlineSummary =
+      deadlinesRead + deadlinesUnreadable + deadlinesFailed > 0
+        ? `; bid deadlines: read ${deadlinesRead}, unreadable ${deadlinesUnreadable}, errors ${deadlinesFailed}` +
+          (gproc ? ` (${bySourceText("gproc")}; ${bySourceText("egp2")})` : "")
+        : "";
+    const fellBack = gprocStage["not-found"] + gprocStage.error;
+    const stageSummary = gproc
+      ? `; stage source: process5 ok ${gprocStage.ok}, fell back to BMA portal ${fellBack} (project unknown to process5 ${gprocStage["not-found"]}, process5 error ${gprocStage.error})`
+      : "";
+    const outcomeSummary = `checked ${tors.length}, changed ${changed}, unchanged ${unchanged}, skipped ${skipped}, failed ${failed}${stageSummary}${deadlineSummary}`;
+```
+
+Existing `outcomeSummary` assertions (`"checked 1, changed 1, …, failed 0"`, the exact deadline one) keep passing because those tests inject no `gprocClient` and jest sets `GPROC_ENABLED=false`. The admin card already prints `outcomeSummary` verbatim, so no frontend change is needed.
+
+Additional tests (add to the `"refreshLifecycle with process5"` describe):
+
+```ts
+  it("reports how many TORs process5 answered and how many fell back (unknown project vs error)", async () => {
+    await seedCode({ sourceListingUrl: listing("r1") });
+    await Tor.create({ title: "b", projectCode: "69099318021", pipelineStatus: "enriched", sourceContentHash: "h2", sourceListingUrl: listing("r2") });
+    await Tor.create({ title: "c", projectCode: "69099318022", pipelineStatus: "enriched", sourceContentHash: "h3", sourceListingUrl: listing("r3") });
+    const g = fakeGproc();
+    const origDetail = g.projectDetail.bind(g);
+    g.projectDetail = async (id: string) => {
+      if (id === "69099318021") return null; // unknown to process5
+      if (id === "69099318022") throw new Error("gprocurement 403");
+      return origDetail();
+    };
+    const out = await refreshLifecycle(deps(fakeClient(), { gprocClient: g }));
+    const summary = (await IngestionRun.findById(out.runId).lean())?.outcomeSummary ?? "";
+    expect(summary).toContain("stage source: process5 ok 1, fell back to BMA portal 2 (project unknown to process5 1, process5 error 1)");
+  });
+
+  it("logs, for an open TOR, the source of its bid deadline and whether the read worked", async () => {
+    await seedCode({ sourceListingUrl: listing("r4") });
+    const extractor = { async extractBidDeadline() { return { date: "2026-10-20", time: "12:00", confidence: 0.95 }; } };
+    const storage = { async put(key: string) { return { key, size: 1 }; } } as unknown as BlobStorage;
+    const g = fakeGproc({
+      rows: [{ announceType: "D0", announceDate: "2026-10-05T17:00:00.000Z", announceFlag: "A" }],
+      detail: { projectId: CODE, projectStatus: "A", announceType: "B0", methodId: "16", stepId: "M03" },
+    });
+    const out = await refreshLifecycle(deps(fakeClient(), { gprocClient: g, deadlineExtractor: extractor, storage }));
+    const line = await SystemLog.findOne({ ingestionRunId: out.runId, message: /^open TOR /i }).lean();
+    expect(line?.message).toContain(CODE);
+    expect(line?.message).toContain("from process5: read ok");
+    expect((await IngestionRun.findById(out.runId).lean())?.outcomeSummary).toContain("(process5 read 1, unreadable 0, errors 0; BMA portal read 0, unreadable 0, errors 0)");
+  });
+
+  it("an open TOR whose process5 PDF download fails is logged as a failure from process5", async () => {
+    await seedCode({ sourceListingUrl: listing("r5") });
+    const extractor = { async extractBidDeadline() { return null; } };
+    const storage = { async put(key: string) { return { key, size: 1 }; } } as unknown as BlobStorage;
+    const g = fakeGproc({
+      rows: [{ announceType: "D0", announceDate: "2026-10-05T17:00:00.000Z", announceFlag: "A" }],
+      detail: { projectId: CODE, projectStatus: "A", announceType: "B0", methodId: "16", stepId: "M03" },
+      pdf: new Error("gprocurement 503"),
+    });
+    const out = await refreshLifecycle(deps(fakeClient(), { gprocClient: g, deadlineExtractor: extractor as any, storage }));
+    const line = await SystemLog.findOne({ ingestionRunId: out.runId, message: /^open TOR / }).lean();
+    expect(line?.severity).toBe("warning");
+    expect(line?.message).toContain("from process5: failed (gprocurement 503)");
+  });
+```
+
+Run the same jest command as Step 2 after wiring; these three plus the earlier ones must pass.
 
 - [ ] **Step 6: Config and docs**
 
