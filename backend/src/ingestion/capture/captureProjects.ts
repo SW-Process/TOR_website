@@ -115,7 +115,7 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
         return { kind: "known", note: "source document attached, queued for enrichment" };
       }
       // (b) summarised from the invitation only: look for the real TOR file and re-queue under a new hash.
-      if (doc?.kind === "invitation" && existing.pipelineStatus !== "processing") {
+      if (doc?.kind === "invitation" && (existing.pipelineStatus === "enriched" || existing.pipelineStatus === "pending")) {
         let upgraded = false;
         try {
           upgraded = await attachTorFromBundle(existing, code);
@@ -198,7 +198,7 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
     await log(out.kind === "failed" ? "warning" : "info", `capture ${p.projectCode}: ${out.kind}${out.note ? ` (${out.note})` : ""}`);
     if (!paused && consecutiveErrors >= BREAKER) {
       paused = true;
-      await log("warning", `process5 paused after ${BREAKER} consecutive errors; the rest of this run is not processed`);
+      await log("warning", `process5 paused after ${BREAKER} consecutive errors`);
     }
     await IngestionRun.updateOne(
       { _id: runId },

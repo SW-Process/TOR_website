@@ -149,7 +149,7 @@ describe("captureProjects", () => {
     expect(r?.stats.torsUnchanged).toBe(1);
 
     await Tor.deleteMany({});
-    await seedTor({ pipelineStatus: "rejected" });
+    await seedTor({ pipelineStatus: "rejected", sourceDocument: seedSource({ storageKey: `tor-pdfs/${CODE}/invitation.pdf`, kind: "invitation" }) });
     const g2 = fakeGproc();
     const o2 = await run([{ projectCode: CODE }], { gproc: g2 });
     expect(g2.zipCalls).toEqual([]);
@@ -194,6 +194,21 @@ describe("captureProjects", () => {
     expect(o2.enq).not.toHaveBeenCalled();
     expect(o2.run?.stats.torsUnchanged).toBe(1);
     expect(g2.invitationCalls).toBe(0);
+  });
+
+  it.each(["rejected", "failed", "processing"] as const)("3b. never upgrades an invitation-sourced %s TOR", async (status) => {
+    await seedTor({ pipelineStatus: status, sourceDocument: seedSource({ storageKey: `tor-pdfs/${CODE}/invitation.pdf`, kind: "invitation" }) });
+    const gproc = fakeGproc();
+    const { run: r, enq } = await run([{ projectCode: CODE }], { gproc });
+    const tor = (await Tor.findOne({ projectCode: CODE }))!;
+    expect(gproc.zipCalls).toEqual([]);
+    expect(gproc.detailCalls).toEqual([]);
+    expect(gproc.invitationCalls).toBe(0);
+    expect(enq).not.toHaveBeenCalled();
+    expect(tor.sourceDocument?.kind).toBe("invitation");
+    expect(tor.sourceContentHash).toBe("old");
+    expect(tor.pipelineStatus).toBe(status);
+    expect(r?.stats.torsUnchanged).toBe(1);
   });
 
   it("4. skips on a title hint that fails the gate, and on a lying hint", async () => {
