@@ -31,6 +31,10 @@ describe("torFromBundle", () => {
     expect(torFromBundle(zip({ "files/Attach_TOR_2.pdf": pdf("t") }))?.name).toBe("files/Attach_TOR_2.pdf");
   });
 
+  it("matches on the base name after a backslash path separator", () => {
+    expect(torFromBundle(zip({ "files\\Attach_TOR_2.pdf": pdf("t"), "other_TOR_big.pdf": pdf("x".repeat(500)) }))?.name).toBe("files\\Attach_TOR_2.pdf");
+  });
+
   it("returns null when no entry looks like a TOR, never guessing among the others", () => {
     expect(torFromBundle(zip({ "annoudoc_1.pdf": pdf("a"), "doc_1.pdf": pdf("b"), "tor.txt": Buffer.from("not a pdf") }))).toBeNull();
   });

@@ -6,7 +6,7 @@ export interface BundleTor {
 }
 
 const DEFAULT_MAX_ENTRY_BYTES = 50 * 1024 * 1024;
-const baseName = (name: string): string => name.split(/[\/]/).pop() ?? name;
+const baseName = (name: string): string => name.split(/[\\/]/).pop() ?? name;
 
 /**
  * Pick the TOR draft PDF out of an e-GP document bundle and extract only that entry.
