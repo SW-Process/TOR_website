@@ -8,6 +8,8 @@ describe("looksSoftwareRelated", () => {
     "จัดหาระบบกล้องโทรทัศน์วงจรปิด CCTV",
     "Web application development for the district office",
     "จ้างที่ปรึกษาออกแบบสถาปัตยกรรมคลาวด์",
+    "จ้างบำรุงรักษาระบบเครือข่ายไร้สาย",
+    "Network equipment maintenance for the district office",
   ])("passes: %s", (text) => {
     expect(looksSoftwareRelated(text)).toBe(true);
   });
