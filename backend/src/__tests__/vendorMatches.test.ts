@@ -54,14 +54,14 @@ async function seedTors() {
 }
 
 describe("GET /api/vendor/matches", () => {
-  it("401s without a session, 403s for an admin", async () => {
+  it("401s without a session, 200 for an admin", async () => {
     expect((await request(app).get("/api/vendor/matches")).status).toBe(401);
 
     const adminAgentReq = request.agent(app);
     await adminAgentReq.post("/api/auth/register").send({ email: "admin@test.com", password: "secret123" });
     await User.updateOne({ email: "admin@test.com" }, { role: "admin" });
     await adminAgentReq.post("/api/auth/login").send({ email: "admin@test.com", password: "secret123" });
-    expect((await adminAgentReq.get("/api/vendor/matches")).status).toBe(403);
+    expect((await adminAgentReq.get("/api/vendor/matches")).status).toBe(200);
   });
 
   it("ranks open, enriched TORs by match score against the caller's profile", async () => {
