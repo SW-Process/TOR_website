@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import TORCard from "./TORCard";
 import { categories, formatBudget } from "@/lib/mockData";
@@ -22,6 +23,8 @@ import {
   PAGE_SIZE,
   PROJECT_TYPE_LABELS,
   PROJECT_TYPES,
+  parseTorFilters,
+  searchParamsToRaw,
   STATUSES,
   toApiParams,
   toUrlParams,
@@ -105,8 +108,13 @@ const TECH_QUICK_PICKS = 8;
 /** Wait this long after the last keystroke before re-querying the backend. */
 const SEARCH_DEBOUNCE_MS = 300;
 
-export default function TORExplorer({ initialFilters }: { initialFilters: TorFilters }) {
-  const [filters, setFiltersState] = useState<TorFilters>(initialFilters);
+export default function TORExplorer() {
+  // Start from the URL, not from what the server rendered: on Back, Next restores this page
+  // from its cache as first rendered (often a bare /tor), while the URL — kept in sync below —
+  // already holds the filters the user picked. Starting from the cached render wiped them, and
+  // the sync effect then rewrote the URL to match.
+  const searchParams = useSearchParams();
+  const [filters, setFiltersState] = useState<TorFilters>(() => parseTorFilters(searchParamsToRaw(searchParams)));
   // Any filter or sort change starts again from page 1; only goToPage keeps it.
   const setFilters = (next: (f: TorFilters) => TorFilters) =>
     setFiltersState((f) => ({ ...next(f), page: 1 }));
@@ -162,6 +170,18 @@ export default function TORExplorer({ initialFilters }: { initialFilters: TorFil
     const next = urlQuery ? `?${urlQuery}` : window.location.pathname;
     window.history.replaceState(null, "", next);
   }, [urlQuery]);
+
+  // Back/Forward between two /tor entries can keep this component mounted, so re-read the
+  // filters from the URL the browser landed on. Only on popstate: the replaceState above
+  // never fires it, so typing can't be reset by a lagging URL.
+  useEffect(() => {
+    function onPopState() {
+      if (window.location.pathname !== "/tor") return;
+      setFiltersState(parseTorFilters(searchParamsToRaw(new URLSearchParams(window.location.search))));
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   // One backend query: every filter + sort + page (FR-2, FR-7).
   const apiQuery = toApiParams(filters).toString();

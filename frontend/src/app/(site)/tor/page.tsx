@@ -10,5 +10,6 @@ export default async function TORPage({
 
   // Keyed by the filters so a real navigation to a different /tor?… (e.g. the
   // header's "ใกล้ปิดรับ" link while already here) remounts with the new state.
-  return <TORExplorer key={toUrlParams(filters).toString()} initialFilters={filters} />;
+  // TORExplorer reads the filters themselves from the URL (see there).
+  return <TORExplorer key={toUrlParams(filters).toString()} />;
 }
