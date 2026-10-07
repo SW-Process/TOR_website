@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Building2, Eye } from "lucide-react";
-import { TOR, formatBudget } from "@/lib/mockData";
-import { statusNote } from "@/lib/torStatus";
+import { TOR } from "@/lib/mockData";
+import { statusNote, torPriceText } from "@/lib/torStatus";
 import StatusBadge from "./StatusBadge";
 import BookmarkButton from "./BookmarkButton";
 import HideTorButton, { HideableCard } from "./HideTorButton";
@@ -55,7 +55,7 @@ export default function TORCard({
         <div className="mt-auto flex items-end justify-between gap-3 pt-3 border-t border-[var(--color-border)]">
           <div>
             <p className="font-[family-name:var(--font-heading)] text-lg font-extrabold text-[var(--color-rose-dark)]">
-              {formatBudget(tor.budget)}
+              {torPriceText(tor)}
             </p>
             <p
               className={`text-xs font-medium ${

@@ -1,6 +1,6 @@
-import type { GprocAnnouncement, GprocBundle, GprocCaptureClientLike, GprocClientLike, GprocProjectDetail } from "./gprocClient.types";
+import type { GprocAnnouncement, GprocBundle, GprocCaptureClientLike, GprocClientLike, GprocMoney, GprocProjectDetail } from "./gprocClient.types";
 
-export type { GprocAnnouncement, GprocBundle, GprocCaptureClientLike, GprocClientLike, GprocProjectDetail } from "./gprocClient.types";
+export type { GprocAnnouncement, GprocBundle, GprocCaptureClientLike, GprocClientLike, GprocMoney, GprocProjectDetail } from "./gprocClient.types";
 
 export interface GprocConfig {
   baseUrl: string;
@@ -123,6 +123,14 @@ export class GprocClient implements GprocCaptureClientLike {
       deptSubName: d.deptSubName ?? null,
       budgetYear: d.budgetYear ?? null,
     };
+  }
+
+  async procurementMoney(projectId: string): Promise<GprocMoney | null> {
+    const body = await this.call<Envelope<{ projectMoney?: unknown; priceBuild?: unknown }>>("GET", `${ANNOUNCEMENT}/getProcurementDetail`, { projectId });
+    const d = body.data;
+    if (!d) return null;
+    const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null);
+    return { projectMoney: num(d.projectMoney), priceBuild: num(d.priceBuild) };
   }
 
   async announcements(projectId: string, detail: GprocProjectDetail): Promise<GprocAnnouncement[]> {

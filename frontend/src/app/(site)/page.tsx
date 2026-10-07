@@ -23,13 +23,15 @@ import mascotSign from "@/components/picture/circle.png";
 import mascotHug from "@/components/picture/hug.png";
 import { formatBudget } from "@/lib/mockData";
 import { fetchAgencies, fetchOpenTorStats, fetchTorList } from "@/lib/torApi";
-import { isBiddable } from "@/lib/torStatus";
+import { isBiddable, torPriceLines } from "@/lib/torStatus";
 import { CLOSING_SOON_HREF } from "@/lib/torSearch";
 
-/** "฿8.5M"-style budget for the compact hero card. */
-function formatCompactBaht(amount: number): string {
-  if (!amount) return "ไม่ระบุงบ";
-  return `฿${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(amount)}`;
+/** "฿8.5M"-style figure for the compact hero card ("ราคากลาง ฿8.5M" when the TOR has no budget). */
+function formatCompactBaht(tor: Parameters<typeof torPriceLines>[0]): string {
+  const first = torPriceLines(tor)[0];
+  if (!first) return "ไม่ระบุงบ";
+  const text = `฿${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(first.amount)}`;
+  return first.label === "ราคากลาง" ? `ราคากลาง ${text}` : text;
 }
 
 export default async function Home() {
@@ -173,7 +175,7 @@ export default async function Home() {
                     <p className="mt-2 truncate text-xs text-[var(--color-text-muted)]">{featured.agency}</p>
                     <div className="mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-3">
                       <span className="font-[family-name:var(--font-heading)] font-extrabold text-[var(--color-rose-dark)]">
-                        {formatCompactBaht(featured.budget)}
+                        {formatCompactBaht(featured)}
                       </span>
                       <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ink)] text-white transition-transform group-hover:scale-110">
                         <ArrowUpRight size={15} />

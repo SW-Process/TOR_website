@@ -37,8 +37,16 @@ export interface GprocBundle {
   name: string | null;
 }
 
+/** The money figures of `getProcurementDetail`: `projectMoney` is the project budget (งบประมาณ), `priceBuild` the reference price (ราคากลาง). */
+export interface GprocMoney {
+  projectMoney: number | null;
+  priceBuild: number | null;
+}
+
 /** The extra calls the capture run needs (the lifecycle refresh does not). */
 export interface GprocCaptureClientLike extends GprocClientLike {
+  /** Budget and reference price of the project; null when process5 has no such project. */
+  procurementMoney(projectId: string): Promise<GprocMoney | null>;
   /** `draft: true` asks for the pre-invitation bundle (Temp endpoint), otherwise the published one. Null when none. */
   documentBundle(projectId: string, opts: { draft: boolean }): Promise<GprocBundle | null>;
   /** The zip bytes. Throws when larger than `maxBytes` or not a zip. */

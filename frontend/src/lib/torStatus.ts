@@ -1,4 +1,4 @@
-import { formatThaiDate, formatThaiMonthYear, type TOR, type TORStatus } from "@/lib/mockData";
+import { formatBudget, formatThaiDate, formatThaiMonthYear, type TOR, type TORStatus } from "@/lib/mockData";
 
 /** Backend `displayStatus` → the Thai label used throughout the UI. */
 export const STATUS_FROM_API: Record<string, TORStatus> = {
@@ -124,4 +124,24 @@ export function statusNote(tor: Pick<TOR, "status" | "procurement">): string {
       return days <= 0 ? "ปิดรับวันนี้" : `เหลือ ${days} วัน`;
     }
   }
+}
+
+export type TorPriceLine = { label: "งบประมาณโครงการ" | "ราคากลาง"; amount: number };
+
+/**
+ * The money figures a TOR actually has, budget first. The two are different numbers, so a missing
+ * budget is never filled with the reference price: it just shows the reference price under its own label.
+ */
+export function torPriceLines(tor: Pick<TOR, "budget" | "referencePrice">): TorPriceLine[] {
+  const lines: TorPriceLine[] = [];
+  if (tor.budget > 0) lines.push({ label: "งบประมาณโครงการ", amount: tor.budget });
+  if ((tor.referencePrice ?? 0) > 0) lines.push({ label: "ราคากลาง", amount: tor.referencePrice! });
+  return lines;
+}
+
+/** The headline figure for a card: "฿6,055,000", with "ราคากลาง " in front when that is all there is; "ไม่ระบุงบ" with none. */
+export function torPriceText(tor: Pick<TOR, "budget" | "referencePrice">): string {
+  const first = torPriceLines(tor)[0];
+  if (!first) return "ไม่ระบุงบ";
+  return first.label === "ราคากลาง" ? `ราคากลาง ${formatBudget(first.amount)}` : formatBudget(first.amount);
 }

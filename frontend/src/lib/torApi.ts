@@ -218,7 +218,8 @@ export function mapApiTor(raw: ApiTor): TOR {
     agency: raw.agency ?? "ไม่ระบุหน่วยงาน",
     department: raw.department ?? "",
     category: mapCategory(raw.category),
-    budget: raw.budget ?? raw.referencePrice ?? 0,
+    budget: raw.budget ?? 0,
+    referencePrice: raw.referencePrice ?? 0,
     announceDate,
     deadline,
     // The server computes the status from the procurement stage; a missing value (an old
