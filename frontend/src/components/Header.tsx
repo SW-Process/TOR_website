@@ -17,17 +17,14 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
-import { CLOSING_SOON_HREF } from "@/lib/torSearch";
 
-const publicLinks = [
+// Top navigation, in display order. membersOnly: vendor and admin pages (dashboard,
+// saved list) — the bookmark API accepts both roles.
+const navItems = [
+  { href: "/", label: "หน้าหลัก" },
+  { href: "/dashboard", label: "แดชบอร์ด", membersOnly: true },
   { href: "/tor", label: "ค้นหา TOR" },
-  { href: CLOSING_SOON_HREF, label: "ใกล้ปิดรับ" },
-];
-
-// Vendor and admin pages (dashboard, saved list): the bookmark API accepts both roles.
-const memberLinks = [
-  { href: "/dashboard", label: "แดชบอร์ด" },
-  { href: "/bookmarks", label: "รายการที่บันทึก" },
+  { href: "/bookmarks", label: "รายการที่บันทึก", membersOnly: true },
 ];
 
 export default function Header() {
@@ -40,7 +37,7 @@ export default function Header() {
   const isAdmin = loggedIn && user?.role === "admin";
   const isVendor = loggedIn && user?.role === "vendor";
   const hasBusinessFeatures = isVendor || isAdmin;
-  const navLinks = [...publicLinks, ...(hasBusinessFeatures ? memberLinks : [])];
+  const navLinks = navItems.filter((link) => !link.membersOnly || hasBusinessFeatures);
 
   async function handleLogout() {
     await logout();
