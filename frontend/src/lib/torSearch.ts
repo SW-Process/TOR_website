@@ -119,6 +119,16 @@ function pageNumber(v: string | string[] | undefined): number {
 }
 
 /** Parse page search params, silently dropping values that aren't valid. */
+/** URLSearchParams (e.g. from useSearchParams) → the record shape parseTorFilters takes; repeated keys become arrays. */
+export function searchParamsToRaw(params: URLSearchParams): RawSearchParams {
+  const raw: RawSearchParams = {};
+  for (const key of new Set(params.keys())) {
+    const values = params.getAll(key);
+    raw[key] = values.length > 1 ? values : values[0];
+  }
+  return raw;
+}
+
 export function parseTorFilters(params: RawSearchParams): TorFilters {
   const sort = first(params.sort) as SortKey;
   return {
