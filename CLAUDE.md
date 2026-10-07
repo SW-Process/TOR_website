@@ -122,7 +122,7 @@ Admins load `extension/` (MV3, unpacked) to pick projects on process5.gprocureme
 `torFromBundle`). TOR-file rule: the TOR PDF is picked from the project's document bundle, falling back to the
 invitation PDF when there is no TOR file yet. `CAPTURE_AGENCIES` optionally filters by the project's body/unit names
 (empty = every software-related project). The original-listing link is resolved by `resolveSourceListingUrl`.
-`GPROC_ENABLED=false` makes the route answer 503. The keyword gate runs on the title with the procurement-method clause ("ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)" etc.) stripped by `capture/stripProcurementMethod.ts`, because that phrase ends almost every process5 title and would otherwise match "อิเล็กทรอนิกส์".
+`GPROC_ENABLED=false` makes the route answer 503. The admin ingestion page shows a read-only capture card (last capture run, its counts, and `GET /api/ingestion/capture/pending` = `{ stuck }`, captured TORs with no stored document so not queued for AI); captures can only be started from the extension. The keyword gate runs on the title with the procurement-method clause ("ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)" etc.) stripped by `capture/stripProcurementMethod.ts`, because that phrase ends almost every process5 title and would otherwise match "อิเล็กทรอนิกส์".
 
 ## Environment
 

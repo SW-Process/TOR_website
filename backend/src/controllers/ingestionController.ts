@@ -10,6 +10,7 @@ import { sweepStaleEnrichmentRuns, sweepStaleRuns } from "../ingestion/enrichmen
 import { chainLifecycleAfterEnrichment } from "../ingestion/lifecycle/afterEnrichment";
 import { selectExtractor } from "../jobs/enrichment";
 import { captureProjects, type CaptureProject } from "../ingestion/capture/captureProjects";
+import { countCaptureStuck } from "../ingestion/capture/countCaptureStuck";
 import { GprocClient, gprocConfigFromEnv, gprocEnabled } from "../scraper/gprocClient";
 import { getStorage } from "../storage";
 
@@ -181,6 +182,11 @@ export async function getLifecyclePending(req: Request, res: Response): Promise<
     willCheck: Math.min(candidates, maxTors),
     maxDeadlineExtractions: maxDeadlineExtractionsPerRun(),
   });
+}
+
+/** GET /api/ingestion/capture/pending — captured TORs with no document yet, so not queued for AI. */
+export async function getCaptureStuck(_req: Request, res: Response): Promise<void> {
+  res.status(200).json({ stuck: await countCaptureStuck() });
 }
 
 /** GET /api/ingestion/runs — recent run history (FR-34). */

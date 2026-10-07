@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Clock, ListChecks, RotateCw, Sparkles } from "lucide-react";
 import AdminPageHeader from "./AdminPageHeader";
 import RunStatusBadge from "./RunStatusBadge";
@@ -17,7 +18,7 @@ const PHASE_LABEL: Record<IngestionPhase, string> = {
   discovery: "ดึงข้อมูล (Ingestion)",
   enrichment: "วิเคราะห์ด้วย AI (Enrichment)",
   lifecycle: "ตรวจสถานะการจัดซื้อ (Lifecycle)",
-  capture: "ดึงผ่าน extension",
+  capture: "ดึงผ่าน extension (Capture)",
 };
 
 const DAYS_PER_MONTH = 30;
@@ -174,6 +175,84 @@ function LifecycleStatus({
   );
 }
 
+/** Read-only: captures start only from the Chrome extension, so there is no trigger here. */
+function CaptureCard({
+  last,
+  ready,
+  stuck,
+}: {
+  last: IngestionRun | null;
+  ready: boolean;
+  stuck: number | null;
+}) {
+  const counts = last
+    ? [
+        { label: "สร้างใหม่", value: last.stats.torsCreated },
+        { label: "มีอยู่แล้ว", value: last.stats.torsUnchanged },
+        { label: "ข้าม", value: last.stats.torsSkipped },
+        { label: "ล้มเหลว", value: last.stats.torsFailed },
+      ]
+    : [];
+  return (
+    <div className="card p-5">
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-text)]">
+          {PHASE_LABEL.capture}
+        </p>
+        {last && <RunStatusBadge status={last.status} />}
+      </div>
+      <p className="mt-1 text-[11px] text-[var(--color-text-faint)]">
+        เริ่มจาก Chrome extension ที่หน้า e-GP เท่านั้น
+      </p>
+
+      {last ? (
+        <div className="mt-4 grid grid-cols-4 gap-3 text-xs">
+          <div className="col-span-4">
+            <p className="text-[var(--color-text-faint)]">รันล่าสุด</p>
+            <p className="mt-0.5 font-medium text-[var(--color-text)]">
+              {formatRelativeTime(last.startedAt)}
+            </p>
+          </div>
+          <div className="col-span-4">
+            <p className="text-[var(--color-text-faint)]">ผลลัพธ์</p>
+            <p className="mt-0.5 font-medium text-[var(--color-text)] leading-relaxed">
+              {last.outcomeSummary ?? (last.status === "running" ? "กำลังทำงาน..." : "—")}
+            </p>
+          </div>
+          {counts.map((c) => (
+            <div key={c.label}>
+              <p className="text-[var(--color-text-faint)]">{c.label}</p>
+              <p className="mt-0.5 font-semibold text-[var(--color-text)]">{c.value}</p>
+            </div>
+          ))}
+          <Link
+            href="/admin/logs?source=ingestion&q=capture"
+            className="col-span-4 text-xs underline text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+          >
+            ดูเหตุผลรายตัวใน log
+          </Link>
+        </div>
+      ) : (
+        <p className="mt-4 text-xs text-[var(--color-text-faint)]">
+          {ready ? "ยังไม่เคยดึงผ่าน extension" : "กำลังโหลด..."}
+        </p>
+      )}
+
+      {stuck !== null && stuck > 0 && (
+        <div className="mt-4 text-xs">
+          <p className="text-[var(--color-text-muted)]">
+            ค้างอยู่ (ยังไม่มีเอกสาร จึงยังไม่เข้า AI):{" "}
+            <span className="font-semibold text-[var(--color-text)]">{stuck}</span>
+          </p>
+          <p className="mt-0.5 text-[11px] text-[var(--color-text-faint)]">
+            จับซ้ำใน extension เพื่อลองใหม่
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ScraperHealth() {
   const {
     runs,
@@ -185,6 +264,7 @@ export default function ScraperHealth() {
     enrichmentQueue,
     lifecyclePending,
     lifecycleQueue,
+    captureStuck,
     triggerIngestion,
     triggerEnrichment,
     triggerLifecycle,
@@ -488,6 +568,7 @@ export default function ScraperHealth() {
               </div>
             );
           })}
+          <CaptureCard last={lastRunFor("capture")} ready={runsReady} stuck={captureStuck} />
         </div>
       </div>
 

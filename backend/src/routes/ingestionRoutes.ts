@@ -8,6 +8,7 @@ import {
   createLifecycleRun,
   getLifecyclePending,
   createCaptureRun,
+  getCaptureStuck,
 } from "../controllers/ingestionController";
 import { requireAuth, requireRole } from "../middleware/auth";
 
@@ -23,5 +24,6 @@ router.get("/enrichment/pending", getEnrichmentPending);
 router.post("/lifecycle/runs", createLifecycleRun);
 router.get("/lifecycle/pending", getLifecyclePending);
 router.post("/capture", createCaptureRun);
+router.get("/capture/pending", getCaptureStuck);
 
 export default router;
