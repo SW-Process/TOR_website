@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { formatBudget, formatThaiDate, formatThaiMonthYear, type FairnessField, type FairnessFlag } from "@/lib/mockData";
 import { fetchTorById, fetchTorList, isUnknownDeadline } from "@/lib/torApi";
-import { ANNOUNCEMENT_KIND_LABELS, statusNote } from "@/lib/torStatus";
+import { ANNOUNCEMENT_KIND_LABELS, statusNote, torPriceLines } from "@/lib/torStatus";
 import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
 import HideTorButton from "@/components/HideTorButton";
@@ -53,6 +53,7 @@ export default async function TORDetailPage({
 
   const procurement = tor.procurement ?? null;
   const bidDeadline = procurement?.bidDeadline ?? null;
+  const priceLines = torPriceLines(tor);
   // Forward the session so the vendor's hidden TORs are left out of "similar TORs".
   const torList = await fetchTorList((await cookies()).toString());
   const related = torList
@@ -267,10 +268,24 @@ export default async function TORDetailPage({
 
         <aside className="lg:sticky lg:top-24 h-fit">
           <div className="card p-5">
-            <p className="text-xs text-[var(--color-text-muted)]">งบประมาณโครงการ</p>
-            <p className="font-[family-name:var(--font-heading)] text-2xl font-extrabold text-[var(--color-rose-dark)] mt-1">
-              {formatBudget(tor.budget)}
-            </p>
+            {priceLines.length === 0 ? (
+              <>
+                <p className="text-xs text-[var(--color-text-muted)]">งบประมาณโครงการ</p>
+                <p className="font-[family-name:var(--font-heading)] text-2xl font-extrabold text-[var(--color-text-muted)] mt-1">ไม่ระบุ</p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-[var(--color-text-muted)]">{priceLines[0].label}</p>
+                <p className="font-[family-name:var(--font-heading)] text-2xl font-extrabold text-[var(--color-rose-dark)] mt-1">
+                  {formatBudget(priceLines[0].amount)}
+                </p>
+                {priceLines[1] && (
+                  <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">
+                    {priceLines[1].label} {formatBudget(priceLines[1].amount)}
+                  </p>
+                )}
+              </>
+            )}
 
             <div className="mt-4 rounded-2xl bg-[var(--color-surface-alt)] px-3.5 py-3">
               <p className="text-xs text-[var(--color-text-muted)]">กำหนดยื่นข้อเสนอ</p>

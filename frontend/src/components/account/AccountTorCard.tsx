@@ -4,8 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { Building2, Clock, ExternalLink, Hash, Sparkles } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
-import { formatBudget, formatThaiDate, type TOR } from "@/lib/mockData";
-import { statusNote } from "@/lib/torStatus";
+import { formatThaiDate, type TOR } from "@/lib/mockData";
+import { statusNote, torPriceText } from "@/lib/torStatus";
 
 /**
  * A TOR as a settings-page card, laid out like the admin report cards: status and
@@ -72,7 +72,7 @@ export default function AccountTorCard({
         </div>
         <div className="mt-auto flex items-end justify-between gap-3 pt-2">
           <div>
-            <p className="text-base font-extrabold text-[var(--color-rose-dark)]">{formatBudget(tor.budget)}</p>
+            <p className="text-base font-extrabold text-[var(--color-rose-dark)]">{torPriceText(tor)}</p>
             <p className="text-[11px] text-[var(--color-text-faint)]">{statusNote(tor)}</p>
           </div>
           <Link

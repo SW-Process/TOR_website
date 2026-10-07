@@ -86,7 +86,10 @@ export interface TOR {
   agency: string;
   department: string;
   category: Category;
+  /** งบประมาณโครงการ; 0 = unknown. Never filled with the reference price. */
   budget: number;
+  /** ราคากลาง; 0/absent = unknown. A different figure from `budget`. */
+  referencePrice?: number;
   announceDate: string;
   deadline: string;
   status: TORStatus;
