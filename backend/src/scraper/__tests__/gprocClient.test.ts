@@ -8,7 +8,7 @@ import {
 
 type Call = { url: string; method: string };
 
-function harness(handler: (url: URL, method: string, n: number) => { status?: number; body?: unknown; text?: string }) {
+function harness(handler: (url: URL, method: string, n: number) => { status?: number; body?: unknown; text?: string; bytes?: Buffer }) {
   const calls: Call[] = [];
   const sleeps: number[] = [];
   const cfg: GprocConfig = {
@@ -26,6 +26,7 @@ function harness(handler: (url: URL, method: string, n: number) => { status?: nu
       calls.push({ url: url.toString(), method });
       const r = handler(url, method, calls.length);
       const status = r.status ?? 200;
+      if (r.bytes) return new Response(r.bytes, { status, headers: { "content-type": "application/zip" } });
       return new Response(r.text ?? JSON.stringify(r.body ?? {}), { status });
     }) as unknown as typeof fetch,
   };
@@ -66,6 +67,10 @@ describe("GprocClient.projectDetail", () => {
       announceType: "W0",
       methodId: "16",
       stepId: "W03",
+      projectName: null,
+      deptName: null,
+      deptSubName: null,
+      budgetYear: null,
     });
     expect(calls[0]!.url).toBe(
       "https://gp.test/egp-oann10-service/pb/a-egp-allt-project/announcement/getProjectDetail?projectId=69099318020"
@@ -164,5 +169,62 @@ describe("GprocClient retries", () => {
     const { client, calls } = harness(() => ({ text: "<html>challenge</html>" }));
     await expect(client.projectDetail("69099318020")).rejects.toThrow();
     expect(calls).toHaveLength(3);
+  });
+});
+
+describe("GprocClient capture additions", () => {
+  const seq = (...items: Array<{ body?: unknown; bytes?: Buffer }>) => harness((_u, _m, n) => items[n - 1] ?? {});
+
+  it("projectDetail also returns the display fields when present", async () => {
+    const { client } = seq({ body: { data: { projectId: "69099312832", projectName: "จ้างบำรุงรักษา", deptName: "กรุงเทพมหานคร", deptSubName: "สำนักงานพัฒนาระบบสารสนเทศดิจิทัล", budgetYear: "2570", announceType: "D0", methodId: "16", projectStatus: "A", stepId: "M03" } } });
+    expect(await client.projectDetail("69099312832")).toMatchObject({
+      projectName: "จ้างบำรุงรักษา",
+      deptName: "กรุงเทพมหานคร",
+      deptSubName: "สำนักงานพัฒนาระบบสารสนเทศดิจิทัล",
+      budgetYear: "2570",
+    });
+  });
+
+  it("announcements carries priceBuild when a row has it", async () => {
+    const { client } = seq({ body: { data: { greenBookAnnouncementTypeLinkDto: [{ announceType: "B0", announceDate: "2026-09-22T17:00:00.000Z", announceFlag: "A", priceBuild: 6055000 }] } } });
+    const rows = await client.announcements("69099312832", { projectId: "69099312832", projectStatus: "A", announceType: "B0", methodId: "16", stepId: "M03" });
+    expect(rows[0]?.priceBuild).toBe(6055000);
+  });
+
+  describe("documentBundle", () => {
+    it("asks the Temp endpoint for the draft bundle and the plain one otherwise", async () => {
+      const { client, calls } = seq(
+        { body: { data: { zipId: "z1", buildName1: "69099312832_23092569.zip" } } },
+        { body: { data: { zipId: "z2", buildName1: "69099312832_01102569_1.zip" } } }
+      );
+      expect(await client.documentBundle("69099312832", { draft: true })).toEqual({ zipId: "z1", name: "69099312832_23092569.zip" });
+      expect(await client.documentBundle("69099312832", { draft: false })).toEqual({ zipId: "z2", name: "69099312832_01102569_1.zip" });
+      expect(calls[0]?.url).toContain("/infoProcureDocAnnounZipTemp?projectId=69099312832");
+      expect(calls[1]?.url).toContain("/infoProcureDocAnnounZip?projectId=69099312832");
+    });
+    it("returns null when there is no bundle", async () => {
+      const { client } = seq({ body: { data: null } }, { body: { data: { zipId: null } } });
+      expect(await client.documentBundle("69099312832", { draft: true })).toBeNull();
+      expect(await client.documentBundle("69099312832", { draft: false })).toBeNull();
+    });
+  });
+
+  describe("downloadBundle", () => {
+    const zipBytes = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(32, 1)]);
+    it("GETs downloadFileTest with the fileId and returns the bytes", async () => {
+      const { client, calls } = seq({ bytes: zipBytes });
+      const out = await client.downloadBundle("77c585", 1000);
+      expect(out.equals(zipBytes)).toBe(true);
+      expect(calls[0]).toMatchObject({ method: "GET" });
+      expect(calls[0]?.url).toContain("/egp-upload-service/v1/downloadFileTest?fileId=77c585");
+    });
+    it("throws when the body is larger than the cap", async () => {
+      const { client } = seq({ bytes: zipBytes });
+      await expect(client.downloadBundle("z", 10)).rejects.toThrow(/larger than/);
+    });
+    it("throws when the bytes are not a zip", async () => {
+      const { client } = seq({ bytes: Buffer.from("<html>blocked</html>") });
+      await expect(client.downloadBundle("z", 1000)).rejects.toThrow(/not a zip/);
+    });
   });
 });

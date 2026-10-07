@@ -319,6 +319,31 @@ describe("runIngestion", () => {
     });
   });
 
+  describe("a TOR created by the process5 capture", () => {
+    it.each(["pending", "enriched", "rejected"] as const)("is adopted quietly on its first egp2 sighting (%s)", async (status) => {
+      const seeded = await Tor.create({
+        title: "ชื่อจาก process5",
+        projectCode: "69000000001",
+        sourceContentHash: "capture-hash",
+        pipelineStatus: status,
+        procurement: { stage: "inviting", announcements: [], source: "gproc", lastCheckedAt: new Date("2026-10-02T00:00:00Z") },
+      });
+      const enqueueEnrichment = jest.fn();
+      const run = await runIngestion(baseOpts, { client: fakeClient(), storage: fakeStorage(), parse, enqueueEnrichment });
+      await run.done;
+      const t = (await Tor.findById(seeded._id).lean())!;
+      expect(t.sourceListingUrl).toContain("p-1");
+      expect(t.sourceContentHash).toHaveLength(64);
+      expect(t.sourceContentHash).not.toBe("capture-hash");
+      expect(t.pipelineStatus).toBe(status);
+      expect(t.title).toBe("ชื่อจาก process5");
+      expect(t.sourceDocument?.storageKey).toBeFalsy();
+      expect(enqueueEnrichment).not.toHaveBeenCalledWith(seeded._id, expect.anything());
+      const r = await IngestionRun.findById(run.runId).lean();
+      expect(r?.stats).toMatchObject({ torsCreated: 1, torsUpdated: 0, torsUnchanged: 1 });
+    });
+  });
+
   it("adopts the new hash quietly when the stored hash is the legacy (contract-inclusive) form", async () => {
     const enqueue = jest.fn();
     const deps = { client: fakeClient(), storage: fakeStorage(), parse, enqueueEnrichment: enqueue };

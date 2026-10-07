@@ -149,7 +149,10 @@ export function applyExtractionToTor(
   const deadline = parseDeadline(result.submissionDeadline);
   if (deadline) tor.submissionDeadline = deadline;
 
-  tor.fairnessFlags = result.fairnessSignals.map((s) => ({
+  // An invitation announcement has no scope of work, so the model has nothing to judge fairness on:
+  // never publish signals from it. They appear when a later capture upgrades the document to the TOR.
+  const signals = tor.sourceDocument?.kind === "invitation" ? [] : result.fairnessSignals;
+  tor.fairnessFlags = signals.map((s) => ({
     field: s.field,
     severity: s.severity,
     message: s.message,

@@ -73,6 +73,7 @@ Out (separate specs):
 
 - `announceType`: `D0` → `invitation`, `W0` → `winner`, `B0` → `bidding-draft`, `price` →
   `reference-price`, `BOQ` ignored, anything else → `unknown` (never decides the stage; logged once per code).
+- Later addition: `D1` (ยกเลิกประกาศเชิญชวน) → `cancellation` and `P0` (แผนการจัดซื้อจัดจ้าง) → `plan`; `D2`, `W1`, `W2` (and unseen `15`, `I0`, `E0`, `S0`, `R0`) stay `unknown` until a stage rule exists.
 - `publishedAt` = `announceDate`. `announcementId` = `gproc:<announceType>:<announceDate>` so a
   re-issued invitation (new date) is a new id and re-opens deadline reading.
 - `hasFile` = true for `D0`.

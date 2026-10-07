@@ -228,6 +228,11 @@ export async function refreshLifecycle(
         }
         if (loaded === "skip") {
           skipped += 1;
+          // Otherwise a TOR nobody can answer for keeps the oldest lastCheckedAt and sits at the head of the
+          // oldest-first queue on every run. Only the check time moves; nothing else is touched.
+          if (tor.procurement) {
+            await Tor.updateOne({ _id: tor._id }, { $set: { "procurement.lastCheckedAt": now() } }, { timestamps: false });
+          }
           await logIngestionEvent({
             severity: "warning",
             message: `lifecycle refresh skipped TOR ${label}: no e-GP project id (no listing URL and process5 could not answer)`,

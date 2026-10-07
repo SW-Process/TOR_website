@@ -147,6 +147,11 @@ export default async function TORDetailPage({
                 สร้างเมื่อ {formatThaiDate(tor.summary.generatedAt)}
               </span>
             </div>
+            {tor.sourceDocument?.kind === "invitation" && (
+              <p className="mt-2 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+                สรุปจากประกาศเชิญชวน (ยังไม่มีเอกสารขอบเขตงาน TOR)
+              </p>
+            )}
 
             <div className="mt-5">
               <h2 className="font-[family-name:var(--font-heading)] font-bold text-[var(--color-text)]">

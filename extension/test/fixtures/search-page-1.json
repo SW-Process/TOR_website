@@ -1,0 +1,63 @@
+{
+  "data": [
+    {
+      "announceDate": "2569-10-06T00:00:00.000+07:00",
+      "announceSubDesc": null,
+      "announceType": "D0",
+      "announceWinnerDate": null,
+      "deptName": "กรุงเทพมหานคร",
+      "deptSubName": "สำนักงานพัฒนาระบบสารสนเทศดิจิทัล",
+      "flowName": "หนังสือเชิญชวน/ประกาศเชิญชวน",
+      "methodId": "16",
+      "priceBuild": 6399000.0,
+      "projectId": "69099314442",
+      "projectMoney": 6399000.0,
+      "projectName": "ประกวดราคาจ้างบำรุงรักษาระบบเครือข่ายและโปรแกรมประยุกต์ ตามโครงการจ้างพัฒนาระบบยืนยันและตรวจสอบตัวบุคคลในระบบดิจิทัล ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
+      "projectStatus": "A",
+      "rdbProvinceMoiName": null,
+      "seqNo": "3",
+      "stepId": "M03",
+      "validateConfidential": false
+    },
+    {
+      "announceDate": "2569-10-06T00:00:00.000+07:00",
+      "announceSubDesc": null,
+      "announceType": "D0",
+      "announceWinnerDate": null,
+      "deptName": "สำนักงานปลัดสำนักนายกรัฐมนตรี",
+      "deptSubName": "สำนักงานปลัดสำนักนายกรัฐมนตรี กรุงเทพฯ",
+      "flowName": "หนังสือเชิญชวน/ประกาศเชิญชวน",
+      "methodId": "16",
+      "priceBuild": 1850000.0,
+      "projectId": "69109064446",
+      "projectMoney": 1850000.0,
+      "projectName": "ประกวดราคาจ้างบำรุงรัการะบบเครือข่ายไร้สาย สปน. ประจำปีงบประมาณ พ.ศ. 2570 ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
+      "projectStatus": "A",
+      "rdbProvinceMoiName": null,
+      "seqNo": "3",
+      "stepId": "M03",
+      "validateConfidential": false
+    },
+    {
+      "announceDate": "2569-10-05T00:00:00.000+07:00",
+      "announceSubDesc": null,
+      "announceType": "D0",
+      "announceWinnerDate": null,
+      "deptName": "กรมพลศึกษา",
+      "deptSubName": "กรมพลศึกษา",
+      "flowName": "หนังสือเชิญชวน/ประกาศเชิญชวน",
+      "methodId": "16",
+      "priceBuild": 980000.0,
+      "projectId": "69089658201",
+      "projectMoney": 980000.0,
+      "projectName": "ประกวดราคาจ้างเหมาบำรุงรักษาระบบดับเพลิง …",
+      "projectStatus": "A",
+      "rdbProvinceMoiName": null,
+      "seqNo": "3",
+      "stepId": "M03",
+      "validateConfidential": false
+    }
+  ],
+  "response": { "responseCode": 0, "responseDesc": "" },
+  "traceId": "3f6c1d9a2b7e4c58a1d0e9f4b2c7a613"
+}

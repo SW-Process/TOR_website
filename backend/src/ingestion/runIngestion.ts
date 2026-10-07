@@ -115,6 +115,15 @@ async function processProject(
     });
     created = true;
     stats.torsCreated += 1;
+  } else if (!tor.sourceListingUrl && tor.procurement?.source === "gproc") {
+    // A TOR created by the process5 capture, seen on egp2 for the first time: adopt the listing
+    // link and the egp2 hash only. No update, PDF fetch or enqueue, and pipelineStatus (which may
+    // be an admin hide) and every other field stay as they are.
+    tor.sourceListingUrl = mapped.set.sourceListingUrl;
+    tor.sourceContentHash = mapped.sourceContentHash;
+    await tor.save();
+    stats.torsUnchanged += 1;
+    return;
   } else {
     // The lifecycle refresh owns `procurement` for a TOR whose stage came from process5: egp2 lags it,
     // so writing here would revert the stage and bump lastCheckedAt. Leave it entirely alone.

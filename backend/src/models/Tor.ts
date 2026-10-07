@@ -30,6 +30,8 @@ export interface IClassification {
   at: Date;
 }
 
+export type SourceDocumentKind = "tor" | "invitation";
+
 export interface ISourceDocument {
   egpUrl: string;
   filename: string;
@@ -39,6 +41,8 @@ export interface ISourceDocument {
   byteSize: number | null;
   sha256: string | null;
   fetchedAt: Date;
+  /** The TOR itself, or the invitation PDF used when no TOR exists yet. Absent on old rows = tor. */
+  kind?: SourceDocumentKind;
 }
 
 export interface IProcurementAnnouncement {
@@ -219,6 +223,7 @@ const sourceDocumentSchema = new Schema<ISourceDocument>(
     byteSize: { type: Number, default: null },
     sha256: { type: String, default: null },
     fetchedAt: { type: Date, default: Date.now },
+    kind: { type: String, enum: ["tor", "invitation"], default: "tor" },
   },
   { _id: false }
 );

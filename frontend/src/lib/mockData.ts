@@ -100,6 +100,8 @@ export interface TOR {
   summary: AISummary;
   description: string;
   fairnessFlags: FairnessFlag[];
+  /** Which document the summary came from; "invitation" = the announcement only, no TOR scope document yet. */
+  sourceDocument?: { kind?: "tor" | "invitation" } | null;
   /** Optional so the mock rows below stay valid; real API rows always set it (or null). */
   procurement?: TorProcurementView | null;
   /** True when an admin closed the TOR by hand (stored status "closed"). */

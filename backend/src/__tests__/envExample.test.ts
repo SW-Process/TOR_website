@@ -18,7 +18,7 @@ describe(".env.example covers the enrichment pipeline vars", () => {
     expect(envExample).toMatch(new RegExp(`^#?\\s*${key}=`, "m"));
   });
 
-  it.each(["GPROC_ENABLED", "GPROC_BASE_URL", "GPROC_DELAY_MS", "GPROC_TIMEOUT_MS", "GPROC_MAX_RETRIES"])(
+  it.each(["GPROC_ENABLED", "GPROC_BASE_URL", "GPROC_DELAY_MS", "GPROC_TIMEOUT_MS", "GPROC_MAX_RETRIES", "CAPTURE_AGENCIES"])(
     "documents %s",
     (key) => {
       expect(envExample).toMatch(new RegExp(`^#?\\s*${key}=`, "m"));

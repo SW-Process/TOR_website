@@ -153,6 +153,40 @@ describe("applyExtractionToTor", () => {
     await expect(tor.save()).resolves.toBeDefined();
   });
 
+  it("produces no fairness flags when the source document is only the invitation", async () => {
+    const tor = await Tor.create({
+      title: "จ้างพัฒนาระบบ",
+      sourceDocument: {
+        egpUrl: "x",
+        filename: "69099312832-invitation.pdf",
+        storageKey: "k",
+        textLayer: "digital",
+        pageCount: 1,
+        byteSize: 1,
+        sha256: "s",
+        fetchedAt: new Date(),
+        kind: "invitation",
+      },
+    });
+    applyExtractionToTor(
+      tor,
+      ok({ fairnessSignals: [{ field: "budget", severity: "high", message: "งบสูงกว่าราคากลางอย่างมีนัยสำคัญ" }] }),
+      { extractorId: "t", fallbackText: "" }
+    );
+    expect(tor.pipelineStatus).toBe("enriched");
+    expect(tor.fairnessFlags).toHaveLength(0);
+  });
+
+  it("keeps fairness flags for a TOR document (kind tor or unset)", async () => {
+    const tor = await Tor.create({ title: "จ้างพัฒนาระบบ" });
+    applyExtractionToTor(
+      tor,
+      ok({ fairnessSignals: [{ field: "budget", severity: "high", message: "งบสูงกว่าราคากลางอย่างมีนัยสำคัญ" }] }),
+      { extractorId: "t", fallbackText: "" }
+    );
+    expect(tor.fairnessFlags.length).toBeGreaterThan(0);
+  });
+
   it("leaves fairnessFlags empty when Gemini reports no signals", async () => {
     const tor = await Tor.create({ title: "จ้างพัฒนาระบบ" });
     applyExtractionToTor(tor, ok({ fairnessSignals: [] }), {

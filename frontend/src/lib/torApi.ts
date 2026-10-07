@@ -164,6 +164,7 @@ export interface ApiTor {
   viewCount?: number;
   sourceDocumentUrl?: string;
   sourceListingUrl?: string;
+  sourceDocument?: { kind?: "tor" | "invitation" } | null;
   aiSummary?: ApiAiSummary | null;
   fairnessFlags?: ApiFairnessFlag[];
 }
@@ -238,6 +239,7 @@ export function mapApiTor(raw: ApiTor): TOR {
       : null,
     // Always the original e-GP announcement page, regardless of whether we have a PDF.
     sourceListingUrl: raw.sourceListingUrl ?? null,
+    sourceDocument: raw.sourceDocument ? { kind: raw.sourceDocument.kind } : null,
     description: raw.aiSummary?.summary ?? "",
     summary: mapSummary(raw.aiSummary, fallbackDate),
     fairnessFlags: mapFairnessFlags(raw.fairnessFlags, fallbackDate),

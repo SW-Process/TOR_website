@@ -9,6 +9,9 @@ import { countLifecycleCandidates, maxDeadlineExtractionsPerRun, maxLifecycleRef
 import { sweepStaleEnrichmentRuns, sweepStaleRuns } from "../ingestion/enrichment/sweepStaleRuns";
 import { chainLifecycleAfterEnrichment } from "../ingestion/lifecycle/afterEnrichment";
 import { selectExtractor } from "../jobs/enrichment";
+import { captureProjects, type CaptureProject } from "../ingestion/capture/captureProjects";
+import { GprocClient, gprocConfigFromEnv, gprocEnabled } from "../scraper/gprocClient";
+import { getStorage } from "../storage";
 
 const MAX_PROJECTS_CEILING = 500;
 const LOOKBACK_DAYS_CEILING = 6000; // ~200 months
@@ -183,7 +186,7 @@ export async function getLifecyclePending(req: Request, res: Response): Promise<
 /** GET /api/ingestion/runs — recent run history (FR-34). */
 export async function listRuns(req: Request, res: Response): Promise<void> {
   // so the admin UI sees a dead run as failed, not "running"
-  await Promise.all([sweepStaleEnrichmentRuns(), sweepStaleRuns("lifecycle")]);
+  await Promise.all([sweepStaleEnrichmentRuns(), sweepStaleRuns("lifecycle"), sweepStaleRuns("capture")]);
   const limitRaw = Number(req.query.limit);
   const limit = Number.isInteger(limitRaw) && limitRaw >= 1 && limitRaw <= 100 ? limitRaw : 20;
   const runs = await IngestionRun.find({}).sort({ startedAt: -1 }).limit(limit).lean();
@@ -195,4 +198,72 @@ export async function getRun(req: Request, res: Response): Promise<void> {
   const run = await IngestionRun.findById(req.params.id).lean();
   if (!run) throw httpError(404, "Ingestion run not found");
   res.status(200).json({ run });
+}
+
+const CAPTURE_MAX_PROJECTS = 100;
+const CAPTURE_HINT_MAX = 500;
+
+function parseCaptureProjects(raw: unknown): CaptureProject[] {
+  const list = (raw as { projects?: unknown } | undefined)?.projects;
+  if (!Array.isArray(list) || list.length < 1 || list.length > CAPTURE_MAX_PROJECTS) {
+    throw httpError(400, `projects must be an array of 1 to ${CAPTURE_MAX_PROJECTS} entries`);
+  }
+  const byCode = new Map<string, CaptureProject>();
+  for (const item of list) {
+    if (typeof item !== "object" || item === null) throw httpError(400, "each project must be an object");
+    const { projectCode, title, agency } = item as Record<string, unknown>;
+    if (typeof projectCode !== "string" || !/^\d{11}$/.test(projectCode)) {
+      throw httpError(400, "projectCode must be an 11-digit project number");
+    }
+    for (const [name, v] of [["title", title], ["agency", agency]] as const) {
+      if (v !== undefined && (typeof v !== "string" || v.length > CAPTURE_HINT_MAX)) {
+        throw httpError(400, `${name} must be a string of at most ${CAPTURE_HINT_MAX} characters`);
+      }
+    }
+    if (byCode.has(projectCode)) continue; // the first entry wins
+    byCode.set(projectCode, {
+      projectCode,
+      ...(typeof title === "string" ? { title } : {}),
+      ...(typeof agency === "string" ? { agency } : {}),
+    });
+  }
+  return [...byCode.values()];
+}
+
+/** POST /api/ingestion/capture — admin-selected process5 projects, created in the background. */
+export async function createCaptureRun(req: Request, res: Response): Promise<void> {
+  const projects = parseCaptureProjects(req.body);
+  if (!gprocEnabled()) throw httpError(503, "The national e-GP source is disabled (GPROC_ENABLED=false)");
+
+  await sweepStaleRuns("capture");
+  const active = await IngestionRun.exists({ status: "running", phase: "capture" });
+  if (active) throw httpError(409, "A capture run is already in progress");
+
+  // Before the run row exists: a bad storage config must not leave a running run behind.
+  let storage;
+  try {
+    storage = getStorage();
+  } catch (err) {
+    throw httpError(503, `Storage is not configured: ${(err as Error).message}`);
+  }
+
+  const run = await IngestionRun.create({
+    trigger: "manual",
+    triggeredBy: req.user!.id,
+    phase: "capture",
+    status: "running",
+    stats: { torsFound: projects.length },
+  });
+  void captureProjects(run._id, projects, { gproc: new GprocClient(gprocConfigFromEnv()), storage }).catch(async (err) => {
+    console.error("capture run failed:", err);
+    try {
+      await IngestionRun.updateOne(
+        { _id: run._id, status: "running" },
+        { $set: { status: "failed", completedAt: new Date(), outcomeSummary: `capture aborted: ${(err as Error).message}` } }
+      );
+    } catch (updateErr) {
+      console.error("capture run could not be marked failed:", updateErr);
+    }
+  });
+  res.status(202).json({ runId: String(run._id), status: "running" });
 }

@@ -13,7 +13,7 @@ export async function runStalledRunsJob(): Promise<void> {
     await connectDB();
     const report = await detectStalledRuns();
     console.log(
-      `stalled-runs check: failed ${report.total} (discovery ${report.discovery}, enrichment ${report.enrichment}, lifecycle ${report.lifecycle})`
+      `stalled-runs check: failed ${report.total} (discovery ${report.discovery}, enrichment ${report.enrichment}, lifecycle ${report.lifecycle}, capture ${report.capture})`
     );
   } catch (err) {
     console.error("stalled-runs job failed:", err);

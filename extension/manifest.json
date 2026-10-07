@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "TOR Aggregator – e-GP capture",
+  "version": "0.1.0",
+  "description": "Collect project numbers from the national e-GP search page and send them to the TOR Aggregator (admin only).",
+  "permissions": ["storage"],
+  "host_permissions": ["https://process5.gprocurement.go.th/*", "http://localhost:8000/*"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "TOR capture" },
+  "content_scripts": [
+    {
+      "matches": ["https://process5.gprocurement.go.th/egp-agpc01-web/announcement*"],
+      "js": ["hook-main.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://process5.gprocurement.go.th/egp-agpc01-web/announcement*"],
+      "js": ["parse.js", "collect.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

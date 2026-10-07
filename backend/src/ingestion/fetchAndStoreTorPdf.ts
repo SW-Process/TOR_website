@@ -1,9 +1,9 @@
-import { createHash } from "node:crypto";
 import type { HydratedDocument, Types } from "mongoose";
 import type { ITor } from "../models/Tor";
 import type { EgpClientLike } from "../scraper/egpClient.types";
 import type { BlobStorage } from "../storage/storage.types";
-import { pdfInspect, type PdfParseFn } from "./pdfInspect";
+import type { PdfParseFn } from "./pdfInspect";
+import { storeTorPdf } from "./storeTorPdf";
 import { logIngestionEvent } from "./log";
 import type { TorAnnouncementRef } from "./mapProject";
 
@@ -50,24 +50,12 @@ export async function fetchAndStoreTorPdf(
     return;
   }
 
-  const sha256 = createHash("sha256").update(buf).digest("hex");
-  const { pageCount, textLayer } = await pdfInspect(buf, deps.parse);
-  const key = `tor-pdfs/${tor.projectCode ?? tor.id}/${ann.announcementId}.pdf`;
-
-  await deps.storage.put(key, buf, { contentType: "application/pdf" });
-
-  tor.sourceDocument = {
-    egpUrl: ann.egpUrl,
-    filename: ann.filename,
-    storageKey: key,
-    textLayer,
-    pageCount,
-    byteSize: buf.length,
-    sha256,
-    fetchedAt: now,
-  };
-  tor.sourceDocumentUrl = deps.storage.publicUrl(key) ?? `/api/tors/${tor.id}/document`;
-  await tor.save();
+  await storeTorPdf(
+    tor,
+    buf,
+    { egpUrl: ann.egpUrl, filename: ann.filename, key: `tor-pdfs/${tor.projectCode ?? tor.id}/${ann.announcementId}.pdf` },
+    { storage: deps.storage, parse: deps.parse }
+  );
 }
 
 export default fetchAndStoreTorPdf;

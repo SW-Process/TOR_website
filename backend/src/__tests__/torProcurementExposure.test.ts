@@ -58,4 +58,37 @@ describe("GET /api/tors/:id — procurement", () => {
     expect(res.body.tor.procurement).not.toHaveProperty("source");
     expect(JSON.stringify(res.body)).not.toContain("tor-pdfs/1/a-1.pdf");
   });
+
+  it("returns a process5 original link for a gproc TOR and the stored egp2 link otherwise, never procurement.source", async () => {
+    const egp2Url = "https://egp2.bangkok.go.th/project/222";
+    const gproc = await Tor.create({
+      title: "gproc",
+      projectCode: "69099312832",
+      pipelineStatus: "enriched",
+      sourceListingUrl: "https://egp2.bangkok.go.th/project/111",
+      procurement: { stage: "inviting", announcements: [], source: "gproc", lastCheckedAt: new Date("2026-10-03T00:00:00Z") },
+    });
+    const egp2 = await Tor.create({
+      title: "egp2",
+      projectCode: "69099312833",
+      pipelineStatus: "enriched",
+      sourceListingUrl: egp2Url,
+      procurement: { stage: "inviting", announcements: [], source: "egp2", lastCheckedAt: new Date("2026-10-03T00:00:00Z") },
+    });
+    const bare = await Tor.create({
+      title: "gproc no url",
+      projectCode: "69099312834",
+      pipelineStatus: "enriched",
+      procurement: { stage: "inviting", announcements: [], source: "gproc", lastCheckedAt: new Date("2026-10-03T00:00:00Z") },
+    });
+
+    const g = await request(app).get(`/api/tors/${gproc.id}`);
+    const e = await request(app).get(`/api/tors/${egp2.id}`);
+    const b = await request(app).get(`/api/tors/${bare.id}`);
+
+    expect(g.body.tor.sourceListingUrl).toBe("https://process5.gprocurement.go.th/egp-agpc01-web/announcement?keywordSearch=69099312832");
+    expect(e.body.tor.sourceListingUrl).toBe(egp2Url);
+    expect(b.body.tor.sourceListingUrl).toBe("https://process5.gprocurement.go.th/egp-agpc01-web/announcement?keywordSearch=69099312834");
+    for (const r of [g, e, b]) expect(r.body.tor.procurement.source).toBeUndefined();
+  });
 });
