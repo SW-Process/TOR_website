@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { zipSync } from "fflate";
 import { EnrichmentJob, IngestionRun, SystemLog, Tor } from "../../../models";
-import type { GprocCaptureClientLike, GprocAnnouncement, GprocProjectDetail } from "../../../scraper/gprocClient.types";
+import type { GprocCaptureClientLike, GprocAnnouncement, GprocMoney, GprocProjectDetail } from "../../../scraper/gprocClient.types";
 import type { BlobStorage } from "../../../storage/storage.types";
 import { captureProjects, type CaptureDeps, type CaptureProject } from "../captureProjects";
 
@@ -37,7 +37,8 @@ function fakeGproc(opts: {
   bundle?: (code: string, draft: boolean) => { zipId: string; name: string | null } | null | Error;
   zip?: Buffer | Error;
   invitation?: Buffer | null | Error;
-} = {}): GprocCaptureClientLike & { detailCalls: string[]; zipCalls: string[]; invitationCalls: number } {
+  money?: GprocMoney | null | Error;
+} = {}): GprocCaptureClientLike & { detailCalls: string[]; zipCalls: string[]; invitationCalls: number; moneyCalls: number } {
   const g = {
     detailCalls: [] as string[],
     zipCalls: [] as string[],
@@ -47,6 +48,13 @@ function fakeGproc(opts: {
       const d = opts.detail ? opts.detail(code) : detail(code);
       if (d instanceof Error) throw d;
       return d;
+    },
+    moneyCalls: 0,
+    async procurementMoney() {
+      g.moneyCalls += 1;
+      const m = opts.money === undefined ? { projectMoney: 5000000, priceBuild: 4890000 } : opts.money;
+      if (m instanceof Error) throw m;
+      return m;
     },
     async announcements() { return rows; },
     async invitationPdf() {
@@ -112,6 +120,7 @@ describe("captureProjects", () => {
     expect(tor.agency).toBe("สำนักดิจิทัล");
     expect(tor.department).toBe("กรุงเทพมหานคร");
     expect(tor.referencePrice).toBe(4890000);
+    expect(tor.budget).toBe(5000000);
     expect(tor.procurement?.source).toBe("gproc");
     expect(tor.procurement?.stage).toBe("inviting");
     expect(tor.sourceListingUrl).toBeUndefined();
@@ -124,6 +133,31 @@ describe("captureProjects", () => {
     expect(r?.stats.torsCreated).toBe(1);
     expect(r?.status).toBe("success");
     expect(r?.outcomeSummary).toContain("created 1");
+  });
+
+  it("1b. still creates the TOR when the budget cannot be read (reference price from the announcement rows)", async () => {
+    const { run: r } = await run([{ projectCode: CODE }], { gproc: fakeGproc({ money: new Error("503") }) });
+    const tor = (await Tor.findOne({ projectCode: CODE }))!;
+    expect(tor.budget).toBeUndefined();
+    expect(tor.referencePrice).toBe(4890000);
+    expect(r?.stats.torsCreated).toBe(1);
+    expect(r?.stats.torsFailed).toBe(0);
+  });
+
+  it("1c. fills in the budget of a captured TOR that has none, never overwrites one", async () => {
+    await seedTor({ sourceDocument: seedSource() });
+    await run([{ projectCode: CODE }], { gproc: fakeGproc() });
+    const filled = (await Tor.findOne({ projectCode: CODE }))!;
+    expect(filled.budget).toBe(5000000);
+    expect(filled.referencePrice).toBe(4890000);
+
+    await Tor.updateOne({ projectCode: CODE }, { $set: { budget: 111, referencePrice: 222 } });
+    const gproc = fakeGproc({ money: { projectMoney: 999, priceBuild: 888 } });
+    await run([{ projectCode: CODE }], { gproc });
+    const kept = (await Tor.findOne({ projectCode: CODE }))!;
+    expect(kept.budget).toBe(111);
+    expect(kept.referencePrice).toBe(222);
+    expect(gproc.moneyCalls).toBe(0);
   });
 
   it("2. leaves an existing TOR alone", async () => {

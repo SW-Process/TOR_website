@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { IProcurement } from "../../models/Tor";
-import type { GprocAnnouncement, GprocProjectDetail } from "../../scraper/gprocClient.types";
+import type { GprocAnnouncement, GprocMoney, GprocProjectDetail } from "../../scraper/gprocClient.types";
 import { buildGprocProcurement } from "../gprocMap";
 
 export interface MappedGprocTor {
@@ -23,12 +23,13 @@ const text = (v: string | null | undefined): string | undefined => {
 };
 
 /**
- * Pure transform: process5 detail + announcement rows → what a new Tor is created from. The reference
- * price is the first `priceBuild` on the rows; `announcementDate` is the earliest announcement. process5
- * gives no budget, so `budget` is never set. No I/O.
+ * Pure transform: process5 detail + announcement rows → what a new Tor is created from. `budget` is
+ * `projectMoney` and the reference price is `priceBuild`, both from `getProcurementDetail` (`money`); without
+ * it the reference price falls back to the first `priceBuild` on the announcement rows and `budget` is left
+ * unset. `announcementDate` is the earliest announcement. No I/O.
  */
 export function mapGprocTor(
-  input: { detail: GprocProjectDetail; announcements: GprocAnnouncement[] },
+  input: { detail: GprocProjectDetail; announcements: GprocAnnouncement[]; money?: GprocMoney | null },
   now: Date
 ): MappedGprocTor | null {
   const title = text(input.detail.projectName);
@@ -42,11 +43,13 @@ export function mapGprocTor(
   const department = text(input.detail.deptName);
   if (agency) set.agency = agency;
   if (department) set.department = department;
-  if (prices.length > 0) set.referencePrice = prices[0];
+  if (input.money?.projectMoney) set.budget = input.money.projectMoney;
+  const referencePrice = input.money?.priceBuild ?? prices[0];
+  if (referencePrice !== undefined) set.referencePrice = referencePrice;
   if (dates.length > 0) set.announcementDate = dates[0]; // announcements are sorted oldest first
 
   const hash = createHash("sha256")
-    .update([title, department ?? "", agency ?? "", String(set.referencePrice ?? "")].join("|"))
+    .update([title, department ?? "", agency ?? "", String(set.referencePrice ?? ""), String(set.budget ?? "")].join("|"))
     .digest("hex");
   return { set, sourceContentHash: hash, procurement, unknownCodes };
 }

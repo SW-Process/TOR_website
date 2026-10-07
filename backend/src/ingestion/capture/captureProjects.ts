@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { HydratedDocument, Types } from "mongoose";
 import { IngestionRun, Tor } from "../../models";
 import type { ITor } from "../../models/Tor";
-import type { GprocCaptureClientLike } from "../../scraper/gprocClient.types";
+import type { GprocCaptureClientLike, GprocMoney } from "../../scraper/gprocClient.types";
 import type { BlobStorage } from "../../storage/storage.types";
 import { enqueue } from "../enrichment/enrichmentJobRepo";
 import { gprocProjectUrl } from "../gprocUrl";
@@ -103,11 +103,33 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
     return false;
   }
 
+  /** Budget and reference price; a miss only costs those two fields, so an error is logged and swallowed. */
+  async function fetchMoney(code: string): Promise<GprocMoney | null> {
+    try {
+      return await deps.gproc.procurementMoney(code);
+    } catch (err) {
+      await log("warning", `capture ${code}: budget not read (${(err as Error).message})`);
+      return null;
+    }
+  }
+
   async function processOne(p: CaptureProject): Promise<Outcome> {
     const code = p.projectCode;
     const existing = await Tor.findOne({ projectCode: code });
     if (existing) {
       if (existing.procurement?.source !== "gproc") return { kind: "known", note: "already in the database" };
+      // A captured TOR created before the budget was read: fill it in (only the empty fields, in one atomic write).
+      if (existing.budget == null) {
+        const money = await fetchMoney(code);
+        const set: Record<string, number> = {};
+        if (money?.projectMoney) set.budget = money.projectMoney;
+        if (existing.referencePrice == null && money?.priceBuild) set.referencePrice = money.priceBuild;
+        if (Object.keys(set).length > 0) {
+          await Tor.updateOne({ _id: existing._id, ...(set.budget ? { budget: null } : {}) }, { $set: set });
+          existing.budget = set.budget ?? existing.budget;
+          await log("info", `capture ${code}: budget filled in from process5`);
+        }
+      }
       const doc = existing.sourceDocument;
       // (a) never judged: no document yet -> retry, then queue; a stored document but (maybe) no job (a failed
       // enqueue earlier) -> just queue it (idempotent when the job exists with the same hash).
@@ -164,7 +186,8 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
     } catch (err) {
       return { kind: "failed", note: `process5: ${(err as Error).message}`, gproc: "error" };
     }
-    const mapped = mapGprocTor({ detail, announcements: rows }, now());
+    const money = await fetchMoney(code);
+    const mapped = mapGprocTor({ detail, announcements: rows, money }, now());
     if (!mapped) return { kind: "failed", note: "process5 returned no project name", gproc: "error" };
     for (const c of mapped.unknownCodes) await log("warning", `capture ${code}: unknown process5 announce type "${c}" (treated as unknown)`);
 

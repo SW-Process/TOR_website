@@ -28,6 +28,15 @@ describe("mapGprocTor", () => {
     expect(m?.procurement).toMatchObject({ stage: "inviting", source: "gproc" });
   });
 
+  it("takes the budget (projectMoney) and the reference price (priceBuild) from the money figures", () => {
+    const m = mapGprocTor({ detail: detail(), announcements: [row("D0", "2026-09-30T17:00:00.000Z", 6055000)], money: { projectMoney: 6399000, priceBuild: 6000000 } }, NOW);
+    expect(m?.set.budget).toBe(6399000);
+    expect(m?.set.referencePrice).toBe(6000000);
+    const noBudget = mapGprocTor({ detail: detail(), announcements: [], money: { projectMoney: null, priceBuild: 5000000 } }, NOW);
+    expect(noBudget?.set.budget).toBeUndefined();
+    expect(noBudget?.set.referencePrice).toBe(5000000);
+  });
+
   it("is stable: the same input gives the same hash, a different title a different one", () => {
     const a = mapGprocTor({ detail: detail(), announcements: [] }, NOW);
     const b = mapGprocTor({ detail: detail(), announcements: [] }, new Date("2027-01-01"));
