@@ -514,6 +514,44 @@ describe("GET /api/ingestion/lifecycle/pending", () => {
   });
 });
 
+describe("GET /api/ingestion/capture/pending", () => {
+  afterEach(async () => {
+    await Tor.deleteMany({});
+  });
+
+  const url = (id: string) => `https://egp.test/project-detail/${id}`;
+  const doc = { storageKey: "tor/x.pdf", sha256: "a", textLayer: "digital", filename: "f.pdf", egpUrl: "https://egp.test/f" };
+
+  it("401 without a session and 403 for a vendor", async () => {
+    expect((await request(app).get("/api/ingestion/capture/pending")).status).toBe(401);
+    const agent = request.agent(app);
+    await agent.post("/api/auth/register").send({ email: "v6@test.com", password: "secret123" });
+    expect((await agent.get("/api/ingestion/capture/pending")).status).toBe(403);
+  });
+
+  it("counts only captured TORs that are pending and have no stored document", async () => {
+    await Tor.create([
+      { title: "stuck-missing", pipelineStatus: "pending", sourceListingUrl: url("1"), procurement: { source: "gproc", stage: "inviting", announcements: [], lastCheckedAt: new Date() } },
+      { title: "stuck-null-key", pipelineStatus: "pending", sourceListingUrl: url("2"), procurement: { source: "gproc", stage: "inviting", announcements: [], lastCheckedAt: new Date() }, sourceDocument: { storageKey: null, textLayer: "missing", filename: "f.pdf", egpUrl: "https://egp.test/f" } },
+      { title: "egp2", pipelineStatus: "pending", sourceListingUrl: url("3"), procurement: { source: "egp2", stage: "inviting", announcements: [], lastCheckedAt: new Date() } },
+      { title: "enriched", pipelineStatus: "enriched", sourceListingUrl: url("4"), procurement: { source: "gproc", stage: "inviting", announcements: [], lastCheckedAt: new Date() } },
+      { title: "has-doc", pipelineStatus: "pending", sourceListingUrl: url("5"), procurement: { source: "gproc", stage: "inviting", announcements: [], lastCheckedAt: new Date() }, sourceDocument: doc },
+      { title: "rejected", pipelineStatus: "rejected", sourceListingUrl: url("6"), procurement: { source: "gproc", stage: "inviting", announcements: [], lastCheckedAt: new Date() } },
+    ] as any);
+    const agent = await adminAgent();
+
+    const res = await agent.get("/api/ingestion/capture/pending");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ stuck: 2 });
+  });
+
+  it("reports zero when nothing is stuck", async () => {
+    const agent = await adminAgent();
+    expect((await agent.get("/api/ingestion/capture/pending")).body).toEqual({ stuck: 0 });
+  });
+});
+
 describe("GET /api/ingestion/runs", () => {
   it("reports an idle lifecycle run as failed rather than running", async () => {
     const dead = await IngestionRun.create({ trigger: "scheduled", phase: "lifecycle", status: "running" });

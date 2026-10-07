@@ -13,7 +13,7 @@ export default function BookmarkButton({
   const { isBookmarked, toggle, ready, canBookmark } = useBookmarks();
   const active = ready && isBookmarked(id);
 
-  // Bookmarking is a vendor feature (the API rejects other roles).
+  // Bookmarking is a vendor/admin feature (the API rejects other roles).
   if (!canBookmark) return null;
 
   if (variant === "full") {

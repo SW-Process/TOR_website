@@ -155,8 +155,8 @@ async function setApplicationStatus(torId: string, applicationStatus: Applicatio
 
 export function useBookmarks() {
   const { user, ready: authReady } = useAuth();
-  // Bookmarks are a vendor feature; the API 403s for other roles.
-  const userId = authReady && user?.role === "vendor" ? user.id : null;
+  // Bookmarks are a vendor/admin feature; the API 403s for other roles.
+  const userId = authReady && (user?.role === "vendor" || user?.role === "admin") ? user.id : null;
 
   useEffect(() => {
     if (authReady) ensureLoaded(userId);

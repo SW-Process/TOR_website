@@ -16,7 +16,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useBookmarks } from "@/lib/useBookmarks";
 import { useProfile } from "@/lib/useProfile";
 import { useMatches } from "@/lib/useMatches";
-import { daysUntil, categories, type Category, type TOR } from "@/lib/mockData";
+import { categories, type Category, type TOR } from "@/lib/mockData";
 import { fetchTorList, mapApiTor } from "@/lib/torApi";
 import { bidDaysLeft, isActiveOpportunity, isBiddable } from "@/lib/torStatus";
 
@@ -48,8 +48,14 @@ function DashboardContent() {
     () =>
       [...openTor]
         .sort((a, b) => {
-          const byDeadline = daysUntil(a.deadline) - daysUntil(b.deadline);
-          return byDeadline !== 0 ? byDeadline : b.views - a.views;
+          const da = bidDaysLeft(a);
+          const db = bidDaysLeft(b);
+          if (da !== db) {
+            if (da === null) return 1;
+            if (db === null) return -1;
+            return da - db;
+          }
+          return b.views - a.views;
         })
         .slice(0, 6),
     [openTor],

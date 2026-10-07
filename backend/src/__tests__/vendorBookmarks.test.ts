@@ -35,6 +35,14 @@ async function vendorAgent(email = "vendor@test.com") {
   return agent;
 }
 
+async function adminAgent(email = "admin@test.com") {
+  const agent = request.agent(app);
+  await agent.post("/api/auth/register").send({ email, password: "secret123" });
+  await User.updateOne({ email }, { role: "admin" });
+  await agent.post("/api/auth/login").send({ email, password: "secret123" });
+  return agent;
+}
+
 async function seedTors() {
   const [a, b, hidden] = await Tor.create([
     { title: "ระบบสารบรรณ", agency: "สำนักการแพทย์", pipelineStatus: "enriched", budget: 1_000_000 },
@@ -133,6 +141,39 @@ describe("/api/vendor/bookmarks", () => {
     const bobs = (await bob.get("/api/vendor/bookmarks")).body.data;
     expect(bobs).toHaveLength(1);
     expect(bobs[0].applicationStatus).toBe("submitted");
+  });
+
+  it("lets an admin bookmark, list, update and delete, separate from a vendor's", async () => {
+    const { a } = await seedTors();
+    const vendor = await vendorAgent();
+    const admin = await adminAgent();
+    await vendor.put(`/api/vendor/bookmarks/${a}`);
+
+    expect((await admin.get("/api/vendor/bookmarks")).body.data).toEqual([]);
+    const put = await admin.put(`/api/vendor/bookmarks/${a}`);
+    expect(put.status).toBe(200);
+    expect(put.body.bookmark.applicationStatus).toBe("interested");
+
+    const patch = await admin.patch(`/api/vendor/bookmarks/${a}`).send({ applicationStatus: "submitted" });
+    expect(patch.status).toBe(200);
+    expect(patch.body.bookmark.applicationStatus).toBe("submitted");
+
+    const adminList = (await admin.get("/api/vendor/bookmarks")).body.data;
+    expect(adminList).toHaveLength(1);
+    expect(adminList[0].applicationStatus).toBe("submitted");
+    const vendorList = (await vendor.get("/api/vendor/bookmarks")).body.data;
+    expect(vendorList).toHaveLength(1);
+    expect(vendorList[0].applicationStatus).toBe("interested");
+
+    expect((await admin.delete(`/api/vendor/bookmarks/${a}`)).status).toBe(204);
+    expect((await admin.get("/api/vendor/bookmarks")).body.data).toEqual([]);
+    expect((await vendor.get("/api/vendor/bookmarks")).body.data).toHaveLength(1);
+  });
+
+  it("still keeps saved searches and hidden TORs closed to an admin", async () => {
+    const admin = await adminAgent();
+    expect((await admin.get("/api/vendor/profile/saved-searches")).status).toBe(403);
+    expect((await admin.get("/api/vendor/hidden-tors")).status).toBe(403);
   });
 
   it("hides bookmarks whose TOR is no longer public", async () => {

@@ -22,7 +22,7 @@ Lets an admin collect project numbers from the national e-GP search page
 2. Open the extension popup and press **ส่งเข้าระบบ**.
 3. The popup polls the run while it is open and shows the summary (reopening it resumes the last run); sent projects are removed from the collection. **ล้าง** empties it.
 
-The API URL defaults to `http://localhost:8000`. To point at the deployed API, enter its URL in the popup and press **บันทึก** (Chrome asks for permission to that origin). Only the origin of the URL is saved, so an API served under a path prefix is not supported.
+The API URL defaults to `http://localhost:8000` and is hidden until you press the gear (ตั้งค่า) button in the popup header. To point at the deployed API, enter its URL there and press **บันทึก** (Chrome asks for permission to that origin). Only the origin of the URL is saved, so an API served under a path prefix is not supported.
 
 ## Tests
 

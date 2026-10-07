@@ -45,10 +45,48 @@ describe("access control", () => {
     expect(res.status).toBe(401);
   });
 
-  it("403 for an admin", async () => {
+  it("401 on matches and the vendor-only routes without a session", async () => {
+    for (const path of ["/matches", "/profile/saved-searches", "/bookmarks", "/hidden-tors"]) {
+      expect((await request(app).get(`/api/vendor${path}`)).status).toBe(401);
+    }
+  });
+
+  it("lets an admin read an empty profile created on demand", async () => {
     const agent = await adminAgent();
     const res = await agent.get("/api/vendor/profile");
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect(res.body.profile.savedSearches).toEqual([]);
+    expect(await VendorProfile.countDocuments()).toBe(1);
+  });
+
+  it("lets an admin save a profile, separate from a vendor's", async () => {
+    const vendor = await vendorAgent();
+    const admin = await adminAgent();
+    await vendor.put("/api/vendor/profile").send({ companyName: "Vendor Co" }).expect(200);
+    await admin.put("/api/vendor/profile").send({ companyName: "Admin Co" }).expect(200);
+
+    expect((await admin.get("/api/vendor/profile")).body.profile.companyName).toBe("Admin Co");
+    expect((await vendor.get("/api/vendor/profile")).body.profile.companyName).toBe("Vendor Co");
+  });
+
+  it("lets an admin use matches", async () => {
+    const admin = await adminAgent();
+    expect((await admin.get("/api/vendor/matches")).status).toBe(200);
+  });
+
+  it("keeps saved searches and hidden TORs vendor-only", async () => {
+    const admin = await adminAgent();
+    expect((await admin.get("/api/vendor/profile/saved-searches")).status).toBe(403);
+    expect((await admin.post("/api/vendor/profile/saved-searches").send({ name: "x" })).status).toBe(403);
+    expect((await admin.get("/api/vendor/hidden-tors")).status).toBe(403);
+    expect((await admin.put(`/api/vendor/hidden-tors/${new mongoose.Types.ObjectId()}`)).status).toBe(403);
+  });
+
+  it("keeps every vendor route open to a vendor", async () => {
+    const vendor = await vendorAgent();
+    for (const path of ["/profile", "/matches", "/profile/saved-searches", "/bookmarks", "/hidden-tors"]) {
+      expect((await vendor.get(`/api/vendor${path}`)).status).toBe(200);
+    }
   });
 });
 
@@ -296,11 +334,11 @@ describe("PUT /api/vendor/profile — access control", () => {
     expect(res.status).toBe(401);
   });
 
-  it("403 for an admin", async () => {
+  it("lets an admin save their own technologyStack", async () => {
     const agent = await adminAgent();
     const res = await agent.put("/api/vendor/profile").send({ technologyStack: ["React"] });
-    expect(res.status).toBe(403);
-    expect(await VendorProfile.countDocuments()).toBe(0);
+    expect(res.status).toBe(200);
+    expect(await VendorProfile.countDocuments()).toBe(1);
   });
 });
 

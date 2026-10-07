@@ -3,8 +3,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { BellRing, ChevronLeft, ChevronRight, X } from "lucide-react";
-import { formatThaiDate, TODAY_ISO, type TOR } from "@/lib/mockData";
-import { bidDaysLeft, isBiddable } from "@/lib/torStatus";
+import { formatThaiDate, type TOR } from "@/lib/mockData";
+import {
+  bangkokToday,
+  bidDaysLeft,
+  bidDeadlineDay,
+  bidDeadlineMonth,
+  isBiddable,
+} from "@/lib/torStatus";
 import { useDayNotes } from "@/lib/useDayNotes";
 
 const weekdayLabels = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
@@ -15,12 +21,13 @@ const monthLabels = [
 
 const CELL_HEIGHT = 96; // px — fixed for every day cell, every month, no exceptions
 
-function dateKey(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
+const weekdayNames = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 
-function monthIndex(d: Date) {
-  return d.getFullYear() * 12 + d.getMonth();
+/** YYYY-MM-DD from the LOCAL calendar parts of a cell date (never toISOString, which is UTC). */
+function localDayKey(d: Date) {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -53,7 +60,7 @@ function DayNoteModal({
       >
         <div className="flex items-start justify-between gap-3">
           <h3 className="text-sm font-bold leading-snug text-[var(--color-text)]">
-            โน้ตวันที่ {formatThaiDate(dateKey(date))}
+            โน้ตวันที่ {formatThaiDate(localDayKey(date))}
           </h3>
           <button
             aria-label="ปิด"
@@ -102,13 +109,16 @@ function CalendarTable({
   dayNoteOf: (dateKey: string) => string;
   onOpenDayNote: (date: Date) => void;
 }) {
-  const today = new Date(TODAY_ISO);
-  const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const todayKey = bangkokToday();
+  const [ty, tm, td] = todayKey.split("-").map(Number);
+  const weekday = weekdayNames[new Date(Date.UTC(ty, tm - 1, td)).getUTCDay()];
+  const [cursor, setCursor] = useState(() => new Date(ty, tm - 1, 1));
 
   const byDate = useMemo(() => {
     const map = new Map<string, TOR[]>();
     for (const tor of saved) {
-      const key = tor.deadline.slice(0, 10);
+      const key = bidDeadlineDay(tor);
+      if (!key) continue;
       map.set(key, [...(map.get(key) ?? []), tor]);
     }
     return map;
@@ -116,7 +126,13 @@ function CalendarTable({
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
-  const hasDeadlineThisMonth = saved.some((t) => monthIndex(new Date(t.deadline)) === monthIndex(cursor));
+  const monthOnly = saved.filter((t) => {
+    const m = bidDeadlineMonth(t);
+    return m !== null && m.year === year && m.month === month;
+  });
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}-`;
+  const hasDeadlineThisMonth =
+    monthOnly.length > 0 || [...byDate.keys()].some((k) => k.startsWith(monthPrefix));
 
   const firstOfMonth = new Date(year, month, 1);
   const startOffset = firstOfMonth.getDay();
@@ -140,6 +156,12 @@ function CalendarTable({
         </h2>
         <div className="flex items-center gap-1.5">
           <button
+            onClick={() => setCursor(new Date(ty, tm - 1, 1))}
+            className="rounded-lg px-2.5 py-1 text-xs font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-alt)]"
+          >
+            วันนี้
+          </button>
+          <button
             aria-label="เดือนก่อนหน้า"
             onClick={() => setCursor(new Date(year, month - 1, 1))}
             className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-alt)]"
@@ -162,6 +184,9 @@ function CalendarTable({
         </div>
       )}
 
+      <p className="px-5 pb-1 text-xs font-semibold text-[var(--color-text)] sm:px-6">
+        วันนี้ วัน{weekday}ที่ {td} {monthLabels[tm - 1]} {ty + 543}
+      </p>
       <p className="px-5 pb-2 text-[11px] text-[var(--color-text-faint)] sm:px-6">
         คลิกที่วันเพื่อเพิ่มโน้ตของคุณเอง
       </p>
@@ -186,9 +211,10 @@ function CalendarTable({
             <tr key={wi}>
               {week.map((date, di) => {
                 const isWeekend = di === 0 || di === 6;
-                const items = date ? byDate.get(dateKey(date)) ?? [] : [];
-                const isToday = date ? dateKey(date) === TODAY_ISO : false;
-                const note = date ? dayNoteOf(dateKey(date)) : "";
+                const key = date ? localDayKey(date) : "";
+                const items = date ? byDate.get(key) ?? [] : [];
+                const isToday = date ? key === todayKey : false;
+                const note = date ? dayNoteOf(key) : "";
                 return (
                   <td
                     key={di}
@@ -228,7 +254,7 @@ function CalendarTable({
                             <Link
                               key={tor.id}
                               href={`/tor/${tor.id}`}
-                              title={tor.title}
+                              title={`${tor.title} — ปิดรับ ${formatThaiDate(key)}`}
                               onClick={(e) => e.stopPropagation()}
                               className="truncate rounded-md bg-[var(--color-rose-light)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-rose-dark)] transition-colors hover:bg-[var(--color-blush)]"
                             >
@@ -250,6 +276,21 @@ function CalendarTable({
           ))}
         </tbody>
       </table>
+
+      {monthOnly.length > 0 && (
+        <div className="flex flex-col gap-1.5 border-t border-[var(--color-border)] px-5 py-3 sm:px-6">
+          <span className="text-xs font-bold text-[var(--color-text)]">ภายในเดือนนี้ (ไม่ระบุวัน)</span>
+          {monthOnly.map((tor) => (
+            <Link
+              key={tor.id}
+              href={`/tor/${tor.id}`}
+              className="truncate text-xs text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-text)]"
+            >
+              {tor.title}
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -298,8 +339,8 @@ export default function DeadlineCalendar({ saved }: { saved: TOR[] }) {
       {ready && activeDay && (
         <DayNoteModal
           date={activeDay}
-          initialValue={dayNoteOf(dateKey(activeDay))}
-          onSave={(note) => setDayNote(dateKey(activeDay), note)}
+          initialValue={dayNoteOf(localDayKey(activeDay))}
+          onSave={(note) => setDayNote(localDayKey(activeDay), note)}
           onClose={() => setActiveDay(null)}
         />
       )}

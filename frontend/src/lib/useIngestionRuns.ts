@@ -69,10 +69,23 @@ export function useIngestionRuns() {
   const [enrichmentQueue, setEnrichmentQueue] = useState<EnrichmentQueueInfo | null>(null);
   const [lifecyclePending, setLifecyclePending] = useState(false);
   const [lifecycleQueue, setLifecycleQueue] = useState<LifecycleQueueInfo | null>(null);
+  // Captured TORs with no document yet (GET /api/ingestion/capture/pending); null until loaded.
+  const [captureStuck, setCaptureStuck] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pollTimers = useRef<Partial<Record<IngestionPhase, ReturnType<typeof setInterval>>>>({});
 
+  const refreshCaptureStuck = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/ingestion/capture/pending");
+      if (!res.ok) return;
+      setCaptureStuck(((await res.json()) as { stuck: number }).stuck);
+    } catch {
+      // The count is advisory.
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
+    void refreshCaptureStuck();
     const res = await apiFetch("/api/ingestion/runs?limit=20");
     if (res.status === 401 || res.status === 403) {
       setForbidden(true);
@@ -82,7 +95,7 @@ export function useIngestionRuns() {
     const { runs: list } = (await res.json()) as { runs: IngestionRun[] };
     setRuns(list);
     return list;
-  }, []);
+  }, [refreshCaptureStuck]);
 
   const refreshEnrichmentQueue = useCallback(async () => {
     try {
@@ -173,6 +186,11 @@ export function useIngestionRuns() {
     apiFetch("/api/ingestion/lifecycle/pending")
       .then(async (res) => {
         if (res.ok) setLifecycleQueue((await res.json()) as LifecycleQueueInfo);
+      })
+      .catch(() => undefined); // advisory count only
+    apiFetch("/api/ingestion/capture/pending")
+      .then(async (res) => {
+        if (res.ok) setCaptureStuck(((await res.json()) as { stuck: number }).stuck);
       })
       .catch(() => undefined); // advisory count only
   }, [pollUntilSettled]);
@@ -286,6 +304,7 @@ export function useIngestionRuns() {
     enrichmentQueue,
     lifecyclePending,
     lifecycleQueue,
+    captureStuck,
     triggerIngestion,
     triggerEnrichment,
     triggerLifecycle,

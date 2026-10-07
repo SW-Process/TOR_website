@@ -126,10 +126,16 @@ function LogDetail({ log }: { log: LogEntry }) {
 }
 
 /** Admin view of backend SystemLog rows (FR-37, FR-38), via GET /api/admin/logs. */
-export default function SystemLogs() {
-  const [query, setQuery] = useState("");
+export default function SystemLogs({
+  initialQuery = "",
+  initialSource = "",
+}: {
+  initialQuery?: string;
+  initialSource?: LogSource | "";
+} = {}) {
+  const [query, setQuery] = useState(initialQuery);
   const [level, setLevel] = useState<LogLevel | "ทั้งหมด">("ทั้งหมด");
-  const [source, setSource] = useState<LogSource | "">("");
+  const [source, setSource] = useState<LogSource | "">(initialSource);
   const [dateFrom, setDateFrom] = useState(""); // YYYY-MM-DD from <input type="date">
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
