@@ -54,6 +54,31 @@ function daysFromNow(iso: string): number {
   return bangkokDayNumber(target) - bangkokDayNumber(now);
 }
 
+/** Today's Asia/Bangkok calendar day (YYYY-MM-DD) on the real clock. */
+export function bangkokToday(): string {
+  return bangkokDay.format(new Date());
+}
+
+/** Bangkok calendar day (YYYY-MM-DD) of the bid deadline; null when unknown or month-only. */
+export function bidDeadlineDay(tor: Pick<TOR, "procurement">): string | null {
+  const bid = tor.procurement?.bidDeadline ?? null;
+  if (!bid || tor.procurement?.bidDeadlinePrecision === "month") return null;
+  const ms = Date.parse(bid);
+  return Number.isNaN(ms) ? null : bangkokDay.format(new Date(ms));
+}
+
+/** Bangkok year and 0-based month of a month-only bid deadline; null otherwise. */
+export function bidDeadlineMonth(
+  tor: Pick<TOR, "procurement">,
+): { year: number; month: number } | null {
+  const bid = tor.procurement?.bidDeadline ?? null;
+  if (!bid || tor.procurement?.bidDeadlinePrecision !== "month") return null;
+  const ms = Date.parse(bid);
+  if (Number.isNaN(ms)) return null;
+  const [y, m] = bangkokDay.format(new Date(ms)).split("-").map(Number);
+  return { year: y, month: m - 1 };
+}
+
 /** Whole days until the real bid deadline, or null when the TOR has none known. Real clock. */
 export function bidDaysLeft(tor: Pick<TOR, "procurement">): number | null {
   const bid = tor.procurement?.bidDeadline ?? null;
