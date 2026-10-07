@@ -24,8 +24,8 @@ const publicLinks = [
   { href: CLOSING_SOON_HREF, label: "ใกล้ปิดรับ" },
 ];
 
-// Vendor-only pages: their APIs reject admins, so admins get the admin panel link instead.
-const vendorLinks = [
+// Vendor and admin pages (dashboard, saved list): the bookmark API accepts both roles.
+const memberLinks = [
   { href: "/dashboard", label: "แดชบอร์ด" },
   { href: "/bookmarks", label: "รายการที่บันทึก" },
 ];
@@ -39,7 +39,8 @@ export default function Header() {
   const loggedIn = ready && isLoggedIn;
   const isAdmin = loggedIn && user?.role === "admin";
   const isVendor = loggedIn && user?.role === "vendor";
-  const navLinks = [...publicLinks, ...(isVendor ? vendorLinks : [])];
+  const hasBusinessFeatures = isVendor || isAdmin;
+  const navLinks = [...publicLinks, ...(hasBusinessFeatures ? memberLinks : [])];
 
   async function handleLogout() {
     await logout();
@@ -91,7 +92,7 @@ export default function Header() {
             </Link>
           )}
 
-          {isVendor && (
+          {hasBusinessFeatures && (
             <Link
               href="/bookmarks"
               aria-label="รายการที่บันทึก"
@@ -134,7 +135,7 @@ export default function Header() {
                         หน้าแอดมิน
                       </Link>
                     )}
-                    {isVendor && (
+                    {hasBusinessFeatures && (
                       <Link
                         href="/account/profile"
                         onClick={() => setMenuOpen(false)}
@@ -214,7 +215,7 @@ export default function Header() {
                   หน้าแอดมิน · {displayName}
                 </Link>
               )}
-              {isVendor && (
+              {hasBusinessFeatures && (
                 <Link
                   href="/account/profile"
                   onClick={() => setOpen(false)}

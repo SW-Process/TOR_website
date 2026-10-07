@@ -96,6 +96,7 @@ export default function SettingsShell({
   const { user, displayName, logout } = useAuth();
   const router = useRouter();
   const isVendor = user?.role === "vendor";
+  const isAdmin = user?.role === "admin";
 
   async function handleLogout() {
     await logout();
@@ -148,9 +149,11 @@ export default function SettingsShell({
             </NavGroup>
 
             <NavGroup title="การใช้งาน TOR Checker">
+              {(isVendor || isAdmin) && (
+                <NavItem icon={Briefcase} label="โปรไฟล์ธุรกิจ" href="/account/profile" active={active === "business"} />
+              )}
               {isVendor && (
                 <>
-                  <NavItem icon={Briefcase} label="โปรไฟล์ธุรกิจ" href="/account/profile" active={active === "business"} />
                   <NavItem icon={Bookmark} label="รายการที่บันทึก" href={settingsHref("saved")} active={active === "saved"} />
                   <NavItem icon={EyeOff} label="TOR ที่ซ่อนไว้" href={settingsHref("hidden")} active={active === "hidden"} />
                 </>

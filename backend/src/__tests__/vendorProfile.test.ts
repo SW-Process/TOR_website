@@ -74,12 +74,12 @@ describe("access control", () => {
     expect((await admin.get("/api/vendor/matches")).status).toBe(200);
   });
 
-  it("keeps saved searches, bookmarks and hidden TORs vendor-only", async () => {
+  it("keeps saved searches and hidden TORs vendor-only", async () => {
     const admin = await adminAgent();
     expect((await admin.get("/api/vendor/profile/saved-searches")).status).toBe(403);
     expect((await admin.post("/api/vendor/profile/saved-searches").send({ name: "x" })).status).toBe(403);
-    expect((await admin.get("/api/vendor/bookmarks")).status).toBe(403);
     expect((await admin.get("/api/vendor/hidden-tors")).status).toBe(403);
+    expect((await admin.put(`/api/vendor/hidden-tors/${new mongoose.Types.ObjectId()}`)).status).toBe(403);
   });
 
   it("keeps every vendor route open to a vendor", async () => {

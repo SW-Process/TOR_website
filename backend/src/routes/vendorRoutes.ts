@@ -36,10 +36,10 @@ router.delete("/profile/saved-searches/:searchId", vendorOnly, deleteSavedSearch
 
 router.get("/matches", vendorOrAdmin, listMatches);
 
-router.get("/bookmarks", vendorOnly, listBookmarks);
-router.put("/bookmarks/:torId", vendorOnly, putBookmark);
-router.patch("/bookmarks/:torId", vendorOnly, updateBookmark);
-router.delete("/bookmarks/:torId", vendorOnly, deleteBookmark);
+router.get("/bookmarks", vendorOrAdmin, listBookmarks);
+router.put("/bookmarks/:torId", vendorOrAdmin, putBookmark);
+router.patch("/bookmarks/:torId", vendorOrAdmin, updateBookmark);
+router.delete("/bookmarks/:torId", vendorOrAdmin, deleteBookmark);
 
 router.get("/hidden-tors", vendorOnly, listHiddenTors);
 router.put("/hidden-tors/:torId", vendorOnly, hideTor);
