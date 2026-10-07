@@ -78,6 +78,53 @@ describe("buildGprocProcurement", () => {
     expect(unknownCodes).toEqual(["X9"]);
   });
 
+  describe("D1 (cancelled invitation) and P0 (plan)", () => {
+    const build = (rows: ReturnType<typeof row>[]) => buildGprocProcurement({ detail: detail({ announceType: "D0" }), announcements: rows }, undefined, NOW);
+
+    it("D0 then a later D1 -> cancelled, D1 mapped to a cancellation", () => {
+      const { procurement: p, unknownCodes } = build([row("D0", "2026-09-22T17:00:00.000Z"), row("D1", "2026-09-30T17:00:00.000Z")]);
+      expect(p.stage).toBe("cancelled");
+      const d1 = p.announcements[1]!;
+      expect(d1.kind).toBe("cancellation");
+      expect(d1.typeName).toBe("ยกเลิกประกาศเชิญชวน");
+      expect(unknownCodes).not.toContain("D1");
+    });
+
+    it("D1 then a later D0 (re-issued) -> inviting", () => {
+      expect(build([row("D1", "2026-09-22T17:00:00.000Z"), row("D0", "2026-09-30T17:00:00.000Z")]).procurement.stage).toBe("inviting");
+    });
+
+    it("D0 and D1 on the same Bangkok day -> inviting", () => {
+      expect(build([row("D0", "2026-09-22T17:00:00.000Z"), row("D1", "2026-09-22T17:00:00.000Z")]).procurement.stage).toBe("inviting");
+    });
+
+    it("D0, W0 then a later D1 -> cancelled", () => {
+      const { procurement: p } = build([row("D0", "2026-09-22T17:00:00.000Z"), row("W0", "2026-09-30T17:00:00.000Z"), row("D1", "2026-10-03T17:00:00.000Z")]);
+      expect(p.stage).toBe("cancelled");
+      expect(p.contractStatus).toBeUndefined();
+    });
+
+    it("P0 alone -> draft with kind plan; with D0 -> inviting", () => {
+      const alone = build([row("P0", "2026-09-20T17:00:00.000Z")]);
+      expect(alone.procurement.stage).toBe("draft");
+      expect(alone.procurement.announcements[0]!.kind).toBe("plan");
+      expect(alone.unknownCodes).toEqual([]);
+      expect(build([row("P0", "2026-09-20T17:00:00.000Z"), row("D0", "2026-09-30T17:00:00.000Z")]).procurement.stage).toBe("inviting");
+    });
+
+    it("D2, W1 and W2 stay unknown (once each) and never decide the stage", () => {
+      const { procurement: p, unknownCodes } = build([
+        row("D0", "2026-09-22T17:00:00.000Z"),
+        row("D2", "2026-09-25T17:00:00.000Z"),
+        row("D2", "2026-09-26T17:00:00.000Z"),
+        row("W1", "2026-09-27T17:00:00.000Z"),
+        row("W2", "2026-09-28T17:00:00.000Z"),
+      ]);
+      expect(p.stage).toBe("inviting");
+      expect(unknownCodes).toEqual(["D2", "W1", "W2"]);
+    });
+  });
+
   it("tolerates an empty list and a row without a date (sorted first)", () => {
     expect(buildGprocProcurement({ detail: detail(), announcements: [] }, undefined, NOW).procurement.stage).toBe("draft");
     const { procurement: p } = buildGprocProcurement({ detail: detail(), announcements: [row("D0", "2026-09-22T17:00:00.000Z"), row("B0", null)] }, undefined, NOW);

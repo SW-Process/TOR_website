@@ -6,6 +6,8 @@ import { deriveStage } from "./procurementStage";
 const BY_CODE: Record<string, { kind: AnnouncementKind; label: string; hasFile: boolean }> = {
   B0: { kind: "bidding-draft", label: "ร่างเอกสารประกวดราคา", hasFile: false },
   D0: { kind: "invitation", label: "ประกาศเชิญชวน", hasFile: true },
+  D1: { kind: "cancellation", label: "ยกเลิกประกาศเชิญชวน", hasFile: false },
+  P0: { kind: "plan", label: "แผนการจัดซื้อจัดจ้าง", hasFile: false },
   W0: { kind: "winner", label: "ประกาศผู้ชนะ", hasFile: false },
   price: { kind: "reference-price", label: "ประกาศราคากลาง", hasFile: false },
 };
