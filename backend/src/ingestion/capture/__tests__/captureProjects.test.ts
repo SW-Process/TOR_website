@@ -374,4 +374,34 @@ describe("captureProjects", () => {
     const tor = (await Tor.findOne({ projectCode: CODE }))!;
     expect(String(tor.ingestionRunId)).toBe(String(r._id));
   });
+
+  describe("14. the procurement-method phrase does not pass the gate", () => {
+    const M = " ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)";
+    const nonSoftware = [
+      "ประกวดราคาจ้างเหมาดูแลสวนหย่อม ประจำปีงบประมาณ พ.ศ. ๒๕๗๐" + M,
+      "ประกวดราคาจ้างเหมากำจัดปลวก แมลง และพาหะนำโรค ประจำปีงบประมาณ พ.ศ. ๒๕๗๐" + M,
+      "ประกวดราคาจ้างเหมาบำรุงรักษาระบบดับเพลิง และระบบป้องกันแจ้งเตือนเพลิงไหม้ประจำอาคาร ประจำปีงบประมาณ พ.ศ. ๒๕๗๐" + M,
+      "ประกวดราคาจ้างจ้างเหมาทำความสะอาด คณะวิทยาศาสตร์ จำนวน 1 งาน" + M,
+    ];
+    it.each(nonSoftware)("skips as a hint, no process5 call: %s", async (title) => {
+      const gproc = fakeGproc();
+      const { run: r } = await run([{ projectCode: CODE, title }], { gproc });
+      expect(gproc.detailCalls).toEqual([]);
+      expect(r?.stats.torsSkipped).toBe(1);
+      expect(await Tor.countDocuments()).toBe(0);
+    });
+    it.each(nonSoftware)("skips as the server title: %s", async (title) => {
+      const gproc = fakeGproc({ detail: (c) => detail(c, { projectName: title }) });
+      const { run: r, enq } = await run([{ projectCode: CODE }], { gproc });
+      expect(r?.stats.torsSkipped).toBe(1);
+      expect(await Tor.countDocuments()).toBe(0);
+      expect(enq).not.toHaveBeenCalled();
+    });
+    it("still passes a genuine software title", async () => {
+      const title = "ประกวดราคาจ้างบำรุงรักษาระบบเครือข่ายและโปรแกรมประยุกต์ ตามโครงการจ้างพัฒนาระบบยืนยันและตรวจสอบตัวบุคคลในระบบดิจิทัล" + M;
+      const gproc = fakeGproc({ detail: (c) => detail(c, { projectName: title }) });
+      await run([{ projectCode: CODE, title }], { gproc });
+      expect(await Tor.countDocuments()).toBe(1);
+    });
+  });
 });

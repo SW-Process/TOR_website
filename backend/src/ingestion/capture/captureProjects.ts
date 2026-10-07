@@ -12,6 +12,7 @@ import { looksSoftwareRelated } from "../softwareKeywordGate";
 import { storeTorPdf } from "../storeTorPdf";
 import { agencyMatches, captureAgencies } from "./agencies";
 import { mapGprocTor } from "./mapGprocTor";
+import { stripProcurementMethod } from "./stripProcurementMethod";
 import { torFromBundle } from "./torFromBundle";
 
 const COMPONENT = "captureProjects";
@@ -144,7 +145,7 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
       return { kind: "known", note: "already in the database" };
     }
 
-    if (p.title && !looksSoftwareRelated(p.title)) return { kind: "skipped", note: "title hint is not software related" };
+    if (p.title && !looksSoftwareRelated(stripProcurementMethod(p.title))) return { kind: "skipped", note: "title hint is not software related" };
     if (p.agency && !agencyMatches(agencies, p.agency)) return { kind: "skipped", note: "agency hint not in CAPTURE_AGENCIES" };
 
     let detail;
@@ -154,7 +155,7 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
       return { kind: "failed", note: `process5: ${(err as Error).message}`, gproc: "error" };
     }
     if (!detail) return { kind: "skipped", note: "unknown to process5", gproc: "ok" };
-    if (!looksSoftwareRelated(detail.projectName ?? "")) return { kind: "skipped", note: "not software related (keyword gate)", gproc: "ok" };
+    if (!looksSoftwareRelated(stripProcurementMethod(detail.projectName ?? ""))) return { kind: "skipped", note: "not software related (keyword gate)", gproc: "ok" };
     if (!agencyMatches(agencies, detail.deptName, detail.deptSubName)) return { kind: "skipped", note: "agency not in CAPTURE_AGENCIES", gproc: "ok" };
 
     let rows;
