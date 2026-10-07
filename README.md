@@ -72,6 +72,23 @@ file in the project root:
 JWT_SECRET=your-own-secret
 ```
 
+### Stored TOR PDFs (GCS)
+
+The backend container reads stored TOR PDFs straight from the `tor-checker-pdfs`
+GCS bucket, using your own Google credentials — no shared secret is checked
+into the repo. Before your first `docker compose up`:
+
+1. Join the `tor-checker` Google Cloud organization and get read access to
+   the `tor-checker-pdfs` bucket.
+2. Install the [gcloud CLI](https://cloud.google.com/sdk/docs/install) and run:
+
+   ```sh
+   gcloud auth application-default login
+   ```
+
+If you skip this, the rest of the stack still works — PDF downloads from a
+TOR's detail page will just fail until you log in.
+
 Stop the containers with:
 
 ```sh

@@ -48,14 +48,20 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-insecure-secret-change-me}
       JWT_EXPIRES_IN: 7d
       CLIENT_ORIGIN: http://localhost:3000
-      STORAGE_DRIVER: local
+      STORAGE_DRIVER: gcs
       STORAGE_LOCAL_DIR: /app/storage
+      GCS_BUCKET: tor-checker-pdfs
+      # Stored TOR PDFs live in GCS, not the local volume below. Each dev reuses their own
+      # gcloud Application Default Credentials (`gcloud auth application-default login`,
+      # once) and needs read access to the bucket in the tor-checker org — see README.md.
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-adc.json
       CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
       - backend_storage:/app/storage
       - backend_npm_cache:/root/.npm
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/run/secrets/gcp-adc.json:ro
     depends_on:
       mongo:
         condition: service_started
