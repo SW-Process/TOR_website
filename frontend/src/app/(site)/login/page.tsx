@@ -115,7 +115,12 @@ function LoginForm() {
                   </div>
                 </label>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold text-[var(--color-text)]">รหัสผ่าน</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-[var(--color-text)]">รหัสผ่าน</span>
+                    <Link href="/forgot-password" className="text-xs font-semibold text-[var(--color-rose-dark)] hover:underline">
+                      ลืมรหัสผ่าน?
+                    </Link>
+                  </div>
                   <div className="flex items-center gap-2.5 rounded-2xl border border-white bg-white/90 px-3.5 py-2.5 shadow-[var(--shadow-sm)] transition-colors focus-within:border-[var(--color-rose-dark)]">
                     <Lock size={16} className="shrink-0 text-[var(--color-text-faint)]" />
                     <input
