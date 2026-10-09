@@ -8,6 +8,8 @@ import { endSessions, setSessionCookie, startSession } from "../services/session
 import { parseUserAgent } from "../utils/userAgent";
 import { httpError } from "../utils/httpError";
 import { getStorage } from "../storage";
+import { getEmailSender } from "../email";
+import { buildPasswordResetEmail } from "../email/passwordResetEmail";
 import { sessionUser } from "../middleware/auth";
 import {
   isGoogleOAuthConfigured,
@@ -28,6 +30,11 @@ const LINK_STATE_PREFIX = "link.";
 /** Where the link flow lands: the security page, with `google=<outcome>` for the banner. */
 const LINK_RETURN_PATH = "/account/settings?section=password&google=";
 const ALLOWED_AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+/** How long an emailed "forgot password" link stays valid. */
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+const RESET_TOKEN_BYTES = 32;
+/** Minimum gap between reset emails to the same account, so repeated requests can't spam an inbox. */
+const RESET_REQUEST_COOLDOWN_MS = 60 * 1000;
 
 interface Credentials {
   email: string;
@@ -80,6 +87,83 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   await sendSession(req, res, user, 200);
+}
+
+function hashResetToken(raw: string): string {
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
+/**
+ * POST /api/auth/forgot-password — email a reset link if that address has an account
+ * (FR-29 delivery path, reused for recovery). Always answers the same way regardless,
+ * so the response can't be used to probe which emails are registered. Works for a
+ * Google-only account too: the link lets it set its first password, same as the
+ * account-settings "set a password" flow already allows while signed in.
+ */
+export async function forgotPassword(req: Request, res: Response): Promise<void> {
+  const { email } = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof email !== "string" || !EMAIL_RE.test(email.trim())) {
+    throw httpError(400, "A valid email is required");
+  }
+
+  const user = await User.findOne({ email: email.trim().toLowerCase() }).select("+resetPasswordExpiresAt");
+  // A still-live token was issued within the cooldown window: don't send another one.
+  // Answering the same way regardless keeps this silent to the caller, same as the
+  // email-exists check above — it only throttles how often one inbox gets mailed.
+  const issuedAt = user?.resetPasswordExpiresAt ? user.resetPasswordExpiresAt.getTime() - RESET_TOKEN_TTL_MS : -Infinity;
+  const onCooldown = Date.now() - issuedAt < RESET_REQUEST_COOLDOWN_MS;
+
+  if (user && !onCooldown) {
+    const rawToken = crypto.randomBytes(RESET_TOKEN_BYTES).toString("hex");
+    user.resetPasswordTokenHash = hashResetToken(rawToken);
+    user.resetPasswordExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    await user.save();
+
+    const link = clientUrl(`/reset-password?token=${user.id}.${rawToken}`);
+    try {
+      await getEmailSender().send({ to: user.email, ...buildPasswordResetEmail(link) });
+    } catch (err) {
+      // The caller gets the same generic response either way; only the server sees this.
+      console.error("forgot-password email failed:", err);
+    }
+  }
+
+  res.status(200).json({ message: "If that email has an account, a reset link is on its way" });
+}
+
+/**
+ * POST /api/auth/reset-password — set a new password from the emailed token. The
+ * token is `<userId>.<rawToken>`; only its sha256 is ever stored, so a database leak
+ * alone can't be used to reset a password. Resetting signs out every existing session,
+ * the same as an account-settings password change does while signed in.
+ */
+export async function resetPassword(req: Request, res: Response): Promise<void> {
+  const { token, password } = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
+    throw httpError(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+  }
+
+  const invalidLink = () => httpError(400, "This reset link is invalid or has expired");
+  if (typeof token !== "string" || token.split(".").length !== 2) throw invalidLink();
+  const [userId, rawToken] = token.split(".") as [string, string];
+  if (!isValidObjectId(userId) || !rawToken) throw invalidLink();
+
+  const user = await User.findById(userId).select("+resetPasswordTokenHash +resetPasswordExpiresAt");
+  if (!user?.resetPasswordTokenHash || !user.resetPasswordExpiresAt) throw invalidLink();
+  if (user.resetPasswordExpiresAt.getTime() < Date.now()) throw invalidLink();
+
+  const candidate = Buffer.from(hashResetToken(rawToken));
+  const stored = Buffer.from(user.resetPasswordTokenHash);
+  if (candidate.length !== stored.length || !crypto.timingSafeEqual(candidate, stored)) throw invalidLink();
+
+  user.set("password", password);
+  user.resetPasswordTokenHash = null;
+  user.resetPasswordExpiresAt = null;
+  user.tokenVersion = (user.tokenVersion ?? 0) + 1; // sign out every device, including whoever requested this
+  await user.save();
+  await Session.deleteMany({ userId: user._id });
+
+  res.status(200).json({ message: "Password has been reset" });
 }
 
 /** POST /api/auth/logout — clear the session cookie. */

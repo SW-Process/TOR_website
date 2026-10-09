@@ -4,6 +4,8 @@ import {
   register,
   login,
   logout,
+  forgotPassword,
+  resetPassword,
   me,
   updateAccount,
   changePassword,
@@ -32,6 +34,8 @@ const router = Router();
 router.post("/register", register);
 router.post("/login", login);
 router.post("/logout", logout);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 router.get("/me", requireAuth, me);
 router.patch("/me", requireAuth, updateAccount);
 router.delete("/me", requireAuth, deleteAccount);
