@@ -9,6 +9,7 @@ import { parseUserAgent } from "../utils/userAgent";
 import { httpError } from "../utils/httpError";
 import { getStorage } from "../storage";
 import { getEmailSender } from "../email";
+import { buildPasswordResetEmail } from "../email/passwordResetEmail";
 import { sessionUser } from "../middleware/auth";
 import {
   isGoogleOAuthConfigured,
@@ -120,14 +121,7 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
 
     const link = clientUrl(`/reset-password?token=${user.id}.${rawToken}`);
     try {
-      await getEmailSender().send({
-        to: user.email,
-        subject: "ตั้งรหัสผ่านใหม่สำหรับบัญชี TOR Checker",
-        text:
-          `มีคำขอตั้งรหัสผ่านใหม่สำหรับบัญชีนี้\n\n` +
-          `ตั้งรหัสผ่านใหม่ได้ที่ลิงก์นี้ (ใช้ได้ภายใน 1 ชั่วโมง):\n${link}\n\n` +
-          `หากคุณไม่ได้ขอ สามารถเพิกเฉยต่ออีเมลนี้ได้ ลิงก์จะไม่ถูกใช้งานหากไม่ได้กดเปิด`,
-      });
+      await getEmailSender().send({ to: user.email, ...buildPasswordResetEmail(link) });
     } catch (err) {
       // The caller gets the same generic response either way; only the server sees this.
       console.error("forgot-password email failed:", err);

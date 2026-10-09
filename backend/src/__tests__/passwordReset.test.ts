@@ -43,7 +43,7 @@ async function requestResetToken(email = creds.email): Promise<string> {
 describe("POST /api/auth/forgot-password", () => {
   it("emails a reset link for a registered address", async () => {
     await request(app).post("/api/auth/register").send(creds);
-    const sent: Array<{ to: string; subject: string; text: string }> = [];
+    const sent: Array<{ to: string; subject: string; text: string; html: string }> = [];
     setEmailSenderForTest({ send: async (m) => { sent.push(m as never); } });
 
     const res = await request(app).post("/api/auth/forgot-password").send({ email: creds.email });
@@ -52,6 +52,7 @@ describe("POST /api/auth/forgot-password", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]?.to).toBe(creds.email);
     expect(sent[0]?.text).toContain("/reset-password?token=");
+    expect(sent[0]?.html).toContain("/reset-password?token=");
 
     const user = await User.findOne({ email: creds.email }).select("+resetPasswordTokenHash +resetPasswordExpiresAt");
     expect(user?.resetPasswordTokenHash).toBeTruthy();
