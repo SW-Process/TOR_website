@@ -15,6 +15,7 @@ import {
   deleteBookmark,
 } from "../controllers/bookmarkController";
 import { listHiddenTors, hideTor, unhideTor } from "../controllers/hiddenTorController";
+import { listNotifications, markNotificationRead } from "../controllers/notificationController";
 import { requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
@@ -44,5 +45,8 @@ router.delete("/bookmarks/:torId", vendorOrAdmin, deleteBookmark);
 router.get("/hidden-tors", vendorOnly, listHiddenTors);
 router.put("/hidden-tors/:torId", vendorOnly, hideTor);
 router.delete("/hidden-tors/:torId", vendorOnly, unhideTor);
+
+router.get("/notifications", vendorOrAdmin, listNotifications);
+router.patch("/notifications/:id/read", vendorOrAdmin, markNotificationRead);
 
 export default router;
