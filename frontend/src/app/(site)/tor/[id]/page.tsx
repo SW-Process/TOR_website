@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { formatBudget, formatThaiDate, formatThaiMonthYear, type FairnessField, type FairnessFlag } from "@/lib/mockData";
 import { fetchTorById, fetchTorList, isUnknownDeadline } from "@/lib/torApi";
-import { ANNOUNCEMENT_KIND_LABELS, statusNote, torPriceLines } from "@/lib/torStatus";
+import { ANNOUNCEMENT_KIND_LABELS, draftHearingEnd, hearingCountdown, statusNote, torPriceLines } from "@/lib/torStatus";
 import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
 import HideTorButton from "@/components/HideTorButton";
@@ -54,6 +54,7 @@ export default async function TORDetailPage({
   const procurement = tor.procurement ?? null;
   const bidDeadline = procurement?.bidDeadline ?? null;
   const priceLines = torPriceLines(tor);
+  const hearingEnd = draftHearingEnd(tor);
   // Forward the session so the vendor's hidden TORs are left out of "similar TORs".
   const torList = await fetchTorList((await cookies()).toString());
   const related = torList
@@ -288,20 +289,24 @@ export default async function TORDetailPage({
             )}
 
             <div className="mt-4 rounded-2xl bg-[var(--color-surface-alt)] px-3.5 py-3">
-              <p className="text-xs text-[var(--color-text-muted)]">กำหนดยื่นข้อเสนอ</p>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                {hearingEnd ? "สิ้นสุดรับฟังคำวิจารณ์" : "กำหนดยื่นข้อเสนอ"}
+              </p>
               <p className="text-sm font-medium text-[var(--color-text)] mt-0.5">
-                {bidDeadline
-                  ? procurement?.bidDeadlinePrecision === "month"
-                    ? `เดือน ${formatThaiMonthYear(bidDeadline)}`
-                    : formatThaiDate(bidDeadline)
-                  : "ไม่ระบุ"}
+                {hearingEnd
+                  ? formatThaiDate(hearingEnd)
+                  : bidDeadline
+                    ? procurement?.bidDeadlinePrecision === "month"
+                      ? `เดือน ${formatThaiMonthYear(bidDeadline)}`
+                      : formatThaiDate(bidDeadline)
+                    : "ไม่ระบุ"}
               </p>
               <p
                 className={`text-xs mt-1 font-medium ${
                   tor.status === "ใกล้ปิดรับ" ? "text-[var(--color-danger)]" : "text-[var(--color-text-muted)]"
                 }`}
               >
-                {statusNote(tor)}
+                {hearingEnd ? hearingCountdown(hearingEnd) : statusNote(tor)}
               </p>
               {!bidDeadline && !isUnknownDeadline(tor.deadline) && (
                 <p className="mt-2 border-t border-[var(--color-border)] pt-2 text-[11px] text-[var(--color-text-faint)]">
