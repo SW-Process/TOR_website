@@ -145,6 +145,17 @@ describe("mergeProcurement", () => {
     expect(merged.bidDeadline).toBeNull();
   });
 
+  it("keeps the hearing end date only while the stage is draft", () => {
+    const draft = (): IProcurement => buildProcurement([egp("tor", "ร่างขอบเขตของงาน (TOR)", "2026-09-01T00:00:00Z")], "ระหว่างดำเนินการ", NOW);
+    const hearing = new Date("2026-10-04T17:00:00Z");
+    // fresh gives one: it wins
+    expect(mergeProcurement(null, { ...draft(), hearingEndDate: hearing }).hearingEndDate).toEqual(hearing);
+    // fresh gives none (egp2, or a process5 hiccup): the stored one stays while it is still a draft
+    expect(mergeProcurement({ ...draft(), hearingEndDate: hearing }, draft()).hearingEndDate).toEqual(hearing);
+    // once invited the date is dropped, even when the source still sent one
+    expect(mergeProcurement({ ...draft(), hearingEndDate: hearing }, { ...fresh(), hearingEndDate: hearing }).hearingEndDate).toBeUndefined();
+  });
+
   it("keeps the existing bidDeadline and per-announcement storageKey across a refresh", () => {
     const existing: IProcurement = {
       ...fresh(),

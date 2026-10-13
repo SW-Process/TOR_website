@@ -75,6 +75,7 @@ export function procurementChanged(
   if (before.stage !== after.stage) return true;
   if ((before.source ?? "egp2") !== (after.source ?? "egp2")) return true;
   if ((before.contractStatus ?? null) !== (after.contractStatus ?? null)) return true;
+  if ((before.hearingEndDate?.getTime() ?? null) !== (after.hearingEndDate?.getTime() ?? null)) return true;
   return announcementSignature(before) !== announcementSignature(after);
 }
 

@@ -37,6 +37,8 @@ export async function writeProcurementIfUnchanged(
   const $unset: Record<string, 1> = {};
   if (merged.contractStatus === undefined) $unset["procurement.contractStatus"] = 1;
   else $set["procurement.contractStatus"] = merged.contractStatus;
+  if (merged.hearingEndDate) $set["procurement.hearingEndDate"] = merged.hearingEndDate;
+  else $unset["procurement.hearingEndDate"] = 1;
 
   const res = await Tor.updateOne(
     { _id: torId, "procurement.lastCheckedAt": existing.lastCheckedAt } as QueryFilter<ITor>,

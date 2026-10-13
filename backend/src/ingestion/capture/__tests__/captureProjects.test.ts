@@ -38,7 +38,9 @@ function fakeGproc(opts: {
   zip?: Buffer | Error;
   invitation?: Buffer | null | Error;
   money?: GprocMoney | null | Error;
-} = {}): GprocCaptureClientLike & { detailCalls: string[]; zipCalls: string[]; invitationCalls: number; moneyCalls: number } {
+  rows?: GprocAnnouncement[];
+  hearing?: Date | null | Error;
+} = {}): GprocCaptureClientLike & { detailCalls: string[]; zipCalls: string[]; invitationCalls: number; moneyCalls: number; hearingCalls: number } {
   const g = {
     detailCalls: [] as string[],
     zipCalls: [] as string[],
@@ -56,7 +58,13 @@ function fakeGproc(opts: {
       if (m instanceof Error) throw m;
       return m;
     },
-    async announcements() { return rows; },
+    hearingCalls: 0,
+    async hearingEndDate() {
+      g.hearingCalls += 1;
+      if (opts.hearing instanceof Error) throw opts.hearing;
+      return opts.hearing ?? null;
+    },
+    async announcements() { return opts.rows ?? rows; },
     async invitationPdf() {
       g.invitationCalls += 1;
       const i = opts.invitation === undefined ? null : opts.invitation;
@@ -158,6 +166,30 @@ describe("captureProjects", () => {
     expect(kept.budget).toBe(111);
     expect(kept.referencePrice).toBe(222);
     expect(gproc.moneyCalls).toBe(0);
+  });
+
+  it("1d. a draft TOR is created with its hearing end date; an invited one never asks for it", async () => {
+    const hearing = new Date("2026-10-04T17:00:00Z");
+    const draftRows: GprocAnnouncement[] = [{ announceType: "B0", announceDate: "2026-09-29T17:00:00.000Z", announceFlag: "A", priceBuild: 4890000 }];
+    const gp = fakeGproc({ rows: draftRows, hearing });
+    await run([{ projectCode: CODE }], { gproc: gp });
+    const tor = (await Tor.findOne({ projectCode: CODE }))!;
+    expect(tor.procurement?.stage).toBe("draft");
+    expect(tor.procurement?.hearingEndDate).toEqual(hearing);
+
+    await Tor.deleteMany({});
+    const invited = fakeGproc({ hearing });
+    await run([{ projectCode: CODE }], { gproc: invited });
+    expect(invited.hearingCalls).toBe(0);
+    expect((await Tor.findOne({ projectCode: CODE }))!.procurement?.hearingEndDate).toBeUndefined();
+  });
+
+  it("1e. still creates a draft TOR when the hearing end date cannot be read", async () => {
+    const draftRows: GprocAnnouncement[] = [{ announceType: "B0", announceDate: "2026-09-29T17:00:00.000Z", announceFlag: "A" }];
+    const { run: r } = await run([{ projectCode: CODE }], { gproc: fakeGproc({ rows: draftRows, hearing: new Error("503") }) });
+    expect(r?.stats.torsCreated).toBe(1);
+    expect(r?.stats.torsFailed).toBe(0);
+    expect((await Tor.findOne({ projectCode: CODE }))!.procurement?.hearingEndDate).toBeUndefined();
   });
 
   it("2. leaves an existing TOR alone", async () => {

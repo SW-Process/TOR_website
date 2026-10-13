@@ -113,7 +113,7 @@ refresh for exactly the TORs it just enriched (`lifecycle/afterEnrichment.ts`), 
 their stage and bid deadline at once; `MAX_DEADLINE_EXTRACTIONS_PER_RUN` applies to that chained run. The manual `POST /api/ingestion/lifecycle/runs` also accepts `onlyOpen: true` (and `GET .../lifecycle/pending?onlyOpen=1` counts the same set) to check only TORs whose stored stage is `inviting`; the scheduled job and the post-enrichment chain always check all stages. The refresh asks the national e-GP
 (`scraper/gprocClient.ts`, mapped by `ingestion/gprocMap.ts`, per-TOR fallback in `lifecycle/loadFresh.ts`)
 first and the BMA portal second; the invitation PDF for the deadline comes from `infoProcureDocAnnounZip` →
-`view-pdf` (POST); `procurement.source` records which source wrote the stage; `GPROC_ENABLED=false` disables it.
+`view-pdf` (POST); `procurement.source` records which source wrote the stage; `GPROC_ENABLED=false` disables it. While a TOR is a `draft` the refresh (and the capture) also reads the end of the public hearing (วันที่สิ้นสุดรับฟังคำวิจารณ์) from process5 `getTorZipList` into `procurement.hearingEndDate`; it is kept only for the draft stage and the TOR page shows it in place of the bid deadline.
 
 ### Capture from process5 (Chrome extension)
 Admins load `extension/` (MV3, unpacked) to pick projects on process5.gprocurement.go.th and send them to

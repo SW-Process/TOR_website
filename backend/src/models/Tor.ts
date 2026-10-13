@@ -84,6 +84,8 @@ export interface IProcurement {
   announcements: IProcurementAnnouncement[];
   bidDeadline?: IBidDeadline | null;
   deadlineAttempt?: IDeadlineAttempt | null;
+  /** End of the public hearing on the draft TOR (the Bangkok day, stored as that day's midnight). Only kept while the stage is `draft`. */
+  hearingEndDate?: Date | null;
   lastCheckedAt: Date;
   source?: ProcurementSource;
 }
@@ -286,6 +288,7 @@ const procurementSchema = new Schema<IProcurement>(
     announcements: { type: [procurementAnnouncementSchema], default: [] },
     bidDeadline: { type: bidDeadlineSchema, default: null },
     deadlineAttempt: { type: deadlineAttemptSchema, default: null },
+    hearingEndDate: { type: Date },
     lastCheckedAt: { type: Date, required: true },
     source: { type: String, enum: ["egp2", "gproc"] },
   },

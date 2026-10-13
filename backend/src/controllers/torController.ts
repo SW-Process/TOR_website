@@ -65,7 +65,7 @@ const listQuerySchema = z.object({
 export type ListQuery = z.infer<typeof listQuerySchema>;
 
 export const LIST_PROJECTION =
-  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt viewCount";
+  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.hearingEndDate procurement.lastCheckedAt viewCount";
 
 const LIST_PROJECT_STAGE = Object.fromEntries(LIST_PROJECTION.split(" ").map((f) => [f, 1]));
 

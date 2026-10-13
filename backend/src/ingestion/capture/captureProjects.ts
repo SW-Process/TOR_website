@@ -189,6 +189,14 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
     const money = await fetchMoney(code);
     const mapped = mapGprocTor({ detail, announcements: rows, money }, now());
     if (!mapped) return { kind: "failed", note: "process5 returned no project name", gproc: "error" };
+    if (mapped.procurement.stage === "draft" && deps.gproc.hearingEndDate) {
+      try {
+        const end = await deps.gproc.hearingEndDate(code);
+        if (end) mapped.procurement.hearingEndDate = end;
+      } catch (err) {
+        await log("warning", `capture ${code}: hearing end date not read (${(err as Error).message})`);
+      }
+    }
     for (const c of mapped.unknownCodes) await log("warning", `capture ${code}: unknown process5 announce type "${c}" (treated as unknown)`);
 
     let tor: HydratedDocument<ITor>;
