@@ -511,6 +511,7 @@ export default function TORExplorer() {
             >
               <option value="newest">ประกาศล่าสุด</option>
               <option value="deadline">ใกล้ปิดรับก่อน</option>
+              <option value="hearing">ใกล้สิ้นสุดรับฟังคำวิจารณ์ก่อน</option>
               <option value="budgetDesc">งบประมาณ: มาก-น้อย</option>
               <option value="budgetAsc">งบประมาณ: น้อย-มาก</option>
             </select>

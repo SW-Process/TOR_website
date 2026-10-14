@@ -9,9 +9,9 @@ import { categoryToSlug } from "@/lib/torApi";
  * is mapped to the backend slug only for the API call.
  */
 
-export type SortKey = "newest" | "deadline" | "budgetDesc" | "budgetAsc";
+export type SortKey = "newest" | "deadline" | "hearing" | "budgetDesc" | "budgetAsc";
 
-export const SORT_KEYS: readonly SortKey[] = ["newest", "deadline", "budgetDesc", "budgetAsc"];
+export const SORT_KEYS: readonly SortKey[] = ["newest", "deadline", "hearing", "budgetDesc", "budgetAsc"];
 export const STATUSES: readonly TORStatus[] = [
   "เปิดรับ",
   "ใกล้ปิดรับ",
@@ -41,6 +41,7 @@ export const PAGE_SIZE = 24;
 const SORT_API: Record<SortKey, { sort: string; order: "asc" | "desc" }> = {
   newest: { sort: "announcementDate", order: "desc" },
   deadline: { sort: "bidDeadline", order: "asc" },
+  hearing: { sort: "hearingEnd", order: "asc" },
   budgetDesc: { sort: "budget", order: "desc" },
   budgetAsc: { sort: "budget", order: "asc" },
 };
