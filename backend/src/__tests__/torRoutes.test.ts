@@ -174,6 +174,26 @@ describe("GET /api/tors", () => {
     expect(titles.slice(6).sort()).toEqual(["ไม่ทราบวันปิด", "ไม่มี procurement"].sort());
   });
 
+  it("hearing-end sort: drafts whose hearing is still open soonest first (last day included), the rest after by announcement date", async () => {
+    const day = 86_400_000;
+    const bangkokMidnight = (offsetDays: number) => new Date(new Date(`${new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10)}T00:00:00+07:00`).getTime() + offsetDays * day);
+    const proc = (stage: string, hearing?: Date) => ({ stage, announcements: [], lastCheckedAt: new Date(), ...(hearing ? { hearingEndDate: hearing } : {}) });
+    await Tor.insertMany([
+      { title: "รับฟังจบแล้ว", pipelineStatus: "enriched", announcementDate: new Date("2026-01-01"), procurement: proc("draft", bangkokMidnight(-2)) },
+      { title: "รับฟังอีก 5 วัน", pipelineStatus: "enriched", announcementDate: new Date("2026-02-01"), procurement: proc("draft", bangkokMidnight(5)) },
+      { title: "ร่าง ไม่มีวัน", pipelineStatus: "enriched", announcementDate: new Date("2026-03-01"), procurement: proc("draft") },
+      { title: "รับฟังวันสุดท้ายวันนี้", pipelineStatus: "enriched", announcementDate: new Date("2026-01-15"), procurement: proc("draft", bangkokMidnight(0)) },
+      { title: "รับฟังอีก 1 วัน", pipelineStatus: "enriched", announcementDate: new Date("2026-01-10"), procurement: proc("draft", bangkokMidnight(1)) },
+      { title: "เปิดเชิญชวนแล้ว", pipelineStatus: "enriched", announcementDate: new Date("2026-04-01"), procurement: proc("inviting") },
+    ]);
+    const res = await request(app).get("/api/tors?sort=hearingEnd");
+    expect(res.status).toBe(200);
+    expect(res.body.order).toBe("asc");
+    const titles = res.body.data.map((t: { title: string }) => t.title);
+    expect(titles.slice(0, 3)).toEqual(["รับฟังวันสุดท้ายวันนี้", "รับฟังอีก 1 วัน", "รับฟังอีก 5 วัน"]);
+    expect(titles.slice(3)).toEqual(["เปิดเชิญชวนแล้ว", "ร่าง ไม่มีวัน", "รับฟังจบแล้ว"]);
+  });
+
   it("rejects the legacy sort=submissionDeadline", async () => {
     expect((await request(app).get("/api/tors?sort=submissionDeadline")).status).toBe(400);
   });
