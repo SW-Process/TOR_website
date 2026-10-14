@@ -87,4 +87,14 @@ describe("writeProcurementIfUnchanged", () => {
     await writeProcurementIfUnchanged(tor._id, procurement({ source: "gproc", lastCheckedAt: T2 }), procurement({ lastCheckedAt: new Date("2026-10-03T00:00:00Z") }));
     expect((await Tor.findById(tor._id).lean())?.procurement?.source).toBe("gproc");
   });
+
+  it("sets the hearing end date and removes it again", async () => {
+    const hearing = new Date("2026-10-04T17:00:00Z");
+    const tor = await Tor.create({ title: "a", procurement: procurement() });
+    expect(await writeProcurementIfUnchanged(tor._id, procurement(), procurement({ hearingEndDate: hearing, lastCheckedAt: T2 }))).toBe(true);
+    const withDate = (await Tor.findById(tor._id).lean())?.procurement;
+    expect(withDate?.hearingEndDate).toEqual(hearing);
+    expect(await writeProcurementIfUnchanged(tor._id, procurement({ lastCheckedAt: T2 }), procurement({ stage: "inviting", lastCheckedAt: new Date("2026-10-03T00:00:00Z") }))).toBe(true);
+    expect((await Tor.findById(tor._id).lean())?.procurement?.hearingEndDate).toBeUndefined();
+  });
 });

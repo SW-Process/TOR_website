@@ -36,6 +36,9 @@ export function maxDeadlineExtractionsPerRun(env: NodeJS.ProcessEnv = process.en
  * deadline is read for every TOR whatever its stage. Once an attempt is recorded they drop out of
  * that branch and are no longer re-checked.
  *
+ * A TOR whose stored stage is still draft or inviting is a candidate even when its contract status reads
+ * finished (that combination means the stage is stale), until process5 has been the source of its stage.
+ *
  * Month-only deadlines (`bidDeadline.precision: "month"`, read from the PDF) are ALWAYS candidates,
  * finished or cancelled included, so the file keeps being re-checked until a day is known or an
  * admin overrides the value.
@@ -68,6 +71,10 @@ export function lifecycleFilter(opts: { gproc?: boolean; onlyOpen?: boolean } = 
             "procurement.stage": { $ne: "cancelled" },
             "procurement.contractStatus": { $nin: FINISHED_CONTRACT_STATUSES },
           },
+          // A finished contract on a TOR still stored as draft/inviting is a contradiction (the stage is
+          // stale, e.g. an old egp2 row): check it so the stage catches up instead of staying "open".
+          // Only until process5 has answered for it once, so a source that keeps saying so is not re-asked forever.
+          { "procurement.stage": { $in: ["draft", "inviting"] }, "procurement.source": { $ne: "gproc" } },
           // A month-only AI deadline is re-checked until a day is known (or an admin sets one).
           { "procurement.bidDeadline.precision": "month", "procurement.bidDeadline.source": "invitation-pdf" },
           {

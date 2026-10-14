@@ -6,6 +6,7 @@ import { Tor } from "../models";
 import type { ITor } from "../models";
 import { httpError } from "../utils/httpError";
 import { escapeRegExp } from "../utils/escapeRegExp";
+import { bangkokDay } from "../utils/bidDeadline";
 import { gprocProjectUrl } from "../ingestion/gprocUrl";
 import { hiddenTorIdsOf } from "./hiddenTorController";
 import { PROJECT_TYPES } from "../config/projectTypes";
@@ -17,20 +18,22 @@ const asArray = (v: unknown): string[] | undefined => {
   return Array.isArray(v) ? v.map(String) : [String(v)];
 };
 
-const SORT_FIELDS = ["announcementDate", "bidDeadline", "budget"] as const;
+const SORT_FIELDS = ["announcementDate", "bidDeadline", "hearingEnd", "budget"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
 
 /** Stored path behind each sort value (`bidDeadline` is the real bid deadline from the lifecycle refresh / admin). */
 const SORT_PATH: Record<SortField, string> = {
   announcementDate: "announcementDate",
   bidDeadline: "procurement.bidDeadline.date",
+  hearingEnd: "procurement.hearingEndDate",
   budget: "budget",
 };
 
-/** Default direction per sort field: newest / soonest deadline / largest budget first. */
+/** Default direction per sort field: newest / soonest deadline or hearing end / largest budget first. */
 export const DEFAULT_ORDER: Record<SortField, "asc" | "desc"> = {
   announcementDate: "desc",
   bidDeadline: "asc",
+  hearingEnd: "asc",
   budget: "desc",
 };
 
@@ -65,7 +68,7 @@ const listQuerySchema = z.object({
 export type ListQuery = z.infer<typeof listQuerySchema>;
 
 export const LIST_PROJECTION =
-  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.lastCheckedAt viewCount";
+  "title agency category budget referencePrice announcementDate submissionDeadline status projectCode projectType technologyStack sourceListingUrl procurement.stage procurement.contractStatus procurement.bidDeadline procurement.hearingEndDate procurement.lastCheckedAt viewCount";
 
 const LIST_PROJECT_STAGE = Object.fromEntries(LIST_PROJECTION.split(" ").map((f) => [f, 1]));
 
@@ -175,6 +178,27 @@ export function sortStages(field: SortField, order: "asc" | "desc"): PipelineSta
         },
       },
       { $sort: { _bucket: 1, _key: 1, _id: -1 } },
+    ];
+  }
+  if (field === "hearingEnd") {
+    // (0) a draft whose public hearing has not ended (the last day still counts: the stored date is that
+    // Bangkok day's midnight) — soonest end first; (1) everything else, newest announcement first.
+    const startOfToday = new Date(`${bangkokDay(new Date())}T00:00:00+07:00`);
+    const hearing = "$procurement.hearingEndDate";
+    return [
+      {
+        $addFields: {
+          _bucket: {
+            $cond: [
+              { $and: [{ $eq: ["$procurement.stage", "draft"] }, { $gte: [{ $ifNull: [hearing, null] }, startOfToday] }] },
+              0,
+              1,
+            ],
+          },
+        },
+      },
+      { $addFields: { _key: { $cond: [{ $eq: ["$_bucket", 0] }, { $multiply: [dir, { $toLong: hearing }] }, 0] } } },
+      { $sort: { _bucket: 1, _key: 1, announcementDate: -1, _id: -1 } },
     ];
   }
   return [{ $addFields: { _missing: missing } }, { $sort: { _missing: 1, [path]: dir, _id: -1 } }];

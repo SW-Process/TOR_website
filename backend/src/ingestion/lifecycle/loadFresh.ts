@@ -65,6 +65,15 @@ export async function loadFreshProcurement(args: {
           contractStatus,
           now()
         );
+        if (procurement.stage === "draft" && gproc.hearingEndDate) {
+          try {
+            const end = await gproc.hearingEndDate(code);
+            if (end) procurement.hearingEndDate = end;
+          } catch (err) {
+            // Best effort: the stored date (if any) is kept by the merge.
+            await warn(`TOR ${code}: hearing end date not read (${(err as Error).message})`);
+          }
+        }
         report?.("ok");
         for (const c of unknownCodes) await warn(`TOR ${code}: unknown process5 announce type "${c}" (treated as unknown)`);
         return {

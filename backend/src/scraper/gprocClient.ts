@@ -133,6 +133,29 @@ export class GprocClient implements GprocCaptureClientLike {
     return { projectMoney: num(d.projectMoney), priceBuild: num(d.priceBuild) };
   }
 
+  async hearingEndDate(projectId: string): Promise<Date | null> {
+    const pd = await this.call<Envelope<Record<string, unknown>>>("GET", `${ANNOUNCEMENT}/getProcurementDetail`, { projectId });
+    const d = pd.data;
+    if (!d) return null;
+    const list = await this.call<Envelope<{ commentFDate?: unknown; webDate?: unknown }[]>>("GET", `${ANNOUNCEMENT}/getTorZipList`, {
+      projectId,
+      methodId: String(d.methodId ?? ""),
+      projectVersion: String(d.projectVersion ?? ""),
+      typeProject: String(d.typeProject ?? ""),
+      stepId: String(d.stepId ?? ""),
+      typeId: String(d.typeId ?? ""),
+    });
+    const zipRows = list.data;
+    if (!Array.isArray(zipRows)) return null;
+    // A draft can be re-published: the row published last carries the hearing that is open now.
+    const rows = zipRows
+      .map((r) => ({ end: typeof r.commentFDate === "string" ? Date.parse(r.commentFDate) : NaN, published: typeof r.webDate === "string" ? Date.parse(r.webDate) : 0 }))
+      .filter((r) => !Number.isNaN(r.end))
+      .sort((a, b) => b.published - a.published);
+    const latest = rows[0];
+    return latest ? new Date(latest.end) : null;
+  }
+
   async announcements(projectId: string, detail: GprocProjectDetail): Promise<GprocAnnouncement[]> {
     if (!detail.announceType || !detail.methodId) {
       throw new Error(`gprocurement project ${projectId}: detail lacks announceType/methodId`);

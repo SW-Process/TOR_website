@@ -27,6 +27,8 @@ export interface GprocClientLike {
   /** Null when e-GP has no such project. */
   projectDetail(projectId: string): Promise<GprocProjectDetail | null>;
   announcements(projectId: string, detail: GprocProjectDetail): Promise<GprocAnnouncement[]>;
+  /** End of the public hearing (วันที่สิ้นสุดรับฟังคำวิจารณ์) of the draft TOR; null when there is none. Optional so a client without it still works. */
+  hearingEndDate?(projectId: string): Promise<Date | null>;
   /** The signed invitation PDF, or null when the project has none (yet). */
   invitationPdf(projectId: string): Promise<Buffer | null>;
 }

@@ -228,3 +228,31 @@ describe("GprocClient capture additions", () => {
     });
   });
 });
+
+describe("GprocClient.hearingEndDate", () => {
+  const seq = (...items: Array<{ body?: unknown }>) => harness((_u, _m, n) => items[n - 1] ?? {});
+  const PD = { data: { methodId: "16", projectVersion: "4", typeProject: "9", stepId: "M03", typeId: "01" } };
+
+  it("reads commentFDate from getTorZipList using the ids of getProcurementDetail", async () => {
+    const { client, calls } = seq({ body: PD }, { body: { data: [{ buildName: "x.zip", commentFDate: "2026-10-04T17:00:00.000Z", webDate: "2026-09-29T17:00:00.000Z", stepId: "D03" }] } });
+    expect(await client.hearingEndDate("69099242843")).toEqual(new Date("2026-10-04T17:00:00.000Z"));
+    expect(calls[0]?.url).toContain("/getProcurementDetail?projectId=69099242843");
+    const url = new URL(calls[1]?.url ?? "");
+    expect(url.pathname.endsWith("/getTorZipList")).toBe(true);
+    expect(Object.fromEntries(url.searchParams)).toEqual({ projectId: "69099242843", methodId: "16", projectVersion: "4", typeProject: "9", stepId: "M03", typeId: "01" });
+  });
+
+  it("uses the row published last when there are several", async () => {
+    const { client } = seq({ body: PD }, { body: { data: [
+      { commentFDate: "2026-09-10T17:00:00.000Z", webDate: "2026-09-05T17:00:00.000Z" },
+      { commentFDate: "2026-10-04T17:00:00.000Z", webDate: "2026-09-29T17:00:00.000Z" },
+    ] } });
+    expect(await client.hearingEndDate("1")).toEqual(new Date("2026-10-04T17:00:00.000Z"));
+  });
+
+  it("is null for an empty list, a row without a date, or an unknown project", async () => {
+    expect(await seq({ body: PD }, { body: { data: [] } }).client.hearingEndDate("1")).toBeNull();
+    expect(await seq({ body: PD }, { body: { data: [{ commentFDate: null, webDate: "2026-09-29T17:00:00.000Z" }] } }).client.hearingEndDate("1")).toBeNull();
+    expect(await seq({ body: { data: null } }).client.hearingEndDate("1")).toBeNull();
+  });
+});

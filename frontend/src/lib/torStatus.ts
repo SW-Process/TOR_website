@@ -54,6 +54,28 @@ function daysFromNow(iso: string): number {
   return bangkokDayNumber(target) - bangkokDayNumber(now);
 }
 
+/** Whole Bangkok days from today to the end of the public hearing (0 = it ends today, negative = it is over). */
+function hearingDaysLeft(iso: string): number {
+  return bangkokDayNumber(Date.parse(iso)) - bangkokDayNumber(Date.now());
+}
+
+/**
+ * The hearing end date of a draft TOR; null when the TOR is not a draft or the date is unknown.
+ * (The backend drops the date once the TOR is invited, so this also guards an old cached response.)
+ */
+export function draftHearingEnd(tor: Pick<TOR, "status" | "procurement">): string | null {
+  if (tor.status !== "ร่าง TOR") return null;
+  const end = tor.procurement?.hearingEndDate ?? null;
+  return end && !Number.isNaN(Date.parse(end)) ? end : null;
+}
+
+/** "เหลืออีก 3 วัน" / "สิ้นสุดวันนี้" / "สิ้นสุดแล้ว" for the end of the public hearing. */
+export function hearingCountdown(iso: string): string {
+  const days = hearingDaysLeft(iso);
+  if (days > 0) return `เหลืออีก ${days} วัน`;
+  return days === 0 ? "สิ้นสุดวันนี้" : "สิ้นสุดแล้ว";
+}
+
 /** Today's Asia/Bangkok calendar day (YYYY-MM-DD) on the real clock. */
 export function bangkokToday(): string {
   return bangkokDay.format(new Date());
@@ -107,8 +129,13 @@ export function statusNote(tor: Pick<TOR, "status" | "procurement">): string {
     }
   }
   switch (tor.status) {
-    case "ร่าง TOR":
-      return "ยังไม่ประกาศเชิญชวน";
+    case "ร่าง TOR": {
+      const hearingEnd = draftHearingEnd(tor);
+      if (!hearingEnd) return "ยังไม่ประกาศเชิญชวน";
+      const days = hearingDaysLeft(hearingEnd);
+      if (days > 0) return `รับฟังคำวิจารณ์เหลือ ${days} วัน`;
+      return days === 0 ? "สิ้นสุดรับฟังคำวิจารณ์วันนี้" : "สิ้นสุดรับฟังคำวิจารณ์แล้ว";
+    }
     case "ประกาศผู้ชนะแล้ว":
       // The bid deadline is stored for every stage; show it like the other cards, or the plain
       // label when it could not be read.

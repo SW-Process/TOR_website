@@ -90,6 +90,17 @@ describe("lifecycleFilter", () => {
     lastCheckedAt: new Date("2026-09-01T00:00:00Z"),
   });
 
+  it("still selects a TOR stored as draft or inviting whose contract status already reads finished (stale stage)", async () => {
+    await Tor.create([
+      { title: "stale draft", pipelineStatus: "enriched", sourceListingUrl: url("s1"), procurement: procurement("draft", "ส่งงานครบถ้วน") },
+      { title: "stale inviting", pipelineStatus: "enriched", sourceListingUrl: url("s2"), procurement: procurement("inviting", "ส่งงานตามกำหนด") },
+      { title: "awarded and delivered", pipelineStatus: "enriched", sourceListingUrl: url("s3"), procurement: procurement("awarded", "ส่งงานครบถ้วน") },
+      { title: "draft already checked on process5", pipelineStatus: "enriched", sourceListingUrl: url("s4"), procurement: { ...procurement("draft", "ส่งงานครบถ้วน"), source: "gproc" } },
+    ] as any);
+    const titles = (await Tor.find(lifecycleFilter() as any).sort({ title: 1 }).lean()).map((t) => t.title);
+    expect(titles).toEqual(["stale draft", "stale inviting"]);
+  });
+
   it("selects enriched, unfinished TORs that have a listing URL", async () => {
     await Tor.create([
       { title: "never checked", pipelineStatus: "enriched", sourceListingUrl: url("a") },

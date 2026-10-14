@@ -24,6 +24,8 @@ export interface TorProcurementView {
   bidDeadline: string | null;
   /** "month": the invitation names only a month and year; `bidDeadline` is then the end of that month. */
   bidDeadlinePrecision: "day" | "month";
+  /** End of the public hearing on the draft TOR (ISO, the Bangkok day's midnight); only set while the stage is draft. Optional so the mock rows stay valid. */
+  hearingEndDate?: string | null;
   lastCheckedAt: string | null;
   /** Dated timeline; only the detail response includes it. */
   announcements: TorAnnouncementView[];

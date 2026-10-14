@@ -507,7 +507,7 @@ describe("refreshLifecycle", () => {
       });
       const d = deadlineDeps();
       const client = withDownload(
-        fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")] }, contract: { p1: "ส่งงานครบถ้วน" } })
+        fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1"), ann("p1-win", "ประกาศรายชื่อผู้ชนะการเสนอราคา", "2026-10-10T00:00:00Z")] }, contract: { p1: "ส่งงานครบถ้วน" } })
       );
       const opts = { deadlineExtractor: d.extractor, storage: d.storage };
       const first = await refreshLifecycle(deps(client, opts));
@@ -589,9 +589,16 @@ function fakeGproc(opts: {
   detail?: GprocProjectDetail | null | Error;
   rows?: GprocAnnouncement[];
   pdf?: Buffer | null | Error;
-} = {}): GprocClientLike & { pdfCalls: number } {
+  hearing?: Date | null | Error;
+} = {}): GprocClientLike & { pdfCalls: number; hearingCalls: number } {
   const g = {
     pdfCalls: 0,
+    hearingCalls: 0,
+    async hearingEndDate() {
+      g.hearingCalls += 1;
+      if (opts.hearing instanceof Error) throw opts.hearing;
+      return opts.hearing ?? null;
+    },
     async projectDetail() {
       if (opts.detail instanceof Error) throw opts.detail;
       return opts.detail === undefined
@@ -629,6 +636,25 @@ describe("refreshLifecycle with process5", () => {
     expect(saved?.source).toBe("gproc");
     expect(saved?.contractStatus).toBe("ระหว่างดำเนินการ"); // not wiped by the process5 write
     expect(saved?.announcements.map((a) => a.announcementId)).toEqual(["gproc-D0-20260923", "gproc-W0-20261006"]);
+  });
+
+  it("stores the hearing end date of a draft from process5, keeps it when process5 fails, and drops it once invited", async () => {
+    const hearing = new Date("2026-10-04T17:00:00Z");
+    const draftRows: GprocAnnouncement[] = [{ announceType: "B0", announceDate: "2026-09-29T17:00:00.000Z", announceFlag: "A" }];
+    const tor = await seedCode({ sourceListingUrl: listing("h1"), procurement: { stage: "draft", announcements: [], lastCheckedAt: new Date("2026-09-01") } });
+
+    const ok = fakeGproc({ rows: draftRows, hearing });
+    await refreshLifecycle(deps(fakeClient(), { gprocClient: ok }));
+    expect((await Tor.findById(tor.id).lean())?.procurement).toMatchObject({ stage: "draft", hearingEndDate: hearing });
+    expect(ok.hearingCalls).toBe(1);
+
+    await refreshLifecycle(deps(fakeClient(), { gprocClient: fakeGproc({ rows: draftRows, hearing: new Error("boom") }) }));
+    expect((await Tor.findById(tor.id).lean())?.procurement?.hearingEndDate).toEqual(hearing);
+
+    const invited = fakeGproc({ rows: [{ announceType: "D0", announceDate: "2026-10-05T17:00:00.000Z", announceFlag: "A" }], hearing });
+    await refreshLifecycle(deps(fakeClient(), { gprocClient: invited }));
+    expect((await Tor.findById(tor.id).lean())?.procurement?.hearingEndDate).toBeUndefined();
+    expect(invited.hearingCalls).toBe(0); // asked only while the TOR is a draft
   });
 
   it("falls back to egp2 when process5 does not know the project", async () => {

@@ -119,5 +119,8 @@ export function mergeProcurement(
     })),
     bidDeadline: existing?.bidDeadline ?? null,
     ...(existing?.deadlineAttempt ? { deadlineAttempt: existing.deadlineAttempt } : {}),
+    // The hearing belongs to the draft only: keep what is stored when the source gives none now
+    // (egp2 never does, process5 may fail), and drop it as soon as the TOR leaves the draft stage.
+    hearingEndDate: fresh.stage === "draft" ? fresh.hearingEndDate ?? existing?.hearingEndDate ?? undefined : undefined,
   };
 }
