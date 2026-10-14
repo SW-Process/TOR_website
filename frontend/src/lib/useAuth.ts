@@ -126,6 +126,27 @@ async function sendAccount(method: string, path: string, payload: object): Promi
   return { ok: true };
 }
 
+/** A public (no session) auth request — its own error reading, and it never touches cachedUser. */
+async function sendPublic(
+  path: string,
+  payload: object,
+  errorFor: (body: { message?: string }) => string
+): Promise<AuthResult> {
+  let res: Response;
+  try {
+    res = await apiFetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    return { ok: false, error: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่" };
+  }
+  const body = (await res.json().catch(() => ({}))) as { message?: string };
+  if (!res.ok) return { ok: false, error: errorFor(body) };
+  return { ok: true };
+}
+
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(cachedUser);
   const [ready, setReady] = useState(checked);
@@ -172,6 +193,26 @@ export function useAuth() {
   const register = useCallback(
     (email: string, password: string) => submitCredentials("/api/auth/register", email, password),
     [submitCredentials]
+  );
+
+  /** Always resolves ok on a valid-looking email — the backend answers the same way either way. */
+  const forgotPassword = useCallback(
+    (email: string) =>
+      sendPublic("/api/auth/forgot-password", { email }, (body) =>
+        body.message?.startsWith("A valid email") ? "รูปแบบอีเมลไม่ถูกต้อง" : "เกิดข้อผิดพลาด กรุณาลองใหม่"
+      ),
+    []
+  );
+
+  /** Sets a new password from an emailed reset token; every existing session is signed out. */
+  const resetPassword = useCallback(
+    (token: string, password: string) =>
+      sendPublic("/api/auth/reset-password", { token, password }, (body) => {
+        if (body.message?.startsWith("Password must be")) return "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
+        if (body.message?.includes("invalid or has expired")) return "ลิงก์นี้ไม่ถูกต้องหรือหมดอายุแล้ว กรุณาขอลิงก์ใหม่อีกครั้ง";
+        return "เกิดข้อผิดพลาด กรุณาลองใหม่";
+      }),
+    []
   );
 
   const logout = useCallback(async () => {
@@ -247,6 +288,8 @@ export function useAuth() {
     isLoggedIn: !!user,
     login,
     register,
+    forgotPassword,
+    resetPassword,
     logout,
     startGoogleLogin,
     uploadAvatar,

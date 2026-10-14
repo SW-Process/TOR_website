@@ -16,6 +16,10 @@ export interface IUser {
   avatarContentType?: string;
   /** Bumped to sign out every session issued before (password change, "log out other devices"). */
   tokenVersion: number;
+  /** sha256 of the current "forgot password" token, if any; the raw token is only ever in the emailed link. */
+  resetPasswordTokenHash: string | null;
+  /** When the current reset token stops being accepted. */
+  resetPasswordExpiresAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,6 +67,9 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     // Every session token carries the version it was issued under; a token whose
     // version no longer matches is rejected by the auth middleware.
     tokenVersion: { type: Number, default: 0 },
+    // Never selected by default — only authController's reset flow reads these.
+    resetPasswordTokenHash: { type: String, default: null, select: false },
+    resetPasswordExpiresAt: { type: Date, default: null, select: false },
   },
   { timestamps: true }
 );
@@ -100,6 +107,8 @@ userSchema.set("toJSON", {
     delete out.avatarKey;
     delete out.avatarContentType;
     delete out.tokenVersion;
+    delete out.resetPasswordTokenHash;
+    delete out.resetPasswordExpiresAt;
     delete out.__v;
     return out;
   },
