@@ -507,7 +507,7 @@ describe("refreshLifecycle", () => {
       });
       const d = deadlineDeps();
       const client = withDownload(
-        fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")] }, contract: { p1: "ส่งงานครบถ้วน" } })
+        fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1"), ann("p1-win", "ประกาศรายชื่อผู้ชนะการเสนอราคา", "2026-10-10T00:00:00Z")] }, contract: { p1: "ส่งงานครบถ้วน" } })
       );
       const opts = { deadlineExtractor: d.extractor, storage: d.storage };
       const first = await refreshLifecycle(deps(client, opts));
