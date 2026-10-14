@@ -132,9 +132,9 @@ export function statusNote(tor: Pick<TOR, "status" | "procurement">): string {
     case "ร่าง TOR": {
       const hearingEnd = draftHearingEnd(tor);
       if (!hearingEnd) return "ยังไม่ประกาศเชิญชวน";
-      return hearingDaysLeft(hearingEnd) < 0
-        ? "สิ้นสุดรับฟังคำวิจารณ์แล้ว"
-        : `รับฟังคำวิจารณ์ถึง ${formatThaiDate(hearingEnd)} (${hearingCountdown(hearingEnd)})`;
+      const days = hearingDaysLeft(hearingEnd);
+      if (days > 0) return `รับฟังคำวิจารณ์เหลือ ${days} วัน`;
+      return days === 0 ? "สิ้นสุดรับฟังคำวิจารณ์วันนี้" : "สิ้นสุดรับฟังคำวิจารณ์แล้ว";
     }
     case "ประกาศผู้ชนะแล้ว":
       // The bid deadline is stored for every stage; show it like the other cards, or the plain
