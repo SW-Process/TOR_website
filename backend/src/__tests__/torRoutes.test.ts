@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import request from "supertest";
 import app from "../app";
 import { Tor } from "../models";
+import { tryBuildFilterFromRaw } from "../controllers/torController";
 
 let mongod: MongoMemoryServer;
 beforeAll(async () => { mongod = await MongoMemoryServer.create(); await mongoose.connect(mongod.getUri()); });
@@ -405,5 +406,25 @@ describe("GET /api/tors/price-stats", () => {
     expect(is.min).toBe(900_000);
     expect(is.max).toBe(1_800_000);
     expect(is.median).toBe(1_350_000);
+  });
+});
+
+describe("tryBuildFilterFromRaw (a saved search's stored filters, not a request)", () => {
+  it("builds the same filter the list endpoint would, and matches the same TORs", async () => {
+    await seed();
+    const filter = tryBuildFilterFromRaw({ category: "web-application" });
+    expect(filter).not.toBeNull();
+    const matches = await Tor.find(filter!).select("title").lean();
+    expect(matches.map((t) => t.title)).toEqual(["เว็บไซต์หน่วยงาน"]);
+  });
+
+  it("returns null for filters that don't parse, instead of throwing", () => {
+    expect(tryBuildFilterFromRaw({ budgetMin: "not-a-number" })).toBeNull();
+    expect(tryBuildFilterFromRaw({ sort: "not-a-real-field" })).toBeNull();
+  });
+
+  it("defaults to an empty object for null/undefined filters", () => {
+    expect(tryBuildFilterFromRaw(null)).toEqual({ pipelineStatus: "enriched" });
+    expect(tryBuildFilterFromRaw(undefined)).toEqual({ pipelineStatus: "enriched" });
   });
 });
