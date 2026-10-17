@@ -5,6 +5,7 @@ import { drainEnrichmentQueue } from "../ingestion/enrichment/drainEnrichmentQue
 import { GeminiExtractor } from "../ingestion/enrichment/geminiExtractor";
 import { chainLifecycleAfterEnrichment } from "../ingestion/lifecycle/afterEnrichment";
 import { notifyProfileMatches } from "../notifications/profileMatchNotifications";
+import { notifySavedSearchMatches } from "../notifications/savedSearchMatchNotifications";
 import type { TorExtractor } from "../ingestion/enrichment/torExtractor";
 
 /**
@@ -29,9 +30,10 @@ export async function runEnrichmentJob(): Promise<void> {
     await connectDB();
     const extractor = selectExtractor();
     const out = await drainEnrichmentQueue({ extractor });
-    // Neither call throws; both run before disconnect so Mongo stays open until they finish.
+    // None of these calls throw; all run before disconnect so Mongo stays open until they finish.
     await chainLifecycleAfterEnrichment(out, { trigger: "scheduled", deadlineExtractor: extractor });
     await notifyProfileMatches(out.enrichedTorIds);
+    await notifySavedSearchMatches(out.enrichedTorIds);
     console.log(
       `enrichment run ${out.runId}: claimed ${out.claimed}, ok ${out.enrichedOk}, rejected ${out.enrichedRejected}, failed ${out.enrichedFailed}`
     );

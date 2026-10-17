@@ -210,6 +210,17 @@ export function parseQuery(req: Request): ListQuery {
   return parsed.data;
 }
 
+/**
+ * Same filter this list endpoint applies, built from an arbitrary object instead of a
+ * request's query string — a saved search's stored `filters` (FR-28/FR-30), not a
+ * trusted request, so a malformed one is skipped (`null`) rather than thrown.
+ */
+export function tryBuildFilterFromRaw(raw: unknown): QueryFilter<ITor> | null {
+  const parsed = listQuerySchema.safeParse(raw ?? {});
+  if (!parsed.success) return null;
+  return buildFilter(parsed.data);
+}
+
 /** GET /api/tors — filtered, sorted, server-paginated list (FR-2). */
 export async function listTors(req: Request, res: Response): Promise<void> {
   const q = parseQuery(req);
