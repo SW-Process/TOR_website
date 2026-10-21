@@ -52,7 +52,8 @@ export function errorHandler(
     return;
   }
 
-  const status = e.status ?? e.statusCode ?? 500;
+  const raw = e.status ?? e.statusCode;
+  const status = typeof raw === "number" && raw >= 400 && raw <= 599 ? raw : 500;
   if (status === 500) console.error(err);
   res.status(status).json({ message: e.message || "Internal server error" });
 }
