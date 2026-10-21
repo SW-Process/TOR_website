@@ -15,7 +15,6 @@ services:
     ports:
       - "3000:3000"
     environment:
-      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/tor_website}
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
       # Server-side (Server Components) runs inside this container, where
       # "localhost" is this container, not the backend one — use the Docker
