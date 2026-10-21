@@ -319,6 +319,38 @@ describe("PUT /api/vendor/profile — technologyStack", () => {
   });
 });
 
+describe("PUT /api/vendor/profile — emailAlertsEnabled", () => {
+  it("defaults to on for a new profile", async () => {
+    const agent = await vendorAgent();
+    expect((await agent.get("/api/vendor/profile")).body.profile.emailAlertsEnabled).toBe(true);
+  });
+
+  it("turns match emails off and back on", async () => {
+    const agent = await vendorAgent();
+    const off = await agent.put("/api/vendor/profile").send({ companyName: "Acme", emailAlertsEnabled: false });
+    expect(off.status).toBe(200);
+    expect(off.body.profile.emailAlertsEnabled).toBe(false);
+
+    const on = await agent.put("/api/vendor/profile").send({ companyName: "Acme", emailAlertsEnabled: true });
+    expect(on.body.profile.emailAlertsEnabled).toBe(true);
+  });
+
+  it("leaves the setting alone when a later PUT omits it", async () => {
+    const agent = await vendorAgent();
+    await agent.put("/api/vendor/profile").send({ companyName: "Acme", emailAlertsEnabled: false });
+
+    const res = await agent.put("/api/vendor/profile").send({ companyName: "Acme Co" });
+
+    expect(res.body.profile.emailAlertsEnabled).toBe(false);
+  });
+
+  it("400 when it is not a boolean", async () => {
+    const agent = await vendorAgent();
+    const res = await agent.put("/api/vendor/profile").send({ emailAlertsEnabled: "no" });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("PUT /api/vendor/profile — access control", () => {
   it("401 without a session", async () => {
     const res = await request(app).put("/api/vendor/profile").send({ technologyStack: ["React"] });
