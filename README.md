@@ -65,12 +65,16 @@ Inside Docker the services talk to each other by name:
 MONGODB_URI=mongodb://mongo:27017/tor_website
 ```
 
-`JWT_SECRET` defaults to an insecure dev value. To override it, create a `.env`
-file in the project root:
+`JWT_SECRET` is required and has no default. Before the first `docker compose up`,
+create a `.env` file in the project root (it is gitignored):
 
-```text
-JWT_SECRET=your-own-secret
+```sh
+cp .env.example .env
+# then set JWT_SECRET, e.g. the output of:
+openssl rand -hex 32
 ```
+
+The backend refuses to start if `JWT_SECRET` is missing or shorter than 32 characters.
 
 ### Stored TOR PDFs (GCS)
 
@@ -114,8 +118,9 @@ docker build --target runner -t tor-frontend ./frontend
 
 ## Run without Docker
 
-Each app runs on its own. Copy the env templates first (`backend/.env.example`;
-the frontend needs `MONGODB_URI` in `frontend/.env.local`).
+Each app runs on its own. Copy the env templates first (`backend/.env.example`
+to `backend/.env`, `frontend/.env.example` to `frontend/.env.local`). Only the
+backend connects to MongoDB.
 
 ```sh
 # Backend — http://localhost:8000

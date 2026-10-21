@@ -15,7 +15,6 @@ services:
     ports:
       - "3000:3000"
     environment:
-      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/tor_website}
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
       # Server-side (Server Components) runs inside this container, where
       # "localhost" is this container, not the backend one — use the Docker
@@ -32,8 +31,6 @@ services:
     depends_on:
       backend:
         condition: service_started
-      mongo:
-        condition: service_started
 
   backend:
     build:
@@ -45,7 +42,9 @@ services:
       PORT: "8000"
       NODE_ENV: development
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/tor_website}
-      JWT_SECRET: ${JWT_SECRET:-dev-insecure-secret-change-me}
+      # Required, no default: a guessable signing secret would let anyone forge sessions.
+      # Put it in the root .env (gitignored) — see .env.example.
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the root .env file (see .env.example)}
       JWT_EXPIRES_IN: 7d
       CLIENT_ORIGIN: http://localhost:3000
       STORAGE_DRIVER: gcs

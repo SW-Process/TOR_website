@@ -14,6 +14,23 @@ const OAUTH_ERRORS: Record<string, string> = {
   google_unavailable: "การเข้าสู่ระบบด้วย Google ไม่พร้อมใช้งานในขณะนี้",
 };
 
+/**
+ * Where to go after signing in. `?next=` comes from the URL, so anyone can craft a
+ * login link with it; only a path on this site is followed, never another origin
+ * (`https://evil.com`, protocol-relative `//evil.com`, backslash tricks, `javascript:`),
+ * so the login page can't be used as an open redirect.
+ */
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return "/dashboard";
+  try {
+    const url = new URL(raw, window.location.origin);
+    if (url.origin !== window.location.origin) return "/dashboard";
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return "/dashboard";
+  }
+}
+
 function LoginForm() {
   const router = useRouter();
   const { login, startGoogleLogin, isLoggedIn, ready: authReady } = useAuth();
@@ -21,7 +38,7 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") || "/dashboard";
+  const nextParam = searchParams.get("next");
   // An error bounced back from Google arrives in the URL; show it once on load.
   const [error, setError] = useState(() => {
     const oauthError = searchParams.get("error");
@@ -96,7 +113,7 @@ function LoginForm() {
                     setSigningIn(false);
                     return;
                   }
-                  router.push(nextPath);
+                  router.push(safeNextPath(nextParam));
                 }}
                 className="mt-7 flex flex-col gap-4"
               >

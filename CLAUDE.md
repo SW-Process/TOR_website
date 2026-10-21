@@ -49,8 +49,8 @@ CI runs on PRs into `main` (`.github/workflows/ci.yml`): backend typecheck + tes
 
 ## Architecture notes that span files
 
-### Two separate MongoDB access layers
-The frontend does **not** only call the Express backend. It has its own Mongoose connection (`frontend/src/lib/mongodb.ts`, cached for serverless/HMR) and its own models (`frontend/src/models/`), used from Next.js route handlers under `frontend/src/app/api/`. The Express backend has a *different* set of Mongoose models in `backend/src/models/`. When changing a schema, check whether both sides need updating. The backend models are the fuller, documented set.
+### Only the backend talks to MongoDB
+The frontend has no database connection and no Next.js API route handlers: every read and write goes through the Express API, which enforces authentication and authorization. Do not add Mongoose (or any DB credential) to the frontend.
 
 ### Backend data model (`backend/src/models/`, index in `models/index.ts`)
 8 collections: `users`, `vendorprofiles` (1:1 with vendor user), `tors` (central entity), `bookmarks` (vendor↔TOR join + application status), `notifications`, `errorreports` (public-submitted TOR corrections), `ingestionruns`, `systemlogs`.
@@ -126,9 +126,8 @@ invitation PDF when there is no TOR file yet. `CAPTURE_AGENCIES` optionally filt
 
 ## Environment
 
-- `backend/.env` — needs `MONGODB_URI` (and `PORT`). `backend/.env.example` lists every required key; `MONGODB_URI` is the one the app throws without.
-- `frontend/.env.local` — needs `MONGODB_URI` (the code throws on startup without it).
-- Inside Docker the frontend uses `mongodb://mongo:27017/tor_website`.
+- `backend/.env` — needs `MONGODB_URI`, `JWT_SECRET` (32+ characters) and `PORT`. `backend/.env.example` lists every key; the server refuses to start without `MONGODB_URI` or a strong `JWT_SECRET`.
+- `frontend/.env.local` — only `NEXT_PUBLIC_API_BASE_URL` / `INTERNAL_API_BASE_URL`; the frontend has no database access.
 - Always update `.env.example` when adding a new variable.
 
 ## Working agreements (from CONTRIBUTING.md)

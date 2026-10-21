@@ -62,7 +62,3 @@ jobs:
       # `npm run lint` is NOT gated yet — see .github/workflows/README.md.
       - name: Build
         run: npm run build
-        env:
-          # src/lib/mongodb.ts throws at import time if this is unset.
-          # The build never opens a connection, so any non-empty value works.
-          MONGODB_URI: mongodb://127.0.0.1:27017/ci
