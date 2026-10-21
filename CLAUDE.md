@@ -126,9 +126,8 @@ invitation PDF when there is no TOR file yet. `CAPTURE_AGENCIES` optionally filt
 
 ## Environment
 
-- `backend/.env` — needs `MONGODB_URI` (and `PORT`). `backend/.env.example` lists every required key; `MONGODB_URI` is the one the app throws without.
-- `frontend/.env.local` — needs `MONGODB_URI` (the code throws on startup without it).
-- Inside Docker the frontend uses `mongodb://mongo:27017/tor_website`.
+- `backend/.env` — needs `MONGODB_URI`, `JWT_SECRET` (32+ characters) and `PORT`. `backend/.env.example` lists every key; the server refuses to start without `MONGODB_URI` or a strong `JWT_SECRET`.
+- `frontend/.env.local` — only `NEXT_PUBLIC_API_BASE_URL` / `INTERNAL_API_BASE_URL`; the frontend has no database access.
 - Always update `.env.example` when adding a new variable.
 
 ## Working agreements (from CONTRIBUTING.md)
