@@ -118,8 +118,9 @@ docker build --target runner -t tor-frontend ./frontend
 
 ## Run without Docker
 
-Each app runs on its own. Copy the env templates first (`backend/.env.example`;
-the frontend needs `MONGODB_URI` in `frontend/.env.local`).
+Each app runs on its own. Copy the env templates first (`backend/.env.example`
+to `backend/.env`, `frontend/.env.example` to `frontend/.env.local`). Only the
+backend connects to MongoDB.
 
 ```sh
 # Backend — http://localhost:8000
