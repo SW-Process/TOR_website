@@ -38,7 +38,7 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") || "/dashboard";
+  const nextParam = searchParams.get("next");
   // An error bounced back from Google arrives in the URL; show it once on load.
   const [error, setError] = useState(() => {
     const oauthError = searchParams.get("error");
@@ -113,7 +113,7 @@ function LoginForm() {
                     setSigningIn(false);
                     return;
                   }
-                  router.push(nextPath);
+                  router.push(safeNextPath(nextParam));
                 }}
                 className="mt-7 flex flex-col gap-4"
               >
