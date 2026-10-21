@@ -49,8 +49,8 @@ CI runs on PRs into `main` (`.github/workflows/ci.yml`): backend typecheck + tes
 
 ## Architecture notes that span files
 
-### Two separate MongoDB access layers
-The frontend does **not** only call the Express backend. It has its own Mongoose connection (`frontend/src/lib/mongodb.ts`, cached for serverless/HMR) and its own models (`frontend/src/models/`), used from Next.js route handlers under `frontend/src/app/api/`. The Express backend has a *different* set of Mongoose models in `backend/src/models/`. When changing a schema, check whether both sides need updating. The backend models are the fuller, documented set.
+### Only the backend talks to MongoDB
+The frontend has no database connection and no Next.js API route handlers: every read and write goes through the Express API, which enforces authentication and authorization. Do not add Mongoose (or any DB credential) to the frontend.
 
 ### Backend data model (`backend/src/models/`, index in `models/index.ts`)
 8 collections: `users`, `vendorprofiles` (1:1 with vendor user), `tors` (central entity), `bookmarks` (vendor↔TOR join + application status), `notifications`, `errorreports` (public-submitted TOR corrections), `ingestionruns`, `systemlogs`.
