@@ -31,8 +31,6 @@ services:
     depends_on:
       backend:
         condition: service_started
-      mongo:
-        condition: service_started
 
   backend:
     build:
