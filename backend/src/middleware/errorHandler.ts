@@ -54,6 +54,14 @@ export function errorHandler(
 
   const raw = e.status ?? e.statusCode;
   const status = typeof raw === "number" && raw >= 400 && raw <= 599 ? raw : 500;
-  if (status === 500) console.error(err);
-  res.status(status).json({ message: e.message || "Internal server error" });
+
+  // 5xx: the cause is ours, not the client's. Log the full error server-side but
+  // answer with a fixed message, so stack details, driver errors, file paths or
+  // config names never reach the client (ASVS V16 error handling).
+  if (status >= 500) {
+    console.error(err);
+    res.status(status).json({ message: "Internal server error" });
+    return;
+  }
+  res.status(status).json({ message: e.message || "Request failed" });
 }
