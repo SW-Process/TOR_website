@@ -16,6 +16,7 @@ import {
   adminUpdateAnnouncement,
   adminUpdateFaq,
 } from "../controllers/adminHelpController";
+import { findUsers, revokeAllSessions, revokeUserSessions } from "../controllers/adminSessionController";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { auditAdminAction } from "../middleware/auditLog";
 
@@ -24,6 +25,9 @@ const router = Router();
 router.use(requireAuth, requireRole("admin"), auditAdminAction);
 
 router.get("/stats", getAdminStats);
+router.get("/users", findUsers);
+router.post("/users/:id/sessions/revoke", revokeUserSessions);
+router.post("/sessions/revoke-all", revokeAllSessions);
 router.get("/notifications", listAdminNotifications);
 router.patch("/notifications/:id/read", markAdminNotificationRead);
 router.get("/tors", listAdminTors);
