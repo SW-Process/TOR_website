@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import ReauthDialog from "@/components/ReauthDialog";
@@ -15,7 +16,10 @@ export const metadata: Metadata = {
     "แพลตฟอร์มค้นหา TOR และประกาศจัดซื้อจัดจ้างของกรุงเทพมหานคร พร้อมสรุปสาระสำคัญด้วย AI ค้นหา กรอง บันทึก และรับการแจ้งเตือน TOR ที่ตรงกับคุณ",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Reading the request makes every page render per request, so each gets the CSP nonce
+  // proxy.ts made for it (Next.js adds it to its scripts by itself).
+  await headers();
   return (
     <html
       lang="th"
