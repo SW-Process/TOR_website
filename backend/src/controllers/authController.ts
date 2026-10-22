@@ -15,6 +15,7 @@ import { clientUrl } from "../utils/clientUrl";
 import { buildPasswordResetEmail } from "../email/passwordResetEmail";
 import { sessionUser } from "../middleware/auth";
 import { maskEmail, securityLog } from "../utils/securityLog";
+import { withTransaction } from "../utils/transaction";
 import {
   REAUTH_WINDOW_MS,
   factorsPresent,
@@ -476,25 +477,25 @@ export async function deleteAccount(req: Request, res: Response): Promise<void> 
   }
   await requireRecentAuth(req, user);
 
-  const profile = await VendorProfile.findOne({ userId: user._id }).select("_id");
-  if (profile) {
-    await Promise.all([
-      Bookmark.deleteMany({ vendorId: profile._id }),
-      Notification.deleteMany({ vendorId: profile._id }),
-    ]);
-    await profile.deleteOne();
-  }
-
-  const conversations = await ChatConversation.find({ user: user._id }).distinct("_id");
-  await ChatMessage.deleteMany({ conversation: { $in: conversations } });
-  await ChatConversation.deleteMany({ _id: { $in: conversations } });
-  await ErrorReport.updateMany({ reportedBy: user._id }, { $set: { reportedBy: null } });
-  await Session.deleteMany({ userId: user._id });
-
+  // All the account's rows go together or not at all (ASVS 2.3.3); the avatar blob is
+  // removed only after the commit, since it can't be rolled back (an orphan is harmless).
+  await withTransaction(async (session) => {
+    const profile = await VendorProfile.findOne({ userId: user._id }).select("_id").session(session ?? null);
+    if (profile) {
+      await Bookmark.deleteMany({ vendorId: profile._id }, { session });
+      await Notification.deleteMany({ vendorId: profile._id }, { session });
+      await profile.deleteOne({ session });
+    }
+    const conversations = await ChatConversation.find({ user: user._id }).session(session ?? null).distinct("_id");
+    await ChatMessage.deleteMany({ conversation: { $in: conversations } }, { session });
+    await ChatConversation.deleteMany({ _id: { $in: conversations } }, { session });
+    await ErrorReport.updateMany({ reportedBy: user._id }, { $set: { reportedBy: null } }, { session });
+    await Session.deleteMany({ userId: user._id }, { session });
+    await User.deleteOne({ _id: user._id }, { session });
+  });
   if (user.avatarKey) {
-    await getStorage().delete?.(user.avatarKey).catch(() => {}); // an orphaned blob is harmless
+    await getStorage().delete?.(user.avatarKey).catch(() => {});
   }
-  await user.deleteOne();
   securityLog(req, { event: "account.delete", outcome: "success" });
 
   res.clearCookie(sessionCookieName(), cookieOptions());
