@@ -6,6 +6,9 @@ import { httpError } from "../utils/httpError";
 import { withDisplayStatus } from "../utils/torStatus";
 import { loadOrCreateProfile } from "./vendorProfileController";
 
+/** Saved TORs per vendor (ASVS 2.1.3, 2.3.2). */
+export const MAX_BOOKMARKS = 1000;
+
 const APPLICATION_STATUSES = ["interested", "preparing", "submitted", "missed"] as const;
 
 // The public TOR list fields (torController LIST_PROJECTION), plus the AI summary line the
@@ -87,6 +90,10 @@ export async function putBookmark(req: Request, res: Response): Promise<void> {
   if (!exists) throw httpError(404, "TOR not found");
 
   const vendorId = await vendorIdOf(req);
+  // A new bookmark only while under the cap (ASVS 2.3.2); updating an existing one is always fine.
+  if (!(await Bookmark.exists({ vendorId, torId })) && (await Bookmark.countDocuments({ vendorId })) >= MAX_BOOKMARKS) {
+    throw httpError(400, `You can keep at most ${MAX_BOOKMARKS} saved TORs`);
+  }
   const bookmark = await Bookmark.findOneAndUpdate(
     { vendorId, torId },
     { $setOnInsert: { vendorId, torId }, ...(Object.keys(update).length ? { $set: update } : {}) },

@@ -20,6 +20,7 @@ function ipAndEmail(req: Request): string {
  * | POST /api/auth/reset-password | 10 per IP per 15 minutes                        |
  * | password / email / delete     | 10 per IP per 15 minutes (re-enter password)    |
  * | POST /api/auth/mfa/verify     | 10 per pending sign-in and 30 per IP, per 15 min |
+ * | POST /api/chat/messages       | 30 per account per 5 minutes                    |
  * | POST /api/tors/:id/report     | 10 per IP per hour                              |
  * | POST /api/tors/:id/view       | 60 per IP per minute                            |
  * Limits are per IP (+email), never per account alone, so nobody can lock out
@@ -43,3 +44,11 @@ export const mfaVerifyPerAccount = rateLimit({
   key: (req) => `mfa|${readPending(req)?.sub ?? clientIp(req)}`,
 });
 export const mfaVerifyPerIp = rateLimit({ name: "mfaVerifyPerIp", windowMs: 15 * MINUTE, max: 30 });
+
+/** Support-chat messages per signed-in account, so one account can't flood the admins' inbox (ASVS 2.4.1). */
+export const chatMessageLimit = rateLimit({
+  name: "chatMessageLimit",
+  windowMs: 5 * MINUTE,
+  max: 30,
+  key: (req) => `chat|${req.user?.id ?? clientIp(req)}`,
+});
