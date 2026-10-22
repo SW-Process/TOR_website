@@ -1,17 +1,36 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { apiFetch } from "./api";
+import { useAuth } from "./useAuth";
 
-const STORAGE_KEY = "tor-insight:day-notes";
+/**
+ * Calendar day notes, kept on the server (`/api/vendor/day-notes`) so nothing about the
+ * account stays in the browser after logout (ASVS 14.3.1). Notes written by older versions
+ * of the app live in localStorage under these keys: they are uploaded once, then removed.
+ */
+const LEGACY_STORAGE_KEY = "tor-insight:day-notes";
+const LEGACY_KEYS_FLAG = "tor-insight:day-notes-keys";
 
 type DayNoteMap = Record<string, string>;
 
 const EMPTY: DayNoteMap = {};
-const listeners = new Set<() => void>();
-// Parsed copy of localStorage, so every read returns the same object until a write.
-let cache: DayNoteMap | null = null;
 
-const KEYS_FLAG = "tor-insight:day-notes-keys";
+interface Store {
+  /** Whose notes these are; null when signed out. */
+  userId: string | null;
+  notes: DayNoteMap;
+  loaded: boolean;
+}
+
+let store: Store = { userId: null, notes: EMPTY, loaded: false };
+let loadingFor: string | null = null;
+const listeners = new Set<() => void>();
+
+function setStore(next: Store) {
+  store = next;
+  for (const listener of listeners) listener();
+}
 
 function localDayKey(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -47,76 +66,107 @@ ${note}` : note;
   return out;
 }
 
-export function readStorage(): DayNoteMap {
-  if (typeof window === "undefined") return EMPTY;
+/** Notes an older version of the app left in localStorage (keys migrated), or {}. */
+function readLegacyNotes(): DayNoteMap {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    let notes: DayNoteMap = raw ? (JSON.parse(raw) as DayNoteMap) : {};
-    try {
-      if (window.localStorage.getItem(KEYS_FLAG) !== "local") {
-        if (notes && typeof notes === "object") {
-          notes = migrateDayNoteKeys(notes);
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
-        }
-        window.localStorage.setItem(KEYS_FLAG, "local");
-      }
-    } catch {
-      // storage unavailable or full: leave the notes as read
-    }
-    return notes;
+    const raw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!raw) return {};
+    const notes = JSON.parse(raw) as DayNoteMap;
+    if (!notes || typeof notes !== "object") return {};
+    return window.localStorage.getItem(LEGACY_KEYS_FLAG) === "local" ? notes : migrateDayNoteKeys(notes);
   } catch {
     return {};
   }
 }
 
-function getSnapshot(): DayNoteMap {
-  if (cache === null) cache = readStorage();
-  return cache;
+function clearLegacyNotes() {
+  try {
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+    window.localStorage.removeItem(LEGACY_KEYS_FLAG);
+  } catch {
+    // storage unavailable: nothing to clear
+  }
 }
 
-function emit() {
-  for (const listener of listeners) listener();
+function saveNote(dateKey: string, note: string): Promise<boolean> {
+  return apiFetch(`/api/vendor/day-notes/${encodeURIComponent(dateKey)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note }),
+  })
+    .then((res) => res.ok)
+    .catch(() => false);
+}
+
+/** Load `userId`'s notes, first moving any old browser-stored ones to the server. */
+async function load(userId: string) {
+  if (loadingFor === userId) return;
+  loadingFor = userId;
+  try {
+    const res = await apiFetch("/api/vendor/day-notes");
+    if (!res.ok) throw new Error(String(res.status));
+    const { notes } = (await res.json()) as { notes: DayNoteMap };
+
+    const legacy = readLegacyNotes();
+    const toUpload = Object.entries(legacy).filter(([key, note]) => typeof note === "string" && note.trim() && !(key in notes));
+    const results = await Promise.all(toUpload.map(([key, note]) => saveNote(key, note)));
+    toUpload.forEach(([key, note], i) => {
+      if (results[i]) notes[key] = note;
+    });
+    // Only forget the browser copy once every old note made it to the server.
+    if (results.every(Boolean)) clearLegacyNotes();
+
+    if (loadingFor === userId) setStore({ userId, notes, loaded: true });
+  } catch {
+    if (loadingFor === userId) setStore({ userId, notes: EMPTY, loaded: true });
+  } finally {
+    if (loadingFor === userId) loadingFor = null;
+  }
 }
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
-  // Another tab changed the notes: drop the cache and re-read.
-  const onStorage = (e: StorageEvent) => {
-    if (e.key !== STORAGE_KEY) return;
-    cache = null;
-    listener();
-  };
-  window.addEventListener("storage", onStorage);
   return () => {
     listeners.delete(listener);
-    window.removeEventListener("storage", onStorage);
   };
 }
 
-function subscribeNothing() {
-  return () => {};
-}
+const getSnapshot = () => store;
 
 export function useDayNotes() {
-  const notes = useSyncExternalStore(subscribe, getSnapshot, () => EMPTY);
-  // False on the server and during hydration, true once mounted on the client.
-  const ready = useSyncExternalStore(
-    subscribeNothing,
-    () => true,
-    () => false
-  );
+  const { user, ready: authReady } = useAuth();
+  const userId = user?.id ?? null;
+  const current = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
-  const setDayNote = useCallback((dateKey: string, note: string) => {
-    const next = { ...getSnapshot() };
-    if (note.trim()) {
-      next[dateKey] = note;
-    } else {
-      delete next[dateKey];
+  useEffect(() => {
+    if (!authReady) return;
+    if (!userId) {
+      // Signed out: drop the previous account's notes from memory too.
+      if (store.userId !== null || store.notes !== EMPTY) setStore({ userId: null, notes: EMPTY, loaded: true });
+      return;
     }
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    cache = next;
-    emit();
-  }, []);
+    if (store.userId !== userId || !store.loaded) void load(userId);
+  }, [authReady, userId]);
+
+  const mine = current.userId === userId;
+  const notes = mine ? current.notes : EMPTY;
+  const ready = authReady && mine && current.loaded;
+
+  const setDayNote = useCallback(
+    (dateKey: string, note: string) => {
+      if (!userId || store.userId !== userId) return;
+      const before = store.notes;
+      const next = { ...before };
+      if (note.trim()) next[dateKey] = note;
+      else delete next[dateKey];
+      setStore({ ...store, notes: next });
+      void saveNote(dateKey, note.trim() ? note : "").then((ok) => {
+        // The server refused it: put back what it still has.
+        if (!ok && store.userId === userId) setStore({ ...store, notes: before });
+      });
+    },
+    [userId]
+  );
 
   const dayNoteOf = useCallback((dateKey: string) => notes[dateKey] ?? "", [notes]);
 
