@@ -107,13 +107,13 @@ export function useIngestionRuns() {
     }
   }, []);
 
-  // The "only open TORs" checkbox: the queue count must follow the same filter the run would use.
-  const lifecycleOnlyOpenRef = useRef(false);
+  // The "only open / only draft TORs" checkboxes: the queue count must follow the same filter the run would use.
+  const lifecycleScopeRef = useRef({ onlyOpen: false, onlyDraft: false });
   const refreshLifecycleQueue = useCallback(async () => {
     try {
-      const res = await apiFetch(
-        `/api/ingestion/lifecycle/pending${lifecycleOnlyOpenRef.current ? "?onlyOpen=1" : ""}`
-      );
+      const { onlyOpen, onlyDraft } = lifecycleScopeRef.current;
+      const query = [onlyOpen ? "onlyOpen=1" : "", onlyDraft ? "onlyDraft=1" : ""].filter(Boolean).join("&");
+      const res = await apiFetch(`/api/ingestion/lifecycle/pending${query ? `?${query}` : ""}`);
       if (!res.ok) return;
       setLifecycleQueue((await res.json()) as LifecycleQueueInfo);
     } catch {
@@ -256,15 +256,15 @@ export function useIngestionRuns() {
     }
   }, [pollUntilSettled]);
 
-  const setLifecycleOnlyOpen = useCallback(
-    (onlyOpen: boolean) => {
-      lifecycleOnlyOpenRef.current = onlyOpen;
+  const setLifecycleScope = useCallback(
+    (scope: { onlyOpen: boolean; onlyDraft: boolean }) => {
+      lifecycleScopeRef.current = scope;
       void refreshLifecycleQueue();
     },
     [refreshLifecycleQueue]
   );
 
-  const triggerLifecycle = useCallback(async (params?: { maxTors?: number; maxDeadlineExtractions?: number; onlyOpen?: boolean }) => {
+  const triggerLifecycle = useCallback(async (params?: { maxTors?: number; maxDeadlineExtractions?: number; onlyOpen?: boolean; onlyDraft?: boolean }) => {
     setError(null);
     setLifecyclePending(true);
     try {
@@ -308,7 +308,7 @@ export function useIngestionRuns() {
     triggerIngestion,
     triggerEnrichment,
     triggerLifecycle,
-    setLifecycleOnlyOpen,
+    setLifecycleScope,
     lastRunFor,
   };
 }
