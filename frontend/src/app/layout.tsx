@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
+import ReauthDialog from "@/components/ReauthDialog";
 
 const plexSansThai = IBM_Plex_Sans_Thai({
   variable: "--font-body",
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-screen flex flex-col bg-[var(--color-bg)] text-[var(--color-text)]">
         {children}
+        <ReauthDialog />
       </body>
     </html>
   );

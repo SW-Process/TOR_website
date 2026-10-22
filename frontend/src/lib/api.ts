@@ -1,3 +1,5 @@
+import { getReauthHandler, type ReauthMethod } from "./reauth";
+
 /**
  * Base URL of the Express backend. Set NEXT_PUBLIC_API_BASE_URL in the
  * environment (compose sets it for the docker stack); falls back to the local
@@ -25,8 +27,11 @@ if (typeof window !== "undefined") {
   }
 }
 
-/** `fetch` against the backend, always sending the session cookie. */
-export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+/**
+ * `fetch` against the backend, always sending the session cookie. A request refused with
+ * `reauth_required` is retried once after the user confirms it's them (lib/reauth).
+ */
+export async function apiFetch(path: string, init?: RequestInit, retried = false): Promise<Response> {
   const headers = new Headers(init?.headers);
   if (typeof window !== "undefined" && Date.now() - lastInputAt > ACTIVE_WINDOW_MS) {
     headers.set("X-Background-Request", "1");
@@ -34,8 +39,12 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers, credentials: "include" });
   // Only a lost session: a wrong password or code is a 401 too, with another code.
   if (res.status === 401 && typeof window !== "undefined") {
-    const body = (await res.clone().json().catch(() => ({}))) as { code?: string };
+    const body = (await res.clone().json().catch(() => ({}))) as { code?: string; methods?: ReauthMethod[] };
     if (body.code === "session_invalid") window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    const confirm = getReauthHandler();
+    if (body.code === "reauth_required" && confirm && !retried && (await confirm(body.methods ?? ["password"]))) {
+      return apiFetch(path, init, true);
+    }
   }
   return res;
 }

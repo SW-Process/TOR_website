@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE, SESSION_EXPIRED_EVENT, apiFetch } from "./api";
+import { getReauthHandler, type ReauthMethod } from "./reauth";
 
 export type UserRole = "vendor" | "admin";
 
@@ -115,7 +116,8 @@ function readError(status: number, body: { message?: string }): string {
 }
 
 /** Thai copy for the account-settings endpoints' errors (backend messages are English). */
-function readAccountError(status: number, body: { message?: string }): string {
+function readAccountError(status: number, body: { message?: string; code?: string }): string {
+  if (body.code === "reauth_required") return "กรุณายืนยันตัวตนก่อนทำรายการนี้";
   if (status === 401) return "รหัสผ่านปัจจุบันไม่ถูกต้อง";
   if (status === 409) return "อีเมลนี้ถูกใช้กับบัญชีอื่นแล้ว";
   if (status === 403) return "บัญชีผู้ดูแลระบบลบจากหน้านี้ไม่ได้";
@@ -143,7 +145,7 @@ async function sendAccount(method: string, path: string, payload: object): Promi
   } catch {
     return { ok: false, error: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่" };
   }
-  const body = (await res.json().catch(() => ({}))) as { message?: string; user?: ApiUser };
+  const body = (await res.json().catch(() => ({}))) as { message?: string; code?: string; user?: ApiUser };
   if (!res.ok) return { ok: false, error: readAccountError(res.status, body) };
   cachedUser = body.user ? toAuthUser(body.user) : null;
   checked = true;
@@ -292,8 +294,18 @@ export function useAuth() {
     []
   );
 
-  /** Full-page trip to Google to link it to this account; lands back on the security settings. */
-  const linkGoogle = useCallback(() => {
+  /**
+   * Full-page trip to Google to link it to this account; lands back on the security settings.
+   * Linking adds a way to sign in, so the user confirms it's them first if the backend asks.
+   */
+  const linkGoogle = useCallback(async () => {
+    const status = await apiFetch("/api/auth/reauth")
+      .then((r) => r.json() as Promise<{ fresh?: boolean; methods?: ReauthMethod[] }>)
+      .catch(() => ({ fresh: true, methods: [] as ReauthMethod[] }));
+    if (!status.fresh) {
+      const confirm = getReauthHandler();
+      if (!confirm || !(await confirm(status.methods ?? ["password"]))) return;
+    }
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = `${API_BASE}/api/auth/google/link`;
   }, []);

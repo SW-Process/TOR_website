@@ -549,6 +549,7 @@ const GOOGLE_LINK_OUTCOMES: Record<string, { ok: boolean; text: string }> = {
   linked: { ok: true, text: "เชื่อมต่อ Google แล้ว ครั้งหน้าเข้าสู่ระบบด้วย Google ได้เลย" },
   taken: { ok: false, text: "บัญชี Google นี้เชื่อมต่อกับบัญชี TOR Checker อื่นอยู่แล้ว" },
   session: { ok: false, text: "เซสชันหมดอายุระหว่างเชื่อมต่อ กรุณาเข้าสู่ระบบแล้วลองใหม่" },
+  reauth: { ok: false, text: "กรุณายืนยันตัวตนก่อนเชื่อมต่อ Google แล้วลองใหม่" },
   error: { ok: false, text: "เชื่อมต่อ Google ไม่สำเร็จ กรุณาลองใหม่" },
 };
 
@@ -586,7 +587,7 @@ function GoogleConnection() {
           {!linked ? (
             <button
               type="button"
-              onClick={linkGoogle}
+              onClick={() => void linkGoogle()}
               className="shrink-0 rounded-xl bg-[var(--color-ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-black"
             >
               เชื่อมต่อ
