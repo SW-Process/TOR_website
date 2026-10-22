@@ -1,5 +1,6 @@
 import type { Types } from "mongoose";
 import { Notification, Tor, VendorProfile } from "../models";
+import type { CreatedMatchNotification } from "./types";
 import type { ITor } from "../models/Tor";
 import type { IVendorProfile } from "../models/VendorProfile";
 import { computeMatch } from "../services/matching";
@@ -20,10 +21,10 @@ const TOR_PROJECTION = "title category budget referencePrice technologyStack";
  * whose profile scores at or above the threshold against each just-enriched TOR
  * (FR-30). Never throws — a notification failure must not affect the enrichment run
  * it rides on. Idempotent: rerunning for the same TOR never gives a vendor a second
- * profile_match notification for it.
+ * profile_match notification for it. Returns the rows it created.
  */
-export async function notifyProfileMatches(torIds: string[] | undefined | null): Promise<number> {
-  if (!torIds || torIds.length === 0) return 0;
+export async function notifyProfileMatches(torIds: string[] | undefined | null): Promise<CreatedMatchNotification[]> {
+  if (!torIds || torIds.length === 0) return [];
 
   try {
     const [tors, profiles] = await Promise.all([
@@ -32,7 +33,7 @@ export async function notifyProfileMatches(torIds: string[] | undefined | null):
         .lean<WithId<ITor>[]>(),
       VendorProfile.find({}).lean<WithId<IVendorProfile>[]>(),
     ]);
-    if (tors.length === 0 || profiles.length === 0) return 0;
+    if (tors.length === 0 || profiles.length === 0) return [];
 
     const candidates: { vendorId: Types.ObjectId; torId: Types.ObjectId; message: string }[] = [];
     for (const tor of tors) {
@@ -42,7 +43,7 @@ export async function notifyProfileMatches(torIds: string[] | undefined | null):
         }
       }
     }
-    if (candidates.length === 0) return 0;
+    if (candidates.length === 0) return [];
 
     // A vendor already notified about this TOR (e.g. a rerun) gets no second row.
     const already = await Notification.find({
@@ -54,15 +55,15 @@ export async function notifyProfileMatches(torIds: string[] | undefined | null):
       .lean();
     const seen = new Set(already.map((n) => `${n.vendorId}:${n.torId}`));
     const toInsert = candidates.filter((c) => !seen.has(`${c.vendorId}:${c.torId}`));
-    if (toInsert.length === 0) return 0;
+    if (toInsert.length === 0) return [];
 
     const created = await Notification.insertMany(
       toInsert.map((c) => ({ ...c, type: "profile_match" as const })),
       { ordered: false }
     );
-    return created.length;
+    return created.map((n) => ({ vendorId: n.vendorId, torId: n.torId, type: "profile_match", savedSearchId: null }));
   } catch (err) {
     console.error("profile-match notifications failed:", err);
-    return 0;
+    return [];
   }
 }

@@ -26,6 +26,8 @@ export interface IVendorProfile {
   budgetRange?: { min?: number; max?: number };
   serviceArea?: string;
   savedSearches: Types.DocumentArray<ISavedSearch>;
+  // master switch for match emails (FR-29); per-saved-search alertsEnabled still applies
+  emailAlertsEnabled: boolean;
   // TORs the vendor chose not to see in search and recommendations
   hiddenTors: IHiddenTor[];
   createdAt: Date;
@@ -85,6 +87,7 @@ const vendorProfileSchema = new Schema<IVendorProfile>(
     },
     serviceArea: { type: String, trim: true },
     savedSearches: { type: [savedSearchSchema], default: [] },
+    emailAlertsEnabled: { type: Boolean, default: true },
     hiddenTors: { type: [hiddenTorSchema], default: [] },
   },
   { timestamps: true }

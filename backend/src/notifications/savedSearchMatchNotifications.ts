@@ -1,5 +1,6 @@
 import type { Types } from "mongoose";
 import { Notification, Tor, VendorProfile } from "../models";
+import type { CreatedMatchNotification } from "./types";
 import { tryBuildFilterFromRaw } from "../controllers/torController";
 
 interface SavedSearchLean {
@@ -22,16 +23,16 @@ interface VendorProfileLean {
  * here as it would if the vendor ran the search again right now. Never throws — a
  * notification failure must not affect the enrichment run it rides on. Idempotent:
  * rerunning for the same TOR never gives a vendor a second notification for the
- * same saved search.
+ * same saved search. Returns the rows it created.
  */
-export async function notifySavedSearchMatches(torIds: string[] | undefined | null): Promise<number> {
-  if (!torIds || torIds.length === 0) return 0;
+export async function notifySavedSearchMatches(torIds: string[] | undefined | null): Promise<CreatedMatchNotification[]> {
+  if (!torIds || torIds.length === 0) return [];
 
   try {
     const profiles = await VendorProfile.find({ "savedSearches.alertsEnabled": true })
       .select("savedSearches")
       .lean<VendorProfileLean[]>();
-    if (profiles.length === 0) return 0;
+    if (profiles.length === 0) return [];
 
     const candidates: { vendorId: Types.ObjectId; torId: Types.ObjectId; savedSearchId: Types.ObjectId; message: string }[] = [];
     for (const profile of profiles) {
@@ -54,7 +55,7 @@ export async function notifySavedSearchMatches(torIds: string[] | undefined | nu
         }
       }
     }
-    if (candidates.length === 0) return 0;
+    if (candidates.length === 0) return [];
 
     // A vendor already notified about this TOR for this saved search (e.g. a rerun) gets no second row.
     const already = await Notification.find({
@@ -66,15 +67,20 @@ export async function notifySavedSearchMatches(torIds: string[] | undefined | nu
       .lean();
     const seen = new Set(already.map((n) => `${n.vendorId}:${n.torId}:${n.savedSearchId}`));
     const toInsert = candidates.filter((c) => !seen.has(`${c.vendorId}:${c.torId}:${c.savedSearchId}`));
-    if (toInsert.length === 0) return 0;
+    if (toInsert.length === 0) return [];
 
     const created = await Notification.insertMany(
       toInsert.map((c) => ({ ...c, type: "saved_search_match" as const })),
       { ordered: false }
     );
-    return created.length;
+    return created.map((n) => ({
+      vendorId: n.vendorId,
+      torId: n.torId,
+      type: "saved_search_match",
+      savedSearchId: n.savedSearchId ?? null,
+    }));
   } catch (err) {
     console.error("saved-search-match notifications failed:", err);
-    return 0;
+    return [];
   }
 }

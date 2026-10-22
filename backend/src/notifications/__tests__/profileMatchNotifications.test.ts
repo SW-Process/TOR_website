@@ -47,7 +47,7 @@ describe("notifyProfileMatches", () => {
 
     const created = await notifyProfileMatches([t.id]);
 
-    expect(created).toBe(1);
+    expect(created).toHaveLength(1);
     const rows = await Notification.find({}).lean();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ vendorId: p._id, torId: t._id, type: "profile_match", read: false });
@@ -60,7 +60,7 @@ describe("notifyProfileMatches", () => {
 
     const created = await notifyProfileMatches([t.id]);
 
-    expect(created).toBe(0);
+    expect(created).toHaveLength(0);
     expect(await Notification.countDocuments({})).toBe(0);
   });
 
@@ -70,7 +70,7 @@ describe("notifyProfileMatches", () => {
     await profile();
 
     const created = await notifyProfileMatches([t.id]);
-    expect(created).toBe(2);
+    expect(created).toHaveLength(2);
   });
 
   it("is idempotent: notifying twice for the same TOR does not duplicate", async () => {
@@ -80,18 +80,18 @@ describe("notifyProfileMatches", () => {
     await notifyProfileMatches([t.id]);
     const second = await notifyProfileMatches([t.id]);
 
-    expect(second).toBe(0);
+    expect(second).toHaveLength(0);
     expect(await Notification.countDocuments({})).toBe(1);
   });
 
   it("does nothing for an empty or missing list of TOR ids", async () => {
-    expect(await notifyProfileMatches([])).toBe(0);
-    expect(await notifyProfileMatches(undefined)).toBe(0);
-    expect(await notifyProfileMatches(null)).toBe(0);
+    expect(await notifyProfileMatches([])).toHaveLength(0);
+    expect(await notifyProfileMatches(undefined)).toHaveLength(0);
+    expect(await notifyProfileMatches(null)).toHaveLength(0);
   });
 
   it("never throws, even if a lookup fails", async () => {
-    await expect(notifyProfileMatches(["not-a-valid-object-id"])).resolves.toBe(0);
+    await expect(notifyProfileMatches(["not-a-valid-object-id"])).resolves.toEqual([]);
   });
 
   it(`matches the match-score badge's "good" cut (score >= ${PROFILE_MATCH_THRESHOLD})`, async () => {
@@ -99,6 +99,6 @@ describe("notifyProfileMatches", () => {
     const t = await tor({ budget: 50_000_000 });
     await profile();
 
-    expect(await notifyProfileMatches([t.id])).toBe(1);
+    expect(await notifyProfileMatches([t.id])).toHaveLength(1);
   });
 });

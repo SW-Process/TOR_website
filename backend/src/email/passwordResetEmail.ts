@@ -1,16 +1,11 @@
+import { COLOR_BLUSH_SOFT, COLOR_BORDER, COLOR_INK, COLOR_ROSE_DARK, COLOR_TEXT_MUTED, FONT_STACK } from "./theme";
+
 /**
  * The "forgot password" email, in the site's own voice and colors (see
  * frontend/src/app/globals.css) rather than a plain-text link. Inline styles and a
  * table layout only — no webfonts or external images — so it renders consistently
  * across mail clients, Outlook included.
  */
-
-const COLOR_INK = "#221a18";
-const COLOR_TEXT_MUTED = "#6b5a56";
-const COLOR_ROSE_DARK = "#c23e60";
-const COLOR_BLUSH_SOFT = "#fdf0ee";
-const COLOR_BORDER = "#f0e2e0";
-const FONT_STACK = `-apple-system, "Segoe UI", "Noto Sans Thai", "Leelawadee UI", Tahoma, Arial, sans-serif`;
 
 export interface PasswordResetEmail {
   subject: string;

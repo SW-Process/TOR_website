@@ -44,7 +44,7 @@ describe("notifySavedSearchMatches", () => {
 
     const created = await notifySavedSearchMatches([t.id]);
 
-    expect(created).toBe(1);
+    expect(created).toHaveLength(1);
     const rows = await Notification.find({}).lean();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ vendorId: p._id, torId: t._id, type: "saved_search_match", read: false });
@@ -56,7 +56,7 @@ describe("notifySavedSearchMatches", () => {
     const t = await tor({ category: "web-application" });
     await profileWithSearch({ filters: { category: "cctv-its" } });
 
-    expect(await notifySavedSearchMatches([t.id])).toBe(0);
+    expect(await notifySavedSearchMatches([t.id])).toHaveLength(0);
     expect(await Notification.countDocuments({})).toBe(0);
   });
 
@@ -64,14 +64,14 @@ describe("notifySavedSearchMatches", () => {
     const t = await tor();
     await profileWithSearch({ filters: { category: "web-application" }, alertsEnabled: false });
 
-    expect(await notifySavedSearchMatches([t.id])).toBe(0);
+    expect(await notifySavedSearchMatches([t.id])).toHaveLength(0);
   });
 
   it("matches on the free-text search box the same way the public list would", async () => {
     const t = await tor({ title: "ระบบจัดการสารบรรณอิเล็กทรอนิกส์" });
     await profileWithSearch({ filters: { q: "สารบรรณ" } });
 
-    expect(await notifySavedSearchMatches([t.id])).toBe(1);
+    expect(await notifySavedSearchMatches([t.id])).toHaveLength(1);
   });
 
   it("notifies once per saved search when a vendor has more than one", async () => {
@@ -86,7 +86,7 @@ describe("notifySavedSearchMatches", () => {
 
     const created = await notifySavedSearchMatches([t.id]);
 
-    expect(created).toBe(2);
+    expect(created).toHaveLength(2);
     const rows = await Notification.find({ vendorId: p._id }).lean();
     expect(rows.map((r) => String(r.savedSearchId)).sort()).toEqual(
       p.savedSearches.map((s) => String(s._id)).sort()
@@ -98,7 +98,7 @@ describe("notifySavedSearchMatches", () => {
     await profileWithSearch({ filters: { budgetMin: "not-a-number" } });
     await profileWithSearch({ filters: { category: "web-application" } });
 
-    expect(await notifySavedSearchMatches([t.id])).toBe(1);
+    expect(await notifySavedSearchMatches([t.id])).toHaveLength(1);
   });
 
   it("is idempotent: notifying twice for the same TOR and saved search does not duplicate", async () => {
@@ -108,17 +108,17 @@ describe("notifySavedSearchMatches", () => {
     await notifySavedSearchMatches([t.id]);
     const second = await notifySavedSearchMatches([t.id]);
 
-    expect(second).toBe(0);
+    expect(second).toHaveLength(0);
     expect(await Notification.countDocuments({})).toBe(1);
   });
 
   it("does nothing for an empty or missing list of TOR ids", async () => {
-    expect(await notifySavedSearchMatches([])).toBe(0);
-    expect(await notifySavedSearchMatches(undefined)).toBe(0);
-    expect(await notifySavedSearchMatches(null)).toBe(0);
+    expect(await notifySavedSearchMatches([])).toHaveLength(0);
+    expect(await notifySavedSearchMatches(undefined)).toHaveLength(0);
+    expect(await notifySavedSearchMatches(null)).toHaveLength(0);
   });
 
   it("never throws, even if a lookup fails", async () => {
-    await expect(notifySavedSearchMatches(["not-a-valid-object-id"])).resolves.toBe(0);
+    await expect(notifySavedSearchMatches(["not-a-valid-object-id"])).resolves.toEqual([]);
   });
 });

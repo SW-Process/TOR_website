@@ -9,6 +9,7 @@ import { parseUserAgent } from "../utils/userAgent";
 import { httpError } from "../utils/httpError";
 import { getStorage } from "../storage";
 import { getEmailSender } from "../email";
+import { clientUrl } from "../utils/clientUrl";
 import { buildPasswordResetEmail } from "../email/passwordResetEmail";
 import { sessionUser } from "../middleware/auth";
 import {
@@ -56,11 +57,6 @@ function validateCredentials(body: unknown): Credentials {
 async function sendSession(req: Request, res: Response, user: UserDocument, status: number): Promise<void> {
   await startSession(req, res, user, "password");
   res.status(status).json({ user });
-}
-
-function clientUrl(path: string): string {
-  const base = process.env.CLIENT_ORIGIN || "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}${path}`;
 }
 
 /** POST /api/auth/register — create a vendor account and start a session. */

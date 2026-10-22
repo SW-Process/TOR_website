@@ -8,8 +8,7 @@ import { refreshLifecycle } from "../ingestion/lifecycle/refreshLifecycle";
 import { countLifecycleCandidates, maxDeadlineExtractionsPerRun, maxLifecycleRefreshPerRun } from "../ingestion/lifecycle/candidates";
 import { sweepStaleEnrichmentRuns, sweepStaleRuns } from "../ingestion/enrichment/sweepStaleRuns";
 import { chainLifecycleAfterEnrichment } from "../ingestion/lifecycle/afterEnrichment";
-import { notifyProfileMatches } from "../notifications/profileMatchNotifications";
-import { notifySavedSearchMatches } from "../notifications/savedSearchMatchNotifications";
+import { notifyMatches } from "../notifications/notifyMatches";
 import { selectExtractor } from "../jobs/enrichment";
 import { captureProjects, type CaptureProject } from "../ingestion/capture/captureProjects";
 import { countCaptureStuck } from "../ingestion/capture/countCaptureStuck";
@@ -124,9 +123,8 @@ export async function createEnrichmentRun(req: Request, res: Response): Promise<
   void drainEnrichmentQueue({ extractor, maxCalls })
     .then(async (out) => {
       await chainLifecycleAfterEnrichment(out, { trigger: "manual", triggeredBy: adminId, deadlineExtractor: extractor });
-      await notifyProfileMatches(out.enrichedTorIds);
-      await notifySavedSearchMatches(out.enrichedTorIds);
-    })
+      await notifyMatches(out.enrichedTorIds);
+      })
     .catch((err) => {
       console.error("enrichment run failed:", err);
     });

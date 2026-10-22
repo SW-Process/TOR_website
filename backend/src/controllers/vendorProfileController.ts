@@ -148,6 +148,12 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
     new VendorProfile({ userId: req.user!.id });
 
   Object.assign(profile, next);
+  // Only changed when sent, so a client that doesn't know the field never turns emails back on or off.
+  const { emailAlertsEnabled } = (req.body ?? {}) as Record<string, unknown>;
+  if (emailAlertsEnabled !== undefined) {
+    if (typeof emailAlertsEnabled !== "boolean") throw httpError(400, "emailAlertsEnabled must be a boolean");
+    profile.emailAlertsEnabled = emailAlertsEnabled;
+  }
   await profile.save();
 
   res.status(200).json({ profile });
