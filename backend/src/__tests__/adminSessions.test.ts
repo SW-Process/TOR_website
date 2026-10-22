@@ -8,7 +8,7 @@ import app from "../app";
 import { Session, User } from "../models";
 
 let mongod: MongoMemoryServer;
-const PASSWORD = "vendor-test-pass-17";
+const PASSWORD = "plum-orchard-ladder-17";
 
 beforeAll(async () => {
   mongod = await MongoMemoryServer.create();

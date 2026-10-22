@@ -44,7 +44,7 @@ export function assertAllowedUrl(raw: string, allowedHosts: readonly string[]): 
 
 export interface SafeFetchOptions {
   allowedHosts: readonly string[];
-  fetchFn?: typeof fetch;
+  fetchFn?: (url: string, init: RequestInit) => Promise<Response>;
 }
 
 /** fetch() limited to `allowedHosts`, following redirects only within them. */

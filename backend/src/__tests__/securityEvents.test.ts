@@ -10,7 +10,7 @@ import { setSecurityLogSink } from "../utils/securityLog";
 
 let mongod: MongoMemoryServer;
 let events: Record<string, unknown>[];
-const PASSWORD = "vendor-test-pass-17";
+const PASSWORD = "plum-orchard-ladder-17";
 
 beforeAll(async () => {
   mongod = await MongoMemoryServer.create();

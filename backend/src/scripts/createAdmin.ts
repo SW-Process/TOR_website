@@ -7,7 +7,7 @@ import "dotenv/config";
 import mongoose from "mongoose";
 import { connectDB } from "../config/db";
 import { User } from "../models";
-import { passwordProblem } from "../utils/passwordPolicy";
+import { newPasswordProblem } from "../utils/passwordPolicy";
 
 async function main(): Promise<void> {
   const [email, password] = process.argv.slice(2);
@@ -15,7 +15,7 @@ async function main(): Promise<void> {
     console.error("Usage: npm run create-admin -- <email> <password>");
     process.exit(1);
   }
-  const problem = passwordProblem(password);
+  const problem = await newPasswordProblem(password, { email });
   if (problem) {
     console.error(problem);
     process.exit(1);

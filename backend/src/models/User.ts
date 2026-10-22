@@ -1,8 +1,29 @@
 import { Schema, model, type HydratedDocument, type Model } from "mongoose";
+import { createHmac } from "node:crypto";
 import bcrypt from "bcrypt";
-import { MAX_PASSWORD_BYTES, passwordByteLength } from "../utils/passwordPolicy";
+import { MAX_PASSWORD_BYTES, MAX_PASSWORD_LENGTH, passwordByteLength } from "../utils/passwordPolicy";
 
+/** bcrypt work factor (ASVS 11.4.2): about 250 ms per hash on Cloud Run. */
 const SALT_ROUNDS = 12;
+/** Marks hashes made from the pre-hashed password (below); a bare `$2b$…` is a legacy hash. */
+const PREHASH_PREFIX = "v2$";
+
+/**
+ * bcrypt reads only 72 bytes. To allow long passwords (ASVS 6.2.9, up to
+ * MAX_PASSWORD_LENGTH characters, Thai included), bcrypt hashes the base64 HMAC-SHA256
+ * of the password instead (44 bytes). The fixed HMAC key just separates our pre-hashes
+ * from plain SHA-256 dumps elsewhere (no "hash shucking"); the salt and cost are still
+ * bcrypt's. Algorithm, cost and prefix can change together (ASVS 11.2.2): hashes carry
+ * their scheme, and sign-in upgrades old ones.
+ */
+function prehash(password: string): string {
+  return createHmac("sha256", "tor-checker/password-prehash/v1").update(password, "utf8").digest("base64");
+}
+
+/** Whether a stored hash is from before pre-hashing, so it should be replaced at the next sign-in. */
+export function isLegacyPasswordHash(hash: string | null | undefined): boolean {
+  return !!hash && !hash.startsWith(PREHASH_PREFIX);
+}
 
 export type UserRole = "vendor" | "admin";
 
@@ -121,7 +142,7 @@ userSchema.virtual("password").set(function (this: UserDocumentInternals, plain:
 userSchema.pre("save", async function () {
   const self = this as UserDocument & UserDocumentInternals;
   if (!self._plainPassword) return;
-  self.passwordHash = await bcrypt.hash(self._plainPassword, SALT_ROUNDS);
+  self.passwordHash = PREHASH_PREFIX + (await bcrypt.hash(prehash(self._plainPassword), SALT_ROUNDS));
   self._plainPassword = undefined;
 });
 
@@ -131,8 +152,12 @@ userSchema.pre("save", async function () {
  */
 userSchema.methods.comparePassword = function (this: UserDocument, candidate: string) {
   if (!this.passwordHash) return Promise.resolve(false);
-  // bcrypt would compare only the first 72 bytes, so a longer candidate could match a
-  // stored password it merely starts with. No password that long can be set, so refuse it.
+  if (candidate.length > MAX_PASSWORD_LENGTH) return Promise.resolve(false);
+  if (this.passwordHash.startsWith(PREHASH_PREFIX)) {
+    return bcrypt.compare(prehash(candidate), this.passwordHash.slice(PREHASH_PREFIX.length));
+  }
+  // Legacy hash of the raw password: bcrypt would compare only the first 72 bytes, so a
+  // longer candidate could match a stored password it merely starts with. Refuse it.
   if (passwordByteLength(candidate) > MAX_PASSWORD_BYTES) return Promise.resolve(false);
   return bcrypt.compare(candidate, this.passwordHash);
 };

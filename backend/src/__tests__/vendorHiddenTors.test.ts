@@ -26,7 +26,7 @@ afterAll(async () => {
 
 async function vendorAgent(email = "vendor@test.com") {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email, password: "vendor-test-pass-17" });
+  await agent.post("/api/auth/register").send({ email, password: "plum-orchard-ladder-17" });
   return agent;
 }
 
@@ -165,7 +165,7 @@ describe("hiding edge cases", () => {
     await vendorAgent("admin@test.com");
     await User.updateOne({ email: "admin@test.com" }, { role: "admin" });
     const admin = request.agent(app);
-    await admin.post("/api/auth/login").send({ email: "admin@test.com", password: "vendor-test-pass-17" });
+    await admin.post("/api/auth/login").send({ email: "admin@test.com", password: "plum-orchard-ladder-17" });
     await admin.put(`/api/vendor/hidden-tors/${a}`).expect(403);
   });
 
@@ -181,7 +181,7 @@ describe("hiding edge cases", () => {
     const { a } = await seedTors();
     const agent = await vendorAgent();
     await agent.put(`/api/vendor/hidden-tors/${a}`).expect(204);
-    await agent.delete("/api/auth/me").send({ currentPassword: "vendor-test-pass-17" }).expect(200);
+    await agent.delete("/api/auth/me").send({ currentPassword: "plum-orchard-ladder-17" }).expect(200);
     expect(await VendorProfile.countDocuments({})).toBe(0);
   });
 });
@@ -214,7 +214,7 @@ describe("hidden TORs and the public read API", () => {
     await vendorAgent("admin@test.com");
     await User.updateOne({ email: "admin@test.com" }, { role: "admin" });
     const admin = request.agent(app);
-    await admin.post("/api/auth/login").send({ email: "admin@test.com", password: "vendor-test-pass-17" });
+    await admin.post("/api/auth/login").send({ email: "admin@test.com", password: "plum-orchard-ladder-17" });
 
     expect((await admin.get("/api/tors")).body.totalCount).toBe(2);
     expect((await request(app).get("/api/tors")).body.totalCount).toBe(2);

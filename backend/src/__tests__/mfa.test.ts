@@ -10,7 +10,7 @@ import { Session, User } from "../models";
 import { base32Decode, currentStep, totpAt } from "../utils/totp";
 
 let mongod: MongoMemoryServer;
-const PASSWORD = "vendor-test-pass-17";
+const PASSWORD = "plum-orchard-ladder-17";
 const EMAIL = "vendor@test.com";
 
 /** Move the clock forward so a new TOTP step (and so a new code) comes up. */

@@ -2,13 +2,13 @@ import crypto from "crypto";
 import { isValidObjectId } from "mongoose";
 import type { Request, Response } from "express";
 import { Bookmark, ChatConversation, ChatMessage, ErrorReport, Notification, Session, User, VendorProfile } from "../models";
-import type { UserDocument } from "../models/User";
+import { isLegacyPasswordHash, type UserDocument } from "../models/User";
 import { cookieName, cookieOptions, sessionCookieName } from "../utils/token";
 import { endSessions, setSessionCookie, startSession } from "../services/sessions";
 import { parseUserAgent } from "../utils/userAgent";
 import { httpError } from "../utils/httpError";
 import { detectImageType } from "../utils/imageType";
-import { MIN_PASSWORD_LENGTH, passwordProblem } from "../utils/passwordPolicy";
+import { MIN_PASSWORD_LENGTH, newPasswordProblem } from "../utils/passwordPolicy";
 import { getStorage } from "../storage";
 import { getEmailSender } from "../email";
 import { clientUrl } from "../utils/clientUrl";
@@ -74,8 +74,11 @@ async function sendSession(req: Request, res: Response, user: UserDocument, stat
 /** POST /api/auth/register — create a vendor account and start a session. */
 export async function register(req: Request, res: Response): Promise<void> {
   const { email, password } = validateCredentials(req.body);
-  const problem = passwordProblem(password);
-  if (problem) throw httpError(400, problem);
+  const problem = await newPasswordProblem(password, { email });
+  if (problem) {
+    securityLog(req, { event: "auth.register", outcome: "failure", reason: "password_policy", email: maskEmail(email) });
+    throw httpError(400, problem);
+  }
 
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) {
@@ -105,6 +108,12 @@ export async function login(req: Request, res: Response): Promise<void> {
       ...(user ? { userId: user.id } : { email: maskEmail(email) }),
     });
     throw httpError(401, "Invalid email or password");
+  }
+  if (isLegacyPasswordHash(user.passwordHash)) {
+    // Re-hash with the current scheme now that we have the password (see models/User).
+    user.set("password", password);
+    await user.save();
+    securityLog(req, { event: "auth.password_rehash", outcome: "success", severity: "INFO", userId: user.id });
   }
   if (user.mfaEnabled) {
     // First factor done; no session until the second (POST /api/auth/mfa/verify).
@@ -182,8 +191,7 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
  */
 export async function resetPassword(req: Request, res: Response): Promise<void> {
   const { token, password } = (req.body ?? {}) as Record<string, unknown>;
-  const problem = passwordProblem(password);
-  if (problem || typeof password !== "string") throw httpError(400, problem ?? "A password is required");
+  if (typeof password !== "string") throw httpError(400, "A password is required");
 
   const invalidLink = () => {
     securityLog(req, { event: "auth.password_reset", outcome: "failure", reason: "invalid_or_expired_token" });
@@ -200,6 +208,9 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
   const candidate = Buffer.from(hashResetToken(rawToken));
   const stored = Buffer.from(user.resetPasswordTokenHash);
   if (candidate.length !== stored.length || !crypto.timingSafeEqual(candidate, stored)) throw invalidLink();
+  // Checked once the link is known to be good, so it can use the account's own email and name.
+  const problem = await newPasswordProblem(password, user);
+  if (problem) throw httpError(400, problem);
 
   user.set("password", password);
   user.resetPasswordTokenHash = null;
@@ -366,10 +377,11 @@ async function saveAndRevokeOtherSessions(req: Request, res: Response, user: Use
  */
 export async function changePassword(req: Request, res: Response): Promise<void> {
   const { currentPassword, newPassword } = (req.body ?? {}) as Record<string, unknown>;
-  const problem = passwordProblem(newPassword);
-  if (problem || typeof newPassword !== "string") throw httpError(400, problem ?? "A new password is required");
+  if (typeof newPassword !== "string") throw httpError(400, "A new password is required");
 
   const user = await loadAccount(req);
+  const problem = await newPasswordProblem(newPassword, user);
+  if (problem) throw httpError(400, problem);
   await confirmPassword(user, currentPassword, req); // always, when there is one (6.2.3)
   await requireRecentAuth(req, user);
   const firstPassword = !user.passwordHash;

@@ -27,7 +27,7 @@ afterAll(async () => {
   await mongod.stop();
 });
 
-const creds = { email: "vendor@test.com", password: "vendor-test-pass-17" };
+const creds = { email: "vendor@test.com", password: "plum-orchard-ladder-17" };
 
 /** Make every session look like it signed in an hour ago (bypassing Mongoose's createdAt guard). */
 async function ageSessions(): Promise<void> {
