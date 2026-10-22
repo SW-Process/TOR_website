@@ -7,6 +7,7 @@ import { cookieOptions, COOKIE_NAME, sessionLifetimeMs } from "../utils/token";
 import { endSessions, setSessionCookie, startSession } from "../services/sessions";
 import { parseUserAgent } from "../utils/userAgent";
 import { httpError } from "../utils/httpError";
+import { detectImageType } from "../utils/imageType";
 import { getStorage } from "../storage";
 import { getEmailSender } from "../email";
 import { clientUrl } from "../utils/clientUrl";
@@ -369,14 +370,17 @@ export async function uploadAvatar(req: Request, res: Response): Promise<void> {
   if (!ALLOWED_AVATAR_TYPES.has(file.mimetype)) {
     throw httpError(400, "Avatar must be a JPEG, PNG, WebP, or GIF image");
   }
+  // The declared type comes from the client; trust only what the bytes say.
+  const contentType = detectImageType(file.buffer);
+  if (!contentType) throw httpError(400, "Avatar must be a JPEG, PNG, WebP, or GIF image");
 
   const user = await User.findById(req.user!.id);
   if (!user) throw httpError(401, "Account no longer exists");
 
   const key = `avatars/${user.id}`;
-  await getStorage().put(key, file.buffer, { contentType: file.mimetype });
+  await getStorage().put(key, file.buffer, { contentType });
   user.avatarKey = key;
-  user.avatarContentType = file.mimetype;
+  user.avatarContentType = contentType;
   await user.save();
 
   res.status(200).json({ user });
