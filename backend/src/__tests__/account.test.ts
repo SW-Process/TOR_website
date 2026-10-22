@@ -28,7 +28,7 @@ afterAll(async () => {
   await mongod.stop();
 });
 
-const creds = { email: "vendor@test.com", password: "secret123" };
+const creds = { email: "vendor@test.com", password: "vendor-test-pass-17" };
 
 /** Register `creds` and return an agent carrying its session cookie. */
 async function signedIn() {

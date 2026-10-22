@@ -27,7 +27,7 @@ afterAll(async () => {
   await mongod.stop();
 });
 
-const creds = { email: "vendor@test.com", password: "secret123" };
+const creds = { email: "vendor@test.com", password: "vendor-test-pass-17" };
 
 /** Two independent "devices" signed in to the same account. */
 const MAC_SAFARI =
@@ -149,7 +149,7 @@ describe("GET /api/auth/sessions", () => {
   it("only shows the caller's own sessions", async () => {
     await twoDevices();
     const stranger = request.agent(app);
-    await stranger.post("/api/auth/register").send({ email: "other@test.com", password: "secret123" }).expect(201);
+    await stranger.post("/api/auth/register").send({ email: "other@test.com", password: "vendor-test-pass-17" }).expect(201);
     expect((await stranger.get("/api/auth/sessions")).body.data).toHaveLength(1);
   });
 });
@@ -176,7 +176,7 @@ describe("DELETE /api/auth/sessions/:id", () => {
   it("will not touch another user's session", async () => {
     const { laptop } = await twoDevices();
     const stranger = request.agent(app);
-    await stranger.post("/api/auth/register").send({ email: "other@test.com", password: "secret123" }).expect(201);
+    await stranger.post("/api/auth/register").send({ email: "other@test.com", password: "vendor-test-pass-17" }).expect(201);
     const theirs = (await stranger.get("/api/auth/sessions")).body.data[0];
 
     await laptop.delete(`/api/auth/sessions/${theirs.id}`).expect(404);

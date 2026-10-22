@@ -143,7 +143,7 @@ describe("GET /api/auth/google/callback", () => {
 });
 
 describe("linking Google from account settings", () => {
-  const creds = { email: "vendor@test.com", password: "secret123" };
+  const creds = { email: "vendor@test.com", password: "vendor-test-pass-17" };
   const identity = { googleId: "g-123", email: "someone.else@gmail.com", emailVerified: true };
 
   /** A signed-in agent that has started the link flow; returns it with the state value. */

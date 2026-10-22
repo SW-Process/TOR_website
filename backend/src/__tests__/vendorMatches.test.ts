@@ -26,7 +26,7 @@ afterAll(async () => {
 
 async function vendorAgent(email = "vendor@test.com") {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email, password: "secret123" });
+  await agent.post("/api/auth/register").send({ email, password: "vendor-test-pass-17" });
   return agent;
 }
 
@@ -58,9 +58,9 @@ describe("GET /api/vendor/matches", () => {
     expect((await request(app).get("/api/vendor/matches")).status).toBe(401);
 
     const adminAgentReq = request.agent(app);
-    await adminAgentReq.post("/api/auth/register").send({ email: "admin@test.com", password: "secret123" });
+    await adminAgentReq.post("/api/auth/register").send({ email: "admin@test.com", password: "vendor-test-pass-17" });
     await User.updateOne({ email: "admin@test.com" }, { role: "admin" });
-    await adminAgentReq.post("/api/auth/login").send({ email: "admin@test.com", password: "secret123" });
+    await adminAgentReq.post("/api/auth/login").send({ email: "admin@test.com", password: "vendor-test-pass-17" });
     expect((await adminAgentReq.get("/api/vendor/matches")).status).toBe(200);
   });
 

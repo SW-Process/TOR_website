@@ -34,7 +34,7 @@ async function seedTor() {
 
 async function vendorAgent(email = "vendor@test.com") {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email, password: "secret123" });
+  await agent.post("/api/auth/register").send({ email, password: "vendor-test-pass-17" });
   return agent;
 }
 
