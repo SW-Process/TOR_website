@@ -7,6 +7,7 @@ import "dotenv/config";
 import mongoose from "mongoose";
 import { connectDB } from "../config/db";
 import { User } from "../models";
+import { passwordProblem } from "../utils/passwordPolicy";
 
 async function main(): Promise<void> {
   const [email, password] = process.argv.slice(2);
@@ -14,8 +15,9 @@ async function main(): Promise<void> {
     console.error("Usage: npm run create-admin -- <email> <password>");
     process.exit(1);
   }
-  if (password.length < 8) {
-    console.error("Password must be at least 8 characters");
+  const problem = passwordProblem(password);
+  if (problem) {
+    console.error(problem);
     process.exit(1);
   }
 
