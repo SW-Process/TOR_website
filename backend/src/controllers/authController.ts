@@ -16,6 +16,14 @@ import { buildPasswordResetEmail } from "../email/passwordResetEmail";
 import { sessionUser } from "../middleware/auth";
 import { maskEmail, securityLog } from "../utils/securityLog";
 import {
+  REAUTH_WINDOW_MS,
+  factorsPresent,
+  isRecentlyAuthenticated,
+  markReauthenticated,
+  reauthMethods,
+  requireRecentAuth,
+} from "../services/reauth";
+import {
   isGoogleOAuthConfigured,
   buildGoogleAuthUrl,
   exchangeCodeForIdentity,
@@ -233,6 +241,30 @@ export async function me(req: Request, res: Response): Promise<void> {
   res.status(200).json({ user: accountView(user) });
 }
 
+/** GET /api/auth/reauth — whether this session may make sensitive changes now, and how to re-authenticate. */
+export async function reauthStatus(req: Request, res: Response): Promise<void> {
+  const user = await loadAccount(req);
+  res.status(200).json({ fresh: await isRecentlyAuthenticated(req), methods: reauthMethods(user), windowMs: REAUTH_WINDOW_MS });
+}
+
+/**
+ * POST /api/auth/reauth — confirm the account's factors (password, and the authenticator
+ * code when MFA is on) so this session may make sensitive changes for the next 10 minutes
+ * (ASVS 7.5.1). A Google-only account without MFA re-authenticates by signing in again.
+ */
+export async function reauthenticate(req: Request, res: Response): Promise<void> {
+  const user = await loadAccount(req);
+  if (reauthMethods(user).includes("google")) {
+    throw httpError(400, "Sign in with Google again to continue", { code: "reauth_google" });
+  }
+  if (!(await factorsPresent(user, (req.body ?? {}) as Record<string, unknown>, req))) {
+    throw httpError(401, "The password or code is incorrect", { code: "bad_credentials" });
+  }
+  await markReauthenticated(req);
+  securityLog(req, { event: "auth.reauth", outcome: "success", methods: reauthMethods(user) });
+  res.status(200).json({ fresh: true, windowMs: REAUTH_WINDOW_MS });
+}
+
 const MAX_DISPLAY_NAME_LENGTH = 60;
 
 /** "Active" in the session list: used within this window. */
@@ -270,6 +302,8 @@ export async function listSessions(req: Request, res: Response): Promise<void> {
 export async function revokeSession(req: Request, res: Response): Promise<void> {
   const id = String(req.params.id);
   if (!isValidObjectId(id)) throw httpError(400, "Invalid session id");
+  // Signing this device out is a logout; signing another one out is a sensitive change (7.5.2).
+  if (id !== req.user!.sessionId) await requireRecentAuth(req, await loadAccount(req));
   const ended = await endSessions({ _id: id, userId: req.user!.id });
   if (!ended) throw httpError(404, "Session not found");
   securityLog(req, { event: "session.revoke", outcome: "success", revokedSessionId: id });
@@ -319,7 +353,8 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   if (problem || typeof newPassword !== "string") throw httpError(400, problem ?? "A new password is required");
 
   const user = await loadAccount(req);
-  await confirmPassword(user, currentPassword, req);
+  await confirmPassword(user, currentPassword, req); // always, when there is one (6.2.3)
+  await requireRecentAuth(req, user);
   const firstPassword = !user.passwordHash;
   user.set("password", newPassword);
   await saveAndRevokeOtherSessions(req, res, user);
@@ -330,6 +365,7 @@ export async function changePassword(req: Request, res: Response): Promise<void>
 /** POST /api/auth/logout-others — sign out every device except this one. */
 export async function logoutOthers(req: Request, res: Response): Promise<void> {
   const user = await loadAccount(req);
+  await requireRecentAuth(req, user);
   await saveAndRevokeOtherSessions(req, res, user);
   securityLog(req, { event: "session.revoke_others", outcome: "success" });
   res.status(200).json({ user: accountView(user) });
@@ -350,6 +386,7 @@ export async function changeEmail(req: Request, res: Response): Promise<void> {
   const user = await loadAccount(req);
   if (!user.passwordHash) throw httpError(400, "Set a password before changing your email");
   await confirmPassword(user, currentPassword, req);
+  await requireRecentAuth(req, user);
 
   if (next !== user.email) {
     if (await User.exists({ email: next })) throw httpError(409, "Email is already registered");
@@ -379,6 +416,7 @@ export async function deleteAccount(req: Request, res: Response): Promise<void> 
   } else if (typeof confirmEmail !== "string" || confirmEmail.trim().toLowerCase() !== user.email) {
     throw httpError(400, "Type your account email to confirm");
   }
+  await requireRecentAuth(req, user);
 
   const profile = await VendorProfile.findOne({ userId: user._id }).select("_id");
   if (profile) {
@@ -468,8 +506,14 @@ export async function googleStart(_req: Request, res: Response): Promise<void> {
  * GET /api/auth/google/link — start linking Google to the signed-in account. Same
  * consent screen as sign-in; the callback tells the two apart by the state prefix.
  */
-export async function googleLinkStart(_req: Request, res: Response): Promise<void> {
+export async function googleLinkStart(req: Request, res: Response): Promise<void> {
   if (!isGoogleOAuthConfigured()) throw httpError(503, "Google sign-in is not available");
+  // Linking adds a way to sign in, so it needs a fresh re-authentication (7.5.1). This is a
+  // page navigation: send the browser back to settings to confirm, rather than a JSON 401.
+  if (!(await isRecentlyAuthenticated(req))) {
+    securityLog(req, { event: "auth.reauth_required", outcome: "blocked", severity: "NOTICE", for: "google_link" });
+    return res.redirect(clientUrl(LINK_RETURN_PATH + "reauth"));
+  }
 
   const state = LINK_STATE_PREFIX + crypto.randomBytes(16).toString("hex");
   res.cookie(oauthStateCookie(), state, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
@@ -508,6 +552,7 @@ async function linkGoogleToSession(req: Request, res: Response, identity: Google
 export async function googleUnlink(req: Request, res: Response): Promise<void> {
   const user = await loadAccount(req);
   if (!user.passwordHash) throw httpError(400, "Set a password before disconnecting Google");
+  await requireRecentAuth(req, user);
   user.googleOAuthId = undefined; // unset, not null — see the sparse unique index on User
   await user.save();
   securityLog(req, { event: "auth.google_unlink", outcome: "success" });

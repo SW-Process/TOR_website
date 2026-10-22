@@ -14,6 +14,8 @@ export interface ISession {
   expiresAt: Date;
   /** The second factor (TOTP or a recovery code) was checked when this session started. */
   mfa: boolean;
+  /** Last time this session re-entered its factors for a sensitive change (services/reauth). */
+  reauthAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +34,7 @@ const sessionSchema = new Schema<ISession>(
     lastSeenAt: { type: Date, default: Date.now },
     expiresAt: { type: Date, required: true },
     mfa: { type: Boolean, default: false },
+    reauthAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

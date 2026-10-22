@@ -9,6 +9,7 @@ export function notFound(req: Request, res: Response): void {
 }
 
 interface MaybeHttpError {
+  body?: Record<string, unknown>;
   status?: number;
   statusCode?: number;
   code?: number;
@@ -77,5 +78,5 @@ export function errorHandler(
     // Our own validation said no: worth a line, since probing for gaps in validation looks like this (ASVS 16.3.3).
     securityLog(req, { event: "input.rejected", outcome: "blocked", severity: "NOTICE", reason: "validation", message: e.message });
   }
-  res.status(status).json({ message: e.message || "Request failed" });
+  res.status(status).json({ ...(e.body ?? {}), message: e.message || "Request failed" });
 }

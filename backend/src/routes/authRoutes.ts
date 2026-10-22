@@ -20,6 +20,8 @@ import {
   googleCallback,
   googleLinkStart,
   googleUnlink,
+  reauthStatus,
+  reauthenticate,
 } from "../controllers/authController";
 import { listMyReports } from "../controllers/errorReportController";
 import { requireAuth } from "../middleware/auth";
@@ -50,9 +52,11 @@ router.patch("/me", requireAuth, updateAccount);
 router.delete("/me", requireAuth, reauthLimit, deleteAccount);
 router.put("/password", requireAuth, reauthLimit, changePassword);
 router.put("/email", requireAuth, reauthLimit, changeEmail);
-router.post("/logout-others", requireAuth, logoutOthers);
+router.get("/reauth", requireAuth, reauthStatus);
+router.post("/reauth", requireAuth, reauthLimit, reauthenticate);
+router.post("/logout-others", requireAuth, reauthLimit, logoutOthers);
 router.get("/sessions", requireAuth, listSessions);
-router.delete("/sessions/:id", requireAuth, revokeSession);
+router.delete("/sessions/:id", requireAuth, reauthLimit, revokeSession);
 router.get("/reports", requireAuth, listMyReports);
 
 router.post("/avatar", requireAuth, avatarUpload.single("avatar"), uploadAvatar);
@@ -61,6 +65,6 @@ router.get("/avatar/:userId", streamAvatar);
 router.get("/google", googleStart);
 router.get("/google/callback", googleCallback);
 router.get("/google/link", requireAuth, googleLinkStart);
-router.delete("/google", requireAuth, googleUnlink);
+router.delete("/google", requireAuth, reauthLimit, googleUnlink);
 
 export default router;
