@@ -20,7 +20,8 @@ describe("originCheck (ASVS 3.5.1, 3.5.2)", () => {
     process.env.CLIENT_ORIGIN = "https://tor.example.com";
   });
   afterAll(() => {
-    process.env.CLIENT_ORIGIN = previous;
+    if (previous === undefined) delete process.env.CLIENT_ORIGIN;
+    else process.env.CLIENT_ORIGIN = previous;
   });
 
   it("lets our own frontend through", async () => {

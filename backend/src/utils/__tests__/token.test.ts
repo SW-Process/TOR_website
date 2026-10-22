@@ -11,7 +11,8 @@ describe("session token algorithm (ASVS 9.1.2)", () => {
     process.env.JWT_SECRET = secret;
   });
   afterAll(() => {
-    process.env.JWT_SECRET = previous;
+    if (previous === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = previous;
   });
 
   it("signs with HS256", () => {
@@ -37,7 +38,8 @@ describe("session token algorithm (ASVS 9.1.2)", () => {
 describe("cookie names (ASVS 3.3.1)", () => {
   const env = process.env.NODE_ENV;
   afterEach(() => {
-    process.env.NODE_ENV = env;
+    if (env === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = env;
   });
 
   it("uses the __Host- prefix with Secure, Path=/ and no Domain in production", async () => {

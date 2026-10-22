@@ -17,7 +17,8 @@ describe("rateLimit (ASVS 6.3.1)", () => {
     process.env.RATE_LIMIT_ENABLED = "true";
   });
   afterAll(() => {
-    process.env.RATE_LIMIT_ENABLED = previous;
+    if (previous === undefined) delete process.env.RATE_LIMIT_ENABLED;
+    else process.env.RATE_LIMIT_ENABLED = previous;
   });
 
   it("allows up to max requests, then answers 429 with Retry-After", async () => {
