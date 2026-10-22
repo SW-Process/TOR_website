@@ -122,8 +122,11 @@ const TOO_MANY_ATTEMPTS = "ลองหลายครั้งเกินไ�
 function passwordPolicyError(message: string | undefined): string | null {
   if (!message) return null;
   if (message.startsWith("Password must be")) return "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
-  if (message.startsWith("Password is too long")) return "รหัสผ่านยาวเกินไป (ไม่เกิน 72 ตัวอักษรภาษาอังกฤษ หรือ 24 ตัวอักษรภาษาไทย)";
+  if (message.startsWith("Password is too long")) return "รหัสผ่านยาวเกินไป (ไม่เกิน 128 ตัวอักษร)";
   if (message.startsWith("This password is too common")) return "รหัสผ่านนี้ถูกใช้บ่อยเกินไปและเดาง่าย กรุณาตั้งรหัสผ่านอื่น";
+  if (message.startsWith("This password is too easy to guess")) return "รหัสผ่านนี้เดาง่ายเกินไป (เช่น ชื่อเว็บไซต์ กทม. หรือคำว่า password) กรุณาตั้งรหัสผ่านอื่น";
+  if (message.startsWith("Please don't use your name")) return "กรุณาอย่าใช้ชื่อหรืออีเมลของคุณในรหัสผ่าน";
+  if (message.startsWith("This password has appeared in a data breach")) return "รหัสผ่านนี้เคยรั่วไหลจากเว็บไซต์อื่น ผู้ไม่หวังดีอาจใช้เดาได้ กรุณาตั้งรหัสผ่านอื่น";
   return null;
 }
 
