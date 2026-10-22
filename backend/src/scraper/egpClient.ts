@@ -5,6 +5,7 @@ import type {
   EgpSearchParams,
   EgpSearchResponse,
 } from "./egpClient.types";
+import { OutboundBlockedError, hostOf, safeFetch } from "../utils/outbound";
 
 export interface EgpClientConfig {
   apiBase: string;
@@ -58,9 +59,13 @@ export class EgpClient implements EgpClientLike {
   private readonly cfg: EgpClientConfig;
   private readonly sleep: (ms: number) => Promise<void>;
 
+  /** The only hosts this client may call: those of its configured API and file bases. */
+  private readonly allowedHosts: string[];
+
   constructor(config: EgpClientConfig) {
     this.cfg = config;
     this.sleep = config.sleep ?? wait;
+    this.allowedHosts = [hostOf(config.apiBase), hostOf(config.fileBase)];
   }
 
   private async request(url: string, accept: "json" | "bytes"): Promise<Response> {
@@ -69,14 +74,18 @@ export class EgpClient implements EgpClientLike {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), this.cfg.timeoutMs);
       try {
-        const res = await fetch(url, {
-          method: "GET",
-          signal: controller.signal,
-          headers: {
-            "User-Agent": this.cfg.userAgent,
-            Accept: accept === "json" ? "application/json" : "application/pdf,application/octet-stream",
+        const res = await safeFetch(
+          url,
+          {
+            method: "GET",
+            signal: controller.signal,
+            headers: {
+              "User-Agent": this.cfg.userAgent,
+              Accept: accept === "json" ? "application/json" : "application/pdf,application/octet-stream",
+            },
           },
-        });
+          { allowedHosts: this.allowedHosts }
+        );
         if (!res.ok) throw new EgpHttpError(res.status, `e-GP ${res.status} for ${url}`);
         await this.sleep(this.cfg.delayMs); // politeness: pause after every successful call
         return res;
@@ -84,6 +93,7 @@ export class EgpClient implements EgpClientLike {
         lastError = err;
         clearTimeout(timer);
         if (err instanceof EgpHttpError && !err.retryable) throw err; // fail fast on genuine 4xx (NFR-07)
+        if (err instanceof OutboundBlockedError) throw err; // a retry can't make it allowed
         if (attempt === this.cfg.maxRetries - 1) break;
         await this.sleep(2 ** attempt * 1000);
         continue;
@@ -126,7 +136,7 @@ export class EgpClient implements EgpClientLike {
   }
 
   async downloadFile(announcementId: string, filename: string): Promise<Buffer> {
-    const url = `${this.cfg.fileBase}/${announcementId}/${encodeURIComponent(filename)}`;
+    const url = `${this.cfg.fileBase}/${encodeURIComponent(announcementId)}/${encodeURIComponent(filename)}`;
     const res = await this.request(url, "bytes");
 
     const len = res.headers.get("content-length");
