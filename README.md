@@ -141,6 +141,7 @@ Backend checks: `npm test`, `npm run typecheck`. Frontend checks: `npm run lint`
 - [CONTRIBUTING.md](CONTRIBUTING.md) — branching, commit messages, and pull requests
 - [docs/deployment/gcp.md](docs/deployment/gcp.md) — deploying to Google Cloud
 - [docs/security/](docs/security/README.md) — security documentation (OWASP ASVS 5.0): input validation, sign-in defenses, authorization rules, dependency policy
+- [docs/ontology/](docs/ontology/README.md) — OWL ontology of the whole application: roles, data model, features, API endpoints, pages, pipeline and deployment
 
 ## Team
 
