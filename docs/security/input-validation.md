@@ -27,14 +27,18 @@ Enforced in `backend/src/controllers/authController.ts` and `backend/src/utils/p
 | Field | Endpoint(s) | Rule |
 | --- | --- | --- |
 | `email` | register, login, forgot-password, change email | String matching `^[^\s@]+@[^\s@]+\.[^\s@]+$`; trimmed and lowercased before lookup and storage. |
-| `password` (new) | register, reset-password, change password, `npm run create-admin` | String of **at least 8 characters**, **at most 72 bytes** in UTF-8 (about 72 English or 24 Thai characters), and **not** one of the 3,000 most common passwords (case-insensitive, `backend/src/config/commonPasswords.ts`). Any characters are allowed; there are no "must contain a number/symbol" rules (ASVS 6.2.5). |
-| `password` (login) | login | String of at least 8 characters. A password longer than 72 bytes never matches, because bcrypt would only compare its first 72 bytes. |
-| `currentPassword` | change password, change email, delete account | Required for accounts that have a password; must match the stored bcrypt hash. Google-only accounts have none to give. |
+| `password` (new) | register, reset-password, change password, `npm run create-admin` | String of **8 to 128 characters** (any script); **not** one of the 3,000 most common passwords (case-insensitive, `config/commonPasswords.ts`); **not** made only of site-specific words and not containing the user's e-mail or display name (`config/contextWords.ts`); **not** found in a data breach (Pwned Passwords). Any characters are allowed; there are no "must contain a number/symbol" rules (ASVS 6.2.5). See [authentication-defenses.md §5](authentication-defenses.md#5-password-rules). |
+| `password` (login) | login | String of at least 8 characters, at most 128. Against a legacy (pre-`v2`) hash, a password longer than 72 bytes never matches. |
+| `currentPassword` | change password, change email, delete account, `POST /api/auth/reauth`, and inline on any action that needs re-authentication | Required for accounts that have a password; must match the stored hash. Google-only accounts have none to give. |
+| `mfaCode` | `POST /api/auth/reauth`, inline on re-authenticated actions | When MFA is on: a 6-digit code for the current 30-second step, or an unused recovery code. |
+| `code` | `POST /api/auth/mfa/verify`, `POST /api/auth/mfa/enable` | 6 digits (`^\d{6}$`, spaces removed) for the current step and not used before; or, on verify, a recovery code `XXXXX-XXXXX` (10 base32 characters, case and dashes ignored). The pending-sign-in cookie must be valid and unused. |
 | `confirmEmail` | delete account (Google-only accounts) | Must equal the account's email (trimmed, lowercased). |
 | `displayName` | `PATCH /api/auth/me` | String, trimmed, at most 60 characters. Blank resets it to the default. |
 | `token` | reset-password | Exactly `<userId>.<secret>`: two parts split by `.`, the first a valid ObjectId. The secret is hashed with SHA-256 and compared in constant time with the stored hash; it must not be expired (1 hour) and works once. |
 | `:id` | `DELETE /api/auth/sessions/:id` | Valid ObjectId of one of the caller's own sessions. |
-| `code`, `state` | `GET /api/auth/google/callback` | Both strings; `state` must equal the value in the OAuth state cookie. The Google ID token must be signed for our client id and have `email_verified: true`. |
+| `code`, `state` | `GET /api/auth/google/callback` | Both strings; `state` must equal the value in the OAuth flow cookie, which also holds this attempt's PKCE verifier and nonce. The Google ID token must be signed for our client id, carry that nonce, and have `email_verified: true`. |
+| `email` (query) | `GET /api/admin/users` | String, trimmed, 3 to 254 characters; escaped before use in a regex. |
+| `:id` | `POST /api/admin/users/:id/sessions/revoke` | Valid ObjectId of an existing user. |
 
 ## 3. Vendor data
 
@@ -54,7 +58,8 @@ Enforced in `backend/src/controllers/vendorProfileController.ts`, `bookmarkContr
 | Field | Rule |
 | --- | --- |
 | `name` | Required on create, string, trimmed, at most 200 characters. |
-| `filters` | Plain object (not an array or `null`). When alerts run, it is re-checked with the same schema as the TOR search (section 5); an invalid saved filter is skipped, never run. |
+| `filters` | Plain object with **only** the TOR search's own fields (`q`, `agency`, `category`, `tech`, `projectType`, `budgetMin`, `budgetMax`, `publishedFrom`, `publishedTo`, `deadlineFrom`, `deadlineTo`, `status`, `sort`, `order`), at most 4 KB, and valid under the TOR search schema (section 5). Anything else, `__proto__` and `$`-keys included, is refused. When alerts run it is checked again; an invalid saved filter is skipped, never run. |
+| (count) | At most **50** saved searches per vendor. |
 | `alertsEnabled` | Boolean. |
 | `:searchId` | Must be one of the caller's own saved searches, else `404`. |
 
@@ -66,6 +71,7 @@ Enforced in `backend/src/controllers/vendorProfileController.ts`, `bookmarkContr
 | `applicationStatus` | One of `interested`, `preparing`, `submitted`, `missed`. |
 | `note` | String, trimmed, at most 2,000 characters. |
 | (PATCH) | At least one of the two fields must be present. |
+| (count) | At most **1,000** bookmarks per vendor; updating an existing one is always allowed. |
 
 ### Hidden TORs (`/api/vendor/hidden-tors/:torId`)
 
@@ -75,7 +81,7 @@ Enforced in `backend/src/controllers/vendorProfileController.ts`, `bookmarkContr
 
 | Field | Rule |
 | --- | --- |
-| `:date` | Must match `^\d{4}-\d{2}-\d{2}$`. This also keeps the key safe as a MongoDB field name (no `.` or `$`). |
+| `:date` | Must match `^\d{4}-\d{2}-\d{2}$` **and** be a real calendar day (`2026-02-30` is refused). The pattern also keeps the key safe as a MongoDB field name (no `.` or `$`). |
 | `note` | String of at most 2,000 characters. Blank (only spaces) deletes the note. |
 | (count) | At most **1,000** notes per vendor. |
 
@@ -208,7 +214,5 @@ Enforced in `backend/src/routes/authRoutes.ts`, `backend/src/controllers/authCon
 
 ## 10. Known limits
 
-These are Level 2 items, not required for Level 1, and are noted here so they aren't mistaken for oversights.
-
-- The number of saved searches per vendor is not capped (ASVS 2.1.3 / 2.3.2, Level 2).
-- Combinations of fields are only checked where they matter (budget and date ranges). There is no general cross-field validation (ASVS 2.2.3, Level 2).
+- Cross-field rules are listed in [business-logic.md](business-logic.md#1-rules-across-fields-asvs-212-223); there is no general cross-field validation beyond them.
+- Free-text fields (chat, notes, report descriptions) accept any text within their length limits; they are only ever shown through React's escaping, never interpreted.

@@ -1,8 +1,10 @@
 # Authorization Rules
 
-**ASVS 5.0 requirement:** 8.1.1 (Level 1): *"Verify that authorization documentation defines rules for restricting function-level and data-specific access based on consumer permissions and resource attributes."*
+**ASVS 5.0 requirements:**
+- **8.1.1 (L1):** *"Verify that authorization documentation defines rules for restricting function-level and data-specific access based on consumer permissions and resource attributes."*
+- **8.1.2 (L2):** *"…defines rules for field-level access restrictions (both read and write) based on consumer permissions and resource attributes…"* (section 4.3).
 
-This document defines who may call which function (section 3) and whose data each function may touch (section 4). The rules are enforced in the Express backend (ASVS 8.3.1); the frontend only hides links and pages for convenience.
+This document defines who may call which function (section 3), whose data each function may touch (section 4), and which fields each caller may read or write (section 4.3). The rules are enforced in the Express backend (ASVS 8.3.1); the frontend only hides links and pages for convenience.
 
 ## 1. Roles
 
@@ -20,13 +22,15 @@ A signed-in user has exactly one role, `vendor` or `admin`, stored in `users.rol
 | --- | --- | --- |
 | `requireAuth` | Needs a valid session cookie. Verifies the JWT (HS256 only), loads the user **and the role from the database** on every request, and checks that the session row still exists and the token version is current. Otherwise `401`. | `backend/src/middleware/auth.ts` |
 | `requireRole(...roles)` | After `requireAuth`, the user's role must be in the list. Otherwise `403 "Insufficient permissions"`. | same |
+| `requireAdminMfa` | After `requireRole("admin")`, the session must have passed two-step verification. Otherwise `403` with `code: "mfa_required"` (ASVS 6.3.3). | same |
+| `requireRecentAuth` | For changes to the account's own authentication (e-mail, password, MFA, Google, sessions, deletion): the factors again, or a full sign-in within 10 minutes. Otherwise `401 reauth_required`. | `backend/src/services/reauth.ts` |
 | `optionalAuth` | Attaches the user when a valid session exists, but never blocks. Used where signed-in users get extra behaviour on a public route. | same |
 | Ownership filters | Every query on a user's own data filters by the id from the session (`req.user.id`), never by an id the client sends. | controllers (section 4) |
 | Public visibility gate | Public TOR endpoints only ever read TORs with `pipelineStatus: "enriched"`. | `torController.ts`, `torDocumentController.ts` |
 
 Rules that make these checks dependable:
 - **The role comes from the database, not from the token.** Changing a role, or deleting an account, takes effect on the next request. Bumping `tokenVersion` (password change, reset, "log out other devices") or deleting a session row revokes a session at once (ASVS 8.3.2, 7.4.1).
-- **Admin and ingestion routes are protected as a whole router** (`router.use(requireAuth, requireRole("admin"))`), so a new admin route can't be added without the check.
+- **Admin and ingestion routes are protected as a whole router** (`router.use(requireAuth, requireRole("admin"), requireAdminMfa, auditAdminAction)`), so a new admin route can't be added without the checks, and every change it makes is written to the security log.
 - **Deny by default.** A route that doesn't list a check is public by design; every such route is listed in section 3.
 - **Not found rather than forbidden.** Asking for another user's item (bookmark, notification, saved search, session) answers `404`, so it doesn't confirm the item exists.
 
@@ -41,15 +45,19 @@ Rules that make these checks dependable:
 | `GET /api/health` | ✅ | ✅ | ✅ | No data. |
 | `POST /api/auth/register`, `/login`, `/forgot-password`, `/reset-password` | ✅ | ✅ | ✅ | Rate limited. Register always creates a vendor. |
 | `POST /api/auth/logout` | ✅ | ✅ | ✅ | Ends only the caller's own session. |
+| `POST /api/auth/mfa/verify` | ✅ | ✅ | ✅ | Second sign-in step: needs the pending cookie from a correct password or Google sign-in. Rate limited. |
+| `GET/POST /api/auth/reauth` | ❌ | 🔒 | 🔒 | Re-authenticate this session. Rate limited. |
+| `POST /api/auth/mfa/setup`, `/mfa/enable`, `/mfa/disable`, `/mfa/recovery-codes` | ❌ | 🔒 | 🔒 | Need a fresh re-authentication (except `enable`, which needs a code from the new seed). Admins can't disable. |
 | `GET /api/auth/google`, `/google/callback` | ✅ | ✅ | ✅ | Google sign-in. A new account is a vendor. |
 | `GET/PATCH /api/auth/me` | ❌ | 🔒 | 🔒 | |
 | `DELETE /api/auth/me` | ❌ | 🔒 | ❌ | Admins can't delete their own account here, so the panel can't be left without an admin by accident. |
-| `PUT /api/auth/password`, `PUT /api/auth/email` | ❌ | 🔒 | 🔒 | Need the current password. Rate limited. |
-| `POST /api/auth/logout-others`, `GET /api/auth/sessions`, `DELETE /api/auth/sessions/:id` | ❌ | 🔒 | 🔒 | |
+| `PUT /api/auth/password`, `PUT /api/auth/email` | ❌ | 🔒 | 🔒 | Need the current password, and a fresh re-authentication. Rate limited. |
+| `GET /api/auth/sessions` | ❌ | 🔒 | 🔒 | |
+| `POST /api/auth/logout-others`, `DELETE /api/auth/sessions/:id` | ❌ | 🔒 | 🔒 | Need a fresh re-authentication (except signing out the current device). |
 | `GET /api/auth/reports` | ❌ | 🔒 | 🔒 | The caller's own error reports. |
 | `POST /api/auth/avatar` | ❌ | 🔒 | 🔒 | |
 | `GET /api/auth/avatar/:userId` | ✅ | ✅ | ✅ | Avatars are public pictures by design (shown in chat and admin lists). Served sandboxed. |
-| `GET /api/auth/google/link`, `DELETE /api/auth/google` | ❌ | 🔒 | 🔒 | Unlink needs a password on the account, so the user can still sign in. |
+| `GET /api/auth/google/link`, `DELETE /api/auth/google` | ❌ | 🔒 | 🔒 | Need a fresh re-authentication. Unlink needs a password on the account, so the user can still sign in. |
 
 ### 3.2 TORs and help center
 
@@ -81,9 +89,14 @@ Rules that make these checks dependable:
 
 ### 3.5 Admin panel (`/api/admin`, admin only)
 
+Every admin and ingestion endpoint also needs the admin's session to have passed two-step verification (`requireAdminMfa`).
+
 | Endpoint | Public | Vendor | Admin |
 | --- | :-: | :-: | :-: |
 | `GET /stats` | ❌ | ❌ | ✅ |
+| `GET /users?email=` (find accounts, with their device counts) | ❌ | ❌ | ✅ |
+| `POST /users/:id/sessions/revoke` (sign one user out everywhere) | ❌ | ❌ | ✅ |
+| `POST /sessions/revoke-all` (sign everyone else out; needs re-authentication) | ❌ | ❌ | ✅ |
 | `GET /notifications`, `PATCH /notifications/:id/read` | ❌ | ❌ | 🔒 |
 | `GET /tors`, `GET /tors/reported` | ❌ | ❌ | ✅ |
 | `PATCH /tors/:id` (correct fields, mark flags reviewed) | ❌ | ❌ | ✅ |
@@ -134,16 +147,37 @@ Admins share one workspace: every admin sees every user report, chat thread, ing
 - Hiding a TOR changes its status; nothing is deleted.
 - They can't read passwords or reset tokens (never returned, stored hashed), create other admins, change roles, or impersonate a user.
 
-### 4.3 Field-level rules
+### 4.3 Field-level rules (ASVS 8.1.2, 8.2.3)
 
-| Data | Fields never returned | Where |
-| --- | --- | --- |
-| User | `passwordHash`, `tokenVersion`, `resetPasswordTokenHash`, `resetPasswordExpiresAt`, `avatarKey`, `avatarContentType` | `User` schema `toJSON` |
-| Session list | Raw User-Agent (only parsed device, browser and OS) | `listSessions` |
-| Public TOR | `sourceContentHash`, `classification`, `ingestionRunId`, `sourceDocument.storageKey`, `sourceDocument.sha256`, announcement storage keys, `procurement.deadlineAttempt`, `procurement.source` | `getTor` projection |
-| Public TOR list | Only the list projection (title, agency, budget, dates, status, …) | `LIST_PROJECTION` |
-| My error reports | The admin who resolved it | `listMyReports` |
-| Notifications about a TOR that is no longer public | Only title, agency and code, marked `isPublic: false` | `listNotifications` |
+**Write rules.** Every write endpoint accepts only the fields listed below. Zod schemas are `.strict()` (an unknown field is `400`) and hand-written validators copy named fields only, so a field that isn't listed can't be set however the request is shaped (mass assignment, ASVS 15.3.3).
+
+| Endpoint | Caller | Fields it may write | Never writable through the API |
+| --- | --- | --- | --- |
+| `POST /api/auth/register` | anyone | `email`, `password` | `role` (always `vendor`), `tokenVersion`, every `mfa*` field |
+| `PATCH /api/auth/me` | owner | `displayName` | everything else |
+| `PUT /api/auth/email`, `PUT /api/auth/password` | owner (re-authenticated) | `email`; `password` | |
+| `POST /api/auth/mfa/*` | owner (re-authenticated) | the MFA fields, through the set-up flow only | the seed itself (generated by the server) |
+| `PUT /api/vendor/profile` | owner | `companyName`, `businessType`, `registeredCapital`, `yearsExperience`, `teamSize`, `certifications`, `technologyStack`, `interestedCategories`, `budgetRange` (`budgetMin` ≤ `budgetMax`), `serviceArea`, `emailAlertsEnabled` | `userId`, `savedSearches`, `hiddenTors`, `dayNotes` (each has its own endpoint) |
+| Saved searches | vendor owner | `name`, `filters` (only the search's own fields), `alertsEnabled` | |
+| Bookmarks | owner | `applicationStatus`, `note` | `vendorId`, `torId` (from the session and the URL) |
+| Day notes | owner | the note text for one date | |
+| `POST /api/tors/:id/report` | anyone | `description`, `reporterEmail` | `reportedBy` (from the session), `status`, `resolvedBy` |
+| `PATCH /api/admin/tors/:id` | admin | `title`, `agency`, `category`, `budget`, `submissionDeadline`, `status`, `bidDeadline`, `resolveFlags` | `pipelineStatus`, `aiSummary`, `classification`, `sourceDocument`, `procurement` (other than the bid deadline), `projectCode`, `viewCount` |
+| `PATCH /api/admin/reports/:id` | admin | `status`, `resolutionNote` | `torId`, `reportedBy`, `description` |
+| Help announcements and FAQs | admin | their content fields and `status` | `createdBy`, `updatedBy` (from the session) |
+
+**Read rules.**
+
+| Data | Who may read | Fields never returned | Where |
+| --- | --- | --- | --- |
+| User | the owner (`/me`); admins see e-mail and role in reports, chats and the session lookup | `passwordHash`, `tokenVersion`, `resetPasswordTokenHash`, `resetPasswordExpiresAt`, `avatarKey`, `avatarContentType`, every `mfaSecret*`/`mfaPending*`/`mfaRecoveryCodes`/`mfaLastStep` field | `User` schema `select: false` + `toJSON` |
+| Session list | the owner | Raw User-Agent (only parsed device, browser and OS) | `listSessions` |
+| Session lookup (admin) | admins | Only id, e-mail, role and the number of signed-in devices; no IPs or devices | `findUsers` |
+| Public TOR | everyone | `sourceContentHash`, `classification`, `ingestionRunId`, `sourceDocument.storageKey`, `sourceDocument.sha256`, announcement storage keys, `procurement.deadlineAttempt`, `procurement.source` | `getTor` projection |
+| Public TOR list | everyone | Only the list projection (title, agency, budget, dates, status, …) | `LIST_PROJECTION` |
+| Fairness flags | admins in the panel; the public sees only the TOR's neutral signals on its page | | admin projection |
+| My error reports | the reporter | The admin who resolved it | `listMyReports` |
+| Notifications about a TOR that is no longer public | the vendor | Only title, agency and code, marked `isPublic: false` | `listNotifications` |
 
 ### 4.4 Rules based on resource state
 
@@ -152,7 +186,8 @@ Admins share one workspace: every admin sees every user report, chat thread, ing
 | TOR | Visible, bookmarkable, hideable and reportable by the public only when `pipelineStatus` is `enriched`. |
 | Help announcement / FAQ | Public only when `status` is `published`; an announcement also disappears after its `endsAt`. |
 | Account without a password (Google only) | Can't change email or unlink Google until it sets a password. |
-| Admin account | Can't be deleted through `DELETE /api/auth/me`. |
+| Admin account | Can't be deleted through `DELETE /api/auth/me`, and can't turn two-step verification off. Its admin access needs an MFA-verified session. |
+| Account with MFA on | Every sign-in needs the second factor; re-authentication needs the password and a code. |
 
 ## 5. Protections around the rules
 
@@ -170,7 +205,7 @@ Admins share one workspace: every admin sees every user report, chat thread, ing
 | --- | --- |
 | `/admin` pages in the frontend | A non-admin who types the URL sees the empty admin layout, but every API call it makes answers `403`, so no data is shown. A role check in the frontend would be a UX improvement only. |
 | Avatars are public by user id | Intended; avatars are not considered sensitive. |
-| No field-level read rules beyond section 4.3 | ASVS 8.1.2 / 8.2.3 are Level 2. |
+| Admins see every report, chat and run | Intended: one shared admin workspace (section 4.2). |
 
 ## 7. Verification
 
@@ -186,5 +221,8 @@ The backend test suite checks these rules, for example:
 | `sessions.test.ts` | Logging out other devices and changing the password revoke the other sessions; the token version is never returned. |
 | `torRoutes.test.ts`, `torProcurementExposure.test.ts` | Only enriched TORs are public, and internal fields (`storageKey`, `deadlineAttempt`, `procurement.source`) are never returned. |
 | `originCheck.test.ts` | Cross-site state-changing requests are refused. |
+| `mfa.test.ts` | Admin and ingestion routes refuse an admin session without MFA; admins can't switch MFA off. |
+| `reauth.test.ts`, `adminSessions.test.ts` | Sensitive account changes need re-authentication; only admins can end other people's sessions. |
+| `businessLimits.test.ts` | Saved-search filters can't carry unknown fields such as `__proto__` or `$where`. |
 
 Not yet covered by a test: a visitor reading another visitor's chat thread (the code filters by `user: req.user.id`, but no test tries it).

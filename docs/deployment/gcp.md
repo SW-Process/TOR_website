@@ -26,12 +26,16 @@ Placeholders: `<PROJECT>`, `<REGION>` (`asia-southeast1`), `<BUCKET>`, `<IMG>`,
   gcloud storage buckets create gs://<BUCKET> --location=asia-southeast1 --uniform-bucket-level-access
   ```
 
-- Secrets: the MongoDB URI (API and jobs) and the session signing key (API only).
-  `JWT_SECRET` must be at least 32 random characters; never reuse the dev value.
+- Secrets: the MongoDB URI (API and jobs), the session signing key and the two-step
+  verification encryption key (API only). `JWT_SECRET` must be at least 32 random
+  characters and `MFA_ENCRYPTION_KEY` exactly 64 hex characters; never reuse the dev
+  values. The API refuses to start in production without either. Key lifecycle and
+  rotation: [docs/security/cryptography.md](../security/cryptography.md#1-key-management-policy-asvs-1111).
 
   ```sh
   printf '%s' "<MONGODB_URI>" | gcloud secrets create MONGODB_URI --data-file=-
   openssl rand -hex 32 | tr -d '\n' | gcloud secrets create JWT_SECRET --data-file=-
+  openssl rand -hex 32 | tr -d '\n' | gcloud secrets create MFA_ENCRYPTION_KEY --data-file=-
   ```
 
 - Service accounts and IAM:
@@ -48,12 +52,14 @@ Placeholders: `<PROJECT>`, `<REGION>` (`asia-southeast1`), `<BUCKET>`, `<IMG>`,
   gcloud secrets add-iam-policy-binding MONGODB_URI \
     --member=serviceAccount:tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
 
-  # tor-api-sa: read PDFs + read the secrets
+  # tor-api-sa: read PDFs, write avatars (and captured PDFs) + read the secrets
   gcloud storage buckets add-iam-policy-binding gs://<BUCKET> \
-    --member=serviceAccount:tor-api-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/storage.objectViewer
+    --member=serviceAccount:tor-api-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/storage.objectUser
   gcloud secrets add-iam-policy-binding MONGODB_URI \
     --member=serviceAccount:tor-api-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
   gcloud secrets add-iam-policy-binding JWT_SECRET \
+    --member=serviceAccount:tor-api-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
+  gcloud secrets add-iam-policy-binding MFA_ENCRYPTION_KEY \
     --member=serviceAccount:tor-api-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
 
   # tor-jobs-sa also acts as the Cloud Scheduler identity, so it needs run.invoker
@@ -91,10 +97,27 @@ gcloud run deploy tor-api \
   --service-account tor-api-sa@<PROJECT>.iam.gserviceaccount.com \
   --min-instances 0 \
   --memory 1Gi --no-cpu-throttling \
-  --set-secrets MONGODB_URI=MONGODB_URI:latest,JWT_SECRET=JWT_SECRET:latest \
+  --set-secrets MONGODB_URI=MONGODB_URI:latest,JWT_SECRET=JWT_SECRET:latest,MFA_ENCRYPTION_KEY=MFA_ENCRYPTION_KEY:latest \
   --set-env-vars STORAGE_DRIVER=gcs,GCS_BUCKET=<BUCKET>,CLIENT_ORIGIN=<FRONTEND_URL>,TRUST_PROXY=1 \
   --command node --args dist/server.js \
   --allow-unauthenticated
+```
+
+Security settings with safe defaults that need no flag: sessions end after 30 idle minutes
+(`SESSION_IDLE_TIMEOUT_MINUTES`) or 12 hours (`SESSION_MAX_HOURS`); admins need two-step
+verification (`ADMIN_MFA_REQUIRED`, never set it to `false` in production); new passwords
+are checked against Pwned Passwords (`BREACHED_PASSWORD_CHECK`). See
+[docs/security/session-management.md](../security/session-management.md). After the
+first deploy, create the first admin with `npm run create-admin` and have them set up
+two-step verification under *Account settings* before using the panel.
+
+Security logs go to Cloud Logging as JSON (`jsonPayload.logType="security"`, see
+[docs/security/logging.md](../security/logging.md)). Before production, lock the log
+bucket so entries can't be deleted before their retention ends. Locking is permanent: the
+retention period can't be shortened afterwards, so set it first if 30 days isn't right.
+
+```sh
+gcloud logging buckets update _Default --location=global --locked
 ```
 
 `TRUST_PROXY=1` makes Express read the real client IP from Cloud Run's `X-Forwarded-For`; the login rate limits count by that IP (use `2` behind an external HTTPS load balancer, never `true`). See [docs/security/authentication-defenses.md](../security/authentication-defenses.md#34-client-ip-behind-cloud-run-important).
