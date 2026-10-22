@@ -8,6 +8,7 @@ import { endSessions, setSessionCookie, startSession } from "../services/session
 import { parseUserAgent } from "../utils/userAgent";
 import { httpError } from "../utils/httpError";
 import { detectImageType } from "../utils/imageType";
+import { MIN_PASSWORD_LENGTH, passwordProblem } from "../utils/passwordPolicy";
 import { getStorage } from "../storage";
 import { getEmailSender } from "../email";
 import { clientUrl } from "../utils/clientUrl";
@@ -21,7 +22,6 @@ import {
 } from "../config/google";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 8;
 const OAUTH_STATE_COOKIE = "oauth_state";
 /**
  * Marks an OAuth round trip that links Google to the signed-in account rather than
@@ -63,6 +63,8 @@ async function sendSession(req: Request, res: Response, user: UserDocument, stat
 /** POST /api/auth/register — create a vendor account and start a session. */
 export async function register(req: Request, res: Response): Promise<void> {
   const { email, password } = validateCredentials(req.body);
+  const problem = passwordProblem(password);
+  if (problem) throw httpError(400, problem);
 
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) throw httpError(409, "Email is already registered");
@@ -136,9 +138,8 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
  */
 export async function resetPassword(req: Request, res: Response): Promise<void> {
   const { token, password } = (req.body ?? {}) as Record<string, unknown>;
-  if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
-    throw httpError(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-  }
+  const problem = passwordProblem(password);
+  if (problem || typeof password !== "string") throw httpError(400, problem ?? "A password is required");
 
   const invalidLink = () => httpError(400, "This reset link is invalid or has expired");
   if (typeof token !== "string" || token.split(".").length !== 2) throw invalidLink();
@@ -280,9 +281,8 @@ async function saveAndRevokeOtherSessions(req: Request, res: Response, user: Use
  */
 export async function changePassword(req: Request, res: Response): Promise<void> {
   const { currentPassword, newPassword } = (req.body ?? {}) as Record<string, unknown>;
-  if (typeof newPassword !== "string" || newPassword.length < MIN_PASSWORD_LENGTH) {
-    throw httpError(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-  }
+  const problem = passwordProblem(newPassword);
+  if (problem || typeof newPassword !== "string") throw httpError(400, problem ?? "A new password is required");
 
   const user = await loadAccount(req);
   await confirmPassword(user, currentPassword);
