@@ -20,6 +20,9 @@ export async function streamTorDocument(req: Request, res: Response): Promise<vo
   const filename = encodeURIComponent(tor.sourceDocument?.filename ?? "tor.pdf");
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+  // The browser's built-in PDF viewer needs to run inside this response, so the API-wide
+  // `default-src 'none'` would show a blank page. Framing stays blocked.
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
   // GCS read streams are lazy: auth / not-found errors only surface here, after
   // the handler returned. If nothing has been sent yet, answer with a real error
   // instead of dropping the socket (which browsers show as "server unreachable").
