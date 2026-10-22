@@ -47,9 +47,9 @@ router.post("/forgot-password", forgotPasswordPerIp, forgotPasswordPerAccount, f
 router.post("/reset-password", resetPasswordLimit, resetPassword);
 router.get("/me", requireAuth, me);
 router.patch("/me", requireAuth, updateAccount);
-router.delete("/me", requireAuth, deleteAccount);
-router.put("/password", requireAuth, changePassword);
-router.put("/email", requireAuth, changeEmail);
+router.delete("/me", requireAuth, reauthLimit, deleteAccount);
+router.put("/password", requireAuth, reauthLimit, changePassword);
+router.put("/email", requireAuth, reauthLimit, changeEmail);
 router.post("/logout-others", requireAuth, logoutOthers);
 router.get("/sessions", requireAuth, listSessions);
 router.delete("/sessions/:id", requireAuth, revokeSession);
