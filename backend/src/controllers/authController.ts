@@ -14,6 +14,7 @@ import { getEmailSender } from "../email";
 import { clientUrl } from "../utils/clientUrl";
 import { buildPasswordResetEmail } from "../email/passwordResetEmail";
 import { sessionUser } from "../middleware/auth";
+import { maskEmail, securityLog } from "../utils/securityLog";
 import {
   isGoogleOAuthConfigured,
   buildGoogleAuthUrl,
@@ -68,11 +69,15 @@ export async function register(req: Request, res: Response): Promise<void> {
   if (problem) throw httpError(400, problem);
 
   const existing = await User.findOne({ email: email.toLowerCase() });
-  if (existing) throw httpError(409, "Email is already registered");
+  if (existing) {
+    securityLog(req, { event: "auth.register", outcome: "failure", reason: "email_taken", userId: existing.id });
+    throw httpError(409, "Email is already registered");
+  }
 
   const user = new User({ email, role: "vendor" });
   user.set("password", password);
   await user.save();
+  securityLog(req, { event: "auth.register", outcome: "success", userId: user.id, method: "password" });
 
   await sendSession(req, res, user, 201);
 }
@@ -83,8 +88,16 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   const user = await User.findOne({ email: email.toLowerCase() }).select("+passwordHash");
   if (!user || !(await user.comparePassword(password))) {
+    securityLog(req, {
+      event: "auth.login",
+      outcome: "failure",
+      method: "password",
+      reason: user ? "bad_password" : "unknown_account",
+      ...(user ? { userId: user.id } : { email: maskEmail(email) }),
+    });
     throw httpError(401, "Invalid email or password");
   }
+  securityLog(req, { event: "auth.login", outcome: "success", method: "password", userId: user.id });
 
   await sendSession(req, res, user, 200);
 }
@@ -113,6 +126,11 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
   const issuedAt = user?.resetPasswordExpiresAt ? user.resetPasswordExpiresAt.getTime() - RESET_TOKEN_TTL_MS : -Infinity;
   const onCooldown = Date.now() - issuedAt < RESET_REQUEST_COOLDOWN_MS;
 
+  if (!user) {
+    securityLog(req, { event: "auth.password_reset_request", outcome: "failure", reason: "unknown_account", email: maskEmail(email) });
+  } else if (onCooldown) {
+    securityLog(req, { event: "auth.password_reset_request", outcome: "blocked", reason: "cooldown", userId: user.id });
+  }
   if (user && !onCooldown) {
     const rawToken = crypto.randomBytes(RESET_TOKEN_BYTES).toString("hex");
     user.resetPasswordTokenHash = hashResetToken(rawToken);
@@ -121,11 +139,19 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
 
     // In the fragment, not the query: browsers never send `#…` to a server (ASVS 14.2.1).
     const link = clientUrl(`/reset-password#token=${user.id}.${rawToken}`);
+    securityLog(req, { event: "auth.password_reset_request", outcome: "success", userId: user.id });
     try {
       await getEmailSender().send({ to: user.email, ...buildPasswordResetEmail(link) });
     } catch (err) {
       // The caller gets the same generic response either way; only the server sees this.
-      console.error("forgot-password email failed:", err);
+      securityLog(req, {
+        event: "email.send",
+        outcome: "failure",
+        severity: "ERROR",
+        userId: user.id,
+        purpose: "password_reset",
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -143,7 +169,10 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
   const problem = passwordProblem(password);
   if (problem || typeof password !== "string") throw httpError(400, problem ?? "A password is required");
 
-  const invalidLink = () => httpError(400, "This reset link is invalid or has expired");
+  const invalidLink = () => {
+    securityLog(req, { event: "auth.password_reset", outcome: "failure", reason: "invalid_or_expired_token" });
+    return httpError(400, "This reset link is invalid or has expired");
+  };
   if (typeof token !== "string" || token.split(".").length !== 2) throw invalidLink();
   const [userId, rawToken] = token.split(".") as [string, string];
   if (!isValidObjectId(userId) || !rawToken) throw invalidLink();
@@ -162,6 +191,7 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
   user.tokenVersion = (user.tokenVersion ?? 0) + 1; // sign out every device, including whoever requested this
   await user.save();
   await Session.deleteMany({ userId: user._id });
+  securityLog(req, { event: "auth.password_reset", outcome: "success", userId: user.id, sessionsEnded: "all" });
 
   res.status(200).json({ message: "Password has been reset" });
 }
@@ -171,6 +201,7 @@ export async function logout(req: Request, res: Response): Promise<void> {
   // Drop this device's session row too, so it leaves the session list at once.
   const current = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined);
   if (current?.sessionId) await endSessions({ _id: current.sessionId, userId: current.id });
+  securityLog(req, { event: "auth.logout", outcome: "success", userId: current?.id ?? null, sessionId: current?.sessionId });
   res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(200).json({ message: "Logged out" });
 }
@@ -188,9 +219,10 @@ function accountView(user: UserDocument) {
 }
 
 /** Accounts with a password must confirm it; Google-only accounts (no hash) have none to give. */
-async function confirmPassword(user: UserDocument, candidate: unknown): Promise<void> {
+async function confirmPassword(user: UserDocument, candidate: unknown, req?: Request): Promise<void> {
   if (!user.passwordHash) return;
   if (typeof candidate !== "string" || !(await user.comparePassword(candidate))) {
+    securityLog(req, { event: "auth.reauth", outcome: "failure", userId: user.id, reason: "bad_password" });
     throw httpError(401, "Current password is incorrect");
   }
 }
@@ -240,6 +272,7 @@ export async function revokeSession(req: Request, res: Response): Promise<void> 
   if (!isValidObjectId(id)) throw httpError(400, "Invalid session id");
   const ended = await endSessions({ _id: id, userId: req.user!.id });
   if (!ended) throw httpError(404, "Session not found");
+  securityLog(req, { event: "session.revoke", outcome: "success", revokedSessionId: id });
   if (id === req.user!.sessionId) res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(204).end();
 }
@@ -287,9 +320,11 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   if (problem || typeof newPassword !== "string") throw httpError(400, problem ?? "A new password is required");
 
   const user = await loadAccount(req);
-  await confirmPassword(user, currentPassword);
+  await confirmPassword(user, currentPassword, req);
+  const firstPassword = !user.passwordHash;
   user.set("password", newPassword);
   await saveAndRevokeOtherSessions(req, res, user);
+  securityLog(req, { event: firstPassword ? "auth.password_set" : "auth.password_change", outcome: "success", sessionsEnded: "others" });
   res.status(200).json({ user: accountView(user) });
 }
 
@@ -297,6 +332,7 @@ export async function changePassword(req: Request, res: Response): Promise<void>
 export async function logoutOthers(req: Request, res: Response): Promise<void> {
   const user = await loadAccount(req);
   await saveAndRevokeOtherSessions(req, res, user);
+  securityLog(req, { event: "session.revoke_others", outcome: "success" });
   res.status(200).json({ user: accountView(user) });
 }
 
@@ -314,12 +350,13 @@ export async function changeEmail(req: Request, res: Response): Promise<void> {
 
   const user = await loadAccount(req);
   if (!user.passwordHash) throw httpError(400, "Set a password before changing your email");
-  await confirmPassword(user, currentPassword);
+  await confirmPassword(user, currentPassword, req);
 
   if (next !== user.email) {
     if (await User.exists({ email: next })) throw httpError(409, "Email is already registered");
     user.email = next;
     await user.save();
+    securityLog(req, { event: "account.email_change", outcome: "success" });
   }
   res.status(200).json({ user: accountView(user) });
 }
@@ -333,10 +370,13 @@ export async function changeEmail(req: Request, res: Response): Promise<void> {
 export async function deleteAccount(req: Request, res: Response): Promise<void> {
   const { currentPassword, confirmEmail } = (req.body ?? {}) as Record<string, unknown>;
   const user = await loadAccount(req);
-  if (user.role === "admin") throw httpError(403, "Admin accounts cannot be deleted here");
+  if (user.role === "admin") {
+    securityLog(req, { event: "account.delete", outcome: "blocked", reason: "admin_account" });
+    throw httpError(403, "Admin accounts cannot be deleted here");
+  }
 
   if (user.passwordHash) {
-    await confirmPassword(user, currentPassword);
+    await confirmPassword(user, currentPassword, req);
   } else if (typeof confirmEmail !== "string" || confirmEmail.trim().toLowerCase() !== user.email) {
     throw httpError(400, "Type your account email to confirm");
   }
@@ -360,6 +400,7 @@ export async function deleteAccount(req: Request, res: Response): Promise<void> 
     await getStorage().delete?.(user.avatarKey).catch(() => {}); // an orphaned blob is harmless
   }
   await user.deleteOne();
+  securityLog(req, { event: "account.delete", outcome: "success" });
 
   res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(200).json({ message: "Account deleted" });
@@ -450,10 +491,14 @@ async function linkGoogleToSession(req: Request, res: Response, identity: Google
   if (!user) return done("session");
 
   const owner = await User.findOne({ googleOAuthId: identity.googleId }).select("_id").lean();
-  if (owner && String(owner._id) !== user.id) return done("taken");
+  if (owner && String(owner._id) !== user.id) {
+    securityLog(req, { event: "auth.google_link", outcome: "failure", userId: user.id, reason: "google_account_taken" });
+    return done("taken");
+  }
 
   user.googleOAuthId = identity.googleId;
   await user.save();
+  securityLog(req, { event: "auth.google_link", outcome: "success", userId: user.id });
   done("linked");
 }
 
@@ -466,6 +511,7 @@ export async function googleUnlink(req: Request, res: Response): Promise<void> {
   if (!user.passwordHash) throw httpError(400, "Set a password before disconnecting Google");
   user.googleOAuthId = undefined; // unset, not null — see the sparse unique index on User
   await user.save();
+  securityLog(req, { event: "auth.google_unlink", outcome: "success" });
   res.status(200).json({ user: accountView(user) });
 }
 
@@ -478,8 +524,10 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
   const { code, state } = req.query;
   // A link round trip reports back to the security settings page, a sign-in to /login.
   const linking = typeof state === "string" && state.startsWith(LINK_STATE_PREFIX);
-  const fail = (reason: string) =>
+  const fail = (reason: string) => {
+    securityLog(req, { event: linking ? "auth.google_link" : "auth.login", outcome: "failure", method: "google", reason });
     res.redirect(clientUrl(linking ? `${LINK_RETURN_PATH}error` : `/login?error=${reason}`));
+  };
 
   if (!isGoogleOAuthConfigured()) return fail("google_unavailable");
 
@@ -508,11 +556,14 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
     if (user) {
       user.googleOAuthId = identity.googleId; // link Google to the existing account
       await user.save();
+      securityLog(req, { event: "auth.google_link", outcome: "success", userId: user.id, via: "verified_email_match" });
     } else {
       user = await User.create({ email, role: "vendor", googleOAuthId: identity.googleId });
       isNew = true;
+      securityLog(req, { event: "auth.register", outcome: "success", userId: user.id, method: "google" });
     }
   }
+  securityLog(req, { event: "auth.login", outcome: "success", method: "google", userId: user.id });
 
   await startSession(req, res, user, "google");
   res.redirect(clientUrl(isNew ? "/account/profile?onboarding=1" : "/dashboard"));
