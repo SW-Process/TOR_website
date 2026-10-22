@@ -17,12 +17,12 @@ import {
   adminUpdateFaq,
 } from "../controllers/adminHelpController";
 import { findUsers, revokeAllSessions, revokeUserSessions } from "../controllers/adminSessionController";
-import { requireAuth, requireRole } from "../middleware/auth";
+import { requireAdminMfa, requireAuth, requireRole } from "../middleware/auth";
 import { auditAdminAction } from "../middleware/auditLog";
 
 const router = Router();
 
-router.use(requireAuth, requireRole("admin"), auditAdminAction);
+router.use(requireAuth, requireRole("admin"), requireAdminMfa, auditAdminAction);
 
 router.get("/stats", getAdminStats);
 router.get("/users", findUsers);

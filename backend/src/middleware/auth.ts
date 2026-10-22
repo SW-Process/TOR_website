@@ -6,6 +6,7 @@ import { LAST_SEEN_RESOLUTION_MS } from "../services/sessions";
 import type { UserRole } from "../models/User";
 import type { AuthUser } from "../types/http";
 import { securityLog } from "../utils/securityLog";
+import { adminMfaRequired } from "../services/mfa";
 
 /**
  * Requests the frontend makes on a timer (chat and status polling) send this header, so
@@ -120,4 +121,18 @@ export function requireRole(...roles: UserRole[]): RequestHandler {
     }
     next();
   };
+}
+
+/**
+ * Admin access needs a session that passed MFA (ASVS 6.3.3): an admin who signed in with a
+ * password only, or hasn't set up an authenticator yet, gets 403 `mfa_required` and is
+ * sent to account settings to do so. Use after requireRole("admin").
+ */
+export function requireAdminMfa(req: Request, res: Response, next: NextFunction): void {
+  if (req.user?.role === "admin" && adminMfaRequired() && !req.user.mfa) {
+    securityLog(req, { event: "authz.denied", outcome: "blocked", reason: "admin_mfa_required" });
+    res.status(403).json({ message: "Two-step verification is required for admin access", code: "mfa_required" });
+    return;
+  }
+  next();
 }

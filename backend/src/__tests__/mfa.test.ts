@@ -214,3 +214,46 @@ describe("re-authentication and turning it off", () => {
     await device.post("/api/auth/mfa/verify").send({ code: recoveryCodes[0] }).expect(401);
   });
 });
+
+describe("admins need two-step verification (ASVS 6.3.3)", () => {
+  beforeEach(() => {
+    process.env.ADMIN_MFA_REQUIRED = "true";
+  });
+
+  async function admin() {
+    const agent = request.agent(app);
+    await agent.post("/api/auth/register").send({ email: "admin@test.com", password: PASSWORD }).expect(201);
+    await User.updateOne({ email: "admin@test.com" }, { role: "admin" });
+    await agent.post("/api/auth/login").send({ email: "admin@test.com", password: PASSWORD }).expect(200);
+    return agent;
+  }
+
+  it("keeps an admin without MFA out of the admin API, but not out of their account", async () => {
+    const agent = await admin();
+    const res = await agent.get("/api/admin/stats").expect(403);
+    expect(res.body.code).toBe("mfa_required");
+    await agent.get("/api/ingestion/runs").expect(403);
+    const me = await agent.get("/api/auth/me").expect(200);
+    expect(me.body.user).toMatchObject({ mfaRequired: true, mfaEnabled: false, sessionMfa: false });
+  });
+
+  it("lets them in once MFA is set up on this session, and on later MFA sign-ins", async () => {
+    const agent = await admin();
+    const setup = await agent.post("/api/auth/mfa/setup").expect(200);
+    await agent.post("/api/auth/mfa/enable").send({ code: codeFor(setup.body.secret) }).expect(200);
+    await agent.get("/api/admin/stats").expect(200);
+
+    advance(30_000);
+    const other = request.agent(app);
+    await other.post("/api/auth/login").send({ email: "admin@test.com", password: PASSWORD }).expect(200);
+    await other.post("/api/auth/mfa/verify").send({ code: codeFor(setup.body.secret) }).expect(200);
+    await other.get("/api/admin/stats").expect(200);
+  });
+
+  it("won't let an admin turn MFA off", async () => {
+    const agent = await admin();
+    const setup = await agent.post("/api/auth/mfa/setup").expect(200);
+    await agent.post("/api/auth/mfa/enable").send({ code: codeFor(setup.body.secret) }).expect(200);
+    await agent.post("/api/auth/mfa/disable").expect(403);
+  });
+});
