@@ -1,5 +1,5 @@
 import { zipSync, strToU8 } from "fflate";
-import { torFromBundle } from "../torFromBundle";
+import { MAX_BUNDLE_ENTRIES, torFromBundle } from "../torFromBundle";
 
 const pdf = (text: string) => Buffer.from(`%PDF-1.7\n${text}`);
 const zip = (files: Record<string, Buffer | Uint8Array>) =>
@@ -57,5 +57,27 @@ describe("torFromBundle", () => {
     expect(torFromBundle(Buffer.from("PK\u0003\u0004 this is not really a zip"))).toBeNull();
     expect(torFromBundle(Buffer.alloc(0))).toBeNull();
     expect(strToU8("x").length).toBe(1); // keeps the fflate import honest
+  });
+
+  describe("zip-bomb limits (ASVS 5.2.3)", () => {
+    it("refuses a bundle with too many files, before inflating anything", () => {
+      const files: Record<string, Buffer> = { "Attach_TOR.pdf": pdf("tor") };
+      for (let i = 0; i < MAX_BUNDLE_ENTRIES; i++) files[`f${i}.txt`] = Buffer.from("x");
+      expect(torFromBundle(zip(files))).toBeNull();
+    });
+
+    it("refuses a bundle that unpacks to more than 200 MB in total", () => {
+      // 5 × 45 MB of zeros compress to almost nothing; each is under the per-entry cap.
+      const big = new Uint8Array(45 * 1024 * 1024);
+      const files: Record<string, Uint8Array> = { "Attach_TOR.pdf": new Uint8Array(pdf("tor")) };
+      for (let i = 0; i < 5; i++) files[`filler${i}.bin`] = big;
+      const bomb = zip(files);
+      expect(bomb.length).toBeLessThan(2 * 1024 * 1024);
+      expect(torFromBundle(bomb)).toBeNull();
+    });
+
+    it("still reads an ordinary bundle", () => {
+      expect(torFromBundle(zip({ "Attach_TOR.pdf": pdf("tor"), "notes.txt": Buffer.from("x") }))?.name).toBe("Attach_TOR.pdf");
+    });
   });
 });

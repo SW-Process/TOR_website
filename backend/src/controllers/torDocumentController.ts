@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { Tor } from "../models";
 import { getStorage } from "../storage";
 import { httpError } from "../utils/httpError";
+import { contentDisposition } from "../utils/contentDisposition";
 
 /** GET /api/tors/:id/document — stream our stored copy of the TOR PDF (FR-05). */
 export async function streamTorDocument(req: Request, res: Response): Promise<void> {
@@ -17,9 +18,8 @@ export async function streamTorDocument(req: Request, res: Response): Promise<vo
     throw httpError(404, "Stored document is unavailable");
   }
 
-  const filename = encodeURIComponent(tor.sourceDocument?.filename ?? "tor.pdf");
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+  res.setHeader("Content-Disposition", contentDisposition("inline", tor.sourceDocument?.filename ?? "tor.pdf", "tor.pdf"));
   // The browser's built-in PDF viewer needs to run inside this response, so the API-wide
   // `default-src 'none'` would show a blank page. Framing stays blocked.
   res.setHeader("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
