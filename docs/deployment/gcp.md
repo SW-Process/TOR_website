@@ -26,10 +26,12 @@ Placeholders: `<PROJECT>`, `<REGION>` (`asia-southeast1`), `<BUCKET>`, `<IMG>`,
   gcloud storage buckets create gs://<BUCKET> --location=asia-southeast1 --uniform-bucket-level-access
   ```
 
-- MongoDB URI as the only secret:
+- Secrets: the MongoDB URI (API and jobs) and the session signing key (API only).
+  `JWT_SECRET` must be at least 32 random characters; never reuse the dev value.
 
   ```sh
   printf '%s' "<MONGODB_URI>" | gcloud secrets create MONGODB_URI --data-file=-
+  openssl rand -hex 32 | tr -d '\n' | gcloud secrets create JWT_SECRET --data-file=-
   ```
 
 - Service accounts and IAM:
@@ -46,10 +48,12 @@ Placeholders: `<PROJECT>`, `<REGION>` (`asia-southeast1`), `<BUCKET>`, `<IMG>`,
   gcloud secrets add-iam-policy-binding MONGODB_URI \
     --member=serviceAccount:tor-jobs-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
 
-  # tor-api-sa: read PDFs + read the secret
+  # tor-api-sa: read PDFs + read the secrets
   gcloud storage buckets add-iam-policy-binding gs://<BUCKET> \
     --member=serviceAccount:tor-api-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/storage.objectViewer
   gcloud secrets add-iam-policy-binding MONGODB_URI \
+    --member=serviceAccount:tor-api-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
+  gcloud secrets add-iam-policy-binding JWT_SECRET \
     --member=serviceAccount:tor-api-sa@<PROJECT>.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
 
   # tor-jobs-sa also acts as the Cloud Scheduler identity, so it needs run.invoker
@@ -87,11 +91,13 @@ gcloud run deploy tor-api \
   --service-account tor-api-sa@<PROJECT>.iam.gserviceaccount.com \
   --min-instances 0 \
   --memory 1Gi --no-cpu-throttling \
-  --set-secrets MONGODB_URI=MONGODB_URI:latest \
-  --set-env-vars STORAGE_DRIVER=gcs,GCS_BUCKET=<BUCKET>,CLIENT_ORIGIN=<FRONTEND_URL> \
+  --set-secrets MONGODB_URI=MONGODB_URI:latest,JWT_SECRET=JWT_SECRET:latest \
+  --set-env-vars STORAGE_DRIVER=gcs,GCS_BUCKET=<BUCKET>,CLIENT_ORIGIN=<FRONTEND_URL>,TRUST_PROXY=1 \
   --command node --args dist/server.js \
   --allow-unauthenticated
 ```
+
+`TRUST_PROXY=1` makes Express read the real client IP from Cloud Run's `X-Forwarded-For`; the login rate limits count by that IP (use `2` behind an external HTTPS load balancer, never `true`). See [docs/security/authentication-defenses.md](../security/authentication-defenses.md#34-client-ip-behind-cloud-run-important).
 
 Capture runs (`POST /api/ingestion/capture`, used by admins through the Chrome extension) happen inside this API service, not in a Cloud Run job. Each project may download a bundle of about 10 MB, so give the service `--memory 1Gi`. The run continues after the 202 response, as a background task that is not bound to the request, so the service also needs CPU always allocated (`--no-cpu-throttling`); with request-only CPU, Cloud Run throttles the process once the response is sent and the run stalls. `CAPTURE_AGENCIES` is optional (empty captures every software-related project), and `GPROC_ENABLED=false` disables capture (the route answers 503).
 
