@@ -5,6 +5,7 @@ import { verifyToken, sessionCookieName } from "../utils/token";
 import { LAST_SEEN_RESOLUTION_MS, adoptLegacySession, legacyKeyOf } from "../services/sessions";
 import type { UserRole } from "../models/User";
 import type { AuthUser } from "../types/http";
+import { securityLog } from "../utils/securityLog";
 
 /**
  * The account a session cookie belongs to, or null when the token is invalid or
@@ -52,12 +53,14 @@ export async function sessionUser(token: string | undefined): Promise<AuthUser |
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = req.cookies?.[sessionCookieName()] as string | undefined;
   if (!token) {
+    securityLog(req, { event: "authz.denied", outcome: "blocked", severity: "NOTICE", reason: "no_session" });
     res.status(401).json({ message: "Authentication required" });
     return;
   }
 
   const user = await sessionUser(token);
   if (!user) {
+    securityLog(req, { event: "authz.denied", outcome: "blocked", reason: "invalid_or_expired_session" });
     res.status(401).json({ message: "Invalid or expired session" });
     return;
   }
@@ -94,6 +97,7 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
 export function requireRole(...roles: UserRole[]): RequestHandler {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
+      securityLog(req, { event: "authz.denied", outcome: "blocked", reason: "role", required: roles, role: req.user?.role });
       res.status(403).json({ message: "Insufficient permissions" });
       return;
     }

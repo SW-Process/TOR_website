@@ -23,12 +23,12 @@ function ipAndEmail(req: Request): string {
  * Limits are per IP (+email), never per account alone, so nobody can lock out
  * someone else's account by failing logins on purpose.
  */
-export const loginPerAccount = rateLimit({ windowMs: 15 * MINUTE, max: 10, key: ipAndEmail });
-export const loginPerIp = rateLimit({ windowMs: 15 * MINUTE, max: 50 });
-export const registerLimit = rateLimit({ windowMs: 60 * MINUTE, max: 10 });
-export const forgotPasswordPerAccount = rateLimit({ windowMs: 60 * MINUTE, max: 5, key: ipAndEmail });
-export const forgotPasswordPerIp = rateLimit({ windowMs: 60 * MINUTE, max: 20 });
-export const resetPasswordLimit = rateLimit({ windowMs: 15 * MINUTE, max: 10 });
-export const reauthLimit = rateLimit({ windowMs: 15 * MINUTE, max: 10 });
-export const reportLimit = rateLimit({ windowMs: 60 * MINUTE, max: 10 });
-export const viewLimit = rateLimit({ windowMs: MINUTE, max: 60 });
+export const loginPerAccount = rateLimit({ name: "loginPerAccount", windowMs: 15 * MINUTE, max: 10, key: ipAndEmail });
+export const loginPerIp = rateLimit({ name: "loginPerIp", windowMs: 15 * MINUTE, max: 50 });
+export const registerLimit = rateLimit({ name: "registerLimit", windowMs: 60 * MINUTE, max: 10 });
+export const forgotPasswordPerAccount = rateLimit({ name: "forgotPasswordPerAccount", windowMs: 60 * MINUTE, max: 5, key: ipAndEmail });
+export const forgotPasswordPerIp = rateLimit({ name: "forgotPasswordPerIp", windowMs: 60 * MINUTE, max: 20 });
+export const resetPasswordLimit = rateLimit({ name: "resetPasswordLimit", windowMs: 15 * MINUTE, max: 10 });
+export const reauthLimit = rateLimit({ name: "reauthLimit", windowMs: 15 * MINUTE, max: 10 });
+export const reportLimit = rateLimit({ name: "reportLimit", windowMs: 60 * MINUTE, max: 10 });
+export const viewLimit = rateLimit({ name: "viewLimit", windowMs: MINUTE, max: 60 });

@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { Error as MongooseError } from "mongoose";
 import { MulterError } from "multer";
+import { securityLog } from "../utils/securityLog";
 
 /** 404 fallthrough for unmatched routes. */
 export function notFound(req: Request, res: Response): void {
@@ -20,7 +21,7 @@ interface MaybeHttpError {
  */
 export function errorHandler(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
@@ -34,12 +35,14 @@ export function errorHandler(
   }
 
   if (err instanceof MulterError) {
+    securityLog(req, { event: "input.rejected", outcome: "blocked", severity: "NOTICE", reason: "upload", detail: err.code });
     res.status(400).json({ message: err.message });
     return;
   }
 
   // Mongoose validation
   if (err instanceof MongooseError.ValidationError) {
+    securityLog(req, { event: "input.rejected", outcome: "blocked", severity: "NOTICE", reason: "schema", fields: Object.keys(err.errors) });
     res.status(400).json({
       message: "Validation failed",
       errors: Object.values(err.errors).map((detail) => detail.message),
@@ -59,9 +62,20 @@ export function errorHandler(
   // answer with a fixed message, so stack details, driver errors, file paths or
   // config names never reach the client (ASVS V16 error handling).
   if (status >= 500) {
-    console.error(err);
+    securityLog(req, {
+      event: "error.unexpected",
+      outcome: "failure",
+      severity: "ERROR",
+      status,
+      error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+      stack: err instanceof Error ? err.stack?.split("\n").slice(0, 8).join(" | ") : undefined,
+    });
     res.status(status).json({ message: "Internal server error" });
     return;
+  }
+  if (status === 400) {
+    // Our own validation said no: worth a line, since probing for gaps in validation looks like this (ASVS 16.3.3).
+    securityLog(req, { event: "input.rejected", outcome: "blocked", severity: "NOTICE", reason: "validation", message: e.message });
   }
   res.status(status).json({ message: e.message || "Request failed" });
 }

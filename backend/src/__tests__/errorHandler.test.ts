@@ -2,6 +2,7 @@ import express from "express";
 import request from "supertest";
 import { errorHandler } from "../middleware/errorHandler";
 import { httpError } from "../utils/httpError";
+import { setSecurityLogSink } from "../utils/securityLog";
 
 /** A throwaway app whose only route throws `err`, so the handler is tested on its own. */
 function appThrowing(err: unknown) {
@@ -14,18 +15,22 @@ function appThrowing(err: unknown) {
 }
 
 describe("errorHandler", () => {
-  let consoleError: jest.SpyInstance;
+  let logged: string[];
   beforeEach(() => {
-    consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    logged = [];
+    setSecurityLogSink((line) => logged.push(line));
   });
-  afterEach(() => consoleError.mockRestore());
+  afterEach(() => setSecurityLogSink());
 
   it("hides the message of an unexpected error and logs it server-side", async () => {
     const res = await request(appThrowing(new Error("connect ECONNREFUSED 10.0.0.5:27017 /app/src/config/db.ts"))).get("/boom");
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ message: "Internal server error" });
     expect(JSON.stringify(res.body)).not.toContain("27017");
-    expect(consoleError).toHaveBeenCalled();
+    // The details go to the server log only.
+    expect(logged).toHaveLength(1);
+    expect(JSON.parse(logged[0]!)).toMatchObject({ event: "error.unexpected", status: 500 });
+    expect(logged[0]).toContain("27017");
   });
 
   it("hides the message of any 5xx, not only 500", async () => {
