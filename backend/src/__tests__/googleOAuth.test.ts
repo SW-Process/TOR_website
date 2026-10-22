@@ -9,6 +9,7 @@ let googleConfigured = true;
 const exchangeMock = jest.fn();
 
 jest.mock("../config/google", () => ({
+  newFlowSecrets: jest.requireActual("../config/google").newFlowSecrets,
   isGoogleOAuthConfigured: () => googleConfigured,
   buildGoogleAuthUrl: (state: string) =>
     `https://accounts.google.com/o/oauth2/v2/auth?state=${state}`,
@@ -61,6 +62,23 @@ describe("GET /api/auth/google", () => {
 });
 
 describe("GET /api/auth/google/callback", () => {
+  it("hands the exchange this attempt's PKCE verifier and nonce (ASVS 10.1.2)", async () => {
+    exchangeMock.mockResolvedValue({ googleId: "g-1", email: "p@gmail.com", emailVerified: true });
+    const { agent, state } = await beginFlow();
+    await agent.get(`/api/auth/google/callback?code=abc&state=${state}`).expect(302);
+    const [code, secrets] = exchangeMock.mock.calls[0]!;
+    expect(code).toBe("abc");
+    expect(secrets.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(secrets.nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
+  it("rejects a callback whose state cookie was tampered with", async () => {
+    const { state } = await beginFlow();
+    const res = await request(app).get(`/api/auth/google/callback?code=abc&state=${state}`).set("Cookie", `oauth_state=${state}`);
+    expect(res.headers.location).toBe("http://localhost:3000/login?error=google_state");
+    expect(exchangeMock).not.toHaveBeenCalled();
+  });
+
   it("rejects a mismatched state", async () => {
     const { agent } = await beginFlow();
     const res = await agent.get("/api/auth/google/callback?code=abc&state=wrong");

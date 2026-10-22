@@ -28,6 +28,8 @@ import {
   isGoogleOAuthConfigured,
   buildGoogleAuthUrl,
   exchangeCodeForIdentity,
+  newFlowSecrets,
+  type GoogleFlowSecrets,
   type GoogleIdentity,
 } from "../config/google";
 
@@ -42,6 +44,33 @@ const oauthStateCookie = () => cookieName("oauth_state");
 const LINK_STATE_PREFIX = "link.";
 /** Where the link flow lands: the security page, with `google=<outcome>` for the banner. */
 const LINK_RETURN_PATH = "/account/settings?section=password&google=";
+
+/**
+ * The state cookie holds the state plus this attempt's PKCE verifier and nonce, as
+ * base64url JSON. It is HttpOnly, `__Host-` in production and lives 10 minutes, so only
+ * the browser that started the flow can finish it (ASVS 10.1.2).
+ */
+interface OAuthFlowCookie extends GoogleFlowSecrets {
+  state: string;
+}
+
+function startGoogleFlow(res: Response, state: string): GoogleFlowSecrets {
+  const secrets = newFlowSecrets();
+  const value = Buffer.from(JSON.stringify({ state, ...secrets } satisfies OAuthFlowCookie)).toString("base64url");
+  res.cookie(oauthStateCookie(), value, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
+  return secrets;
+}
+
+function readGoogleFlow(raw: unknown): OAuthFlowCookie | null {
+  if (typeof raw !== "string") return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as Partial<OAuthFlowCookie>;
+    if (typeof parsed.state !== "string" || typeof parsed.codeVerifier !== "string" || typeof parsed.nonce !== "string") return null;
+    return parsed as OAuthFlowCookie;
+  } catch {
+    return null;
+  }
+}
 const ALLOWED_AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 /** How long an emailed "forgot password" link stays valid. */
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
@@ -524,11 +553,7 @@ export async function googleStart(_req: Request, res: Response): Promise<void> {
   if (!isGoogleOAuthConfigured()) throw httpError(503, "Google sign-in is not available");
 
   const state = crypto.randomBytes(16).toString("hex");
-  res.cookie(oauthStateCookie(), state, {
-    ...cookieOptions(),
-    maxAge: 10 * 60 * 1000,
-  });
-  res.redirect(buildGoogleAuthUrl(state));
+  res.redirect(buildGoogleAuthUrl(state, startGoogleFlow(res, state)));
 }
 
 /**
@@ -545,8 +570,7 @@ export async function googleLinkStart(req: Request, res: Response): Promise<void
   }
 
   const state = LINK_STATE_PREFIX + crypto.randomBytes(16).toString("hex");
-  res.cookie(oauthStateCookie(), state, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
-  res.redirect(buildGoogleAuthUrl(state));
+  res.redirect(buildGoogleAuthUrl(state, startGoogleFlow(res, state)));
 }
 
 /**
@@ -604,16 +628,16 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
 
   if (!isGoogleOAuthConfigured()) return fail("google_unavailable");
 
-  const expectedState = req.cookies?.[oauthStateCookie()] as string | undefined;
+  const flow = readGoogleFlow(req.cookies?.[oauthStateCookie()]);
   res.clearCookie(oauthStateCookie(), cookieOptions());
 
-  if (typeof code !== "string" || typeof state !== "string" || state !== expectedState) {
+  if (typeof code !== "string" || typeof state !== "string" || !flow || state !== flow.state) {
     return fail("google_state");
   }
 
   let identity: GoogleIdentity;
   try {
-    identity = await exchangeCodeForIdentity(code);
+    identity = await exchangeCodeForIdentity(code, { codeVerifier: flow.codeVerifier, nonce: flow.nonce });
   } catch {
     return fail("google_exchange");
   }
