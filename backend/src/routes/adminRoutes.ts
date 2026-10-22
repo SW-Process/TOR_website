@@ -17,10 +17,11 @@ import {
   adminUpdateFaq,
 } from "../controllers/adminHelpController";
 import { requireAuth, requireRole } from "../middleware/auth";
+import { auditAdminAction } from "../middleware/auditLog";
 
 const router = Router();
 
-router.use(requireAuth, requireRole("admin"));
+router.use(requireAuth, requireRole("admin"), auditAdminAction);
 
 router.get("/stats", getAdminStats);
 router.get("/notifications", listAdminNotifications);

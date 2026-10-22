@@ -11,10 +11,11 @@ import {
   getCaptureStuck,
 } from "../controllers/ingestionController";
 import { requireAuth, requireRole } from "../middleware/auth";
+import { auditAdminAction } from "../middleware/auditLog";
 
 const router = Router();
 
-router.use(requireAuth, requireRole("admin"));
+router.use(requireAuth, requireRole("admin"), auditAdminAction);
 
 router.post("/runs", createRun);
 router.get("/runs", listRuns);
