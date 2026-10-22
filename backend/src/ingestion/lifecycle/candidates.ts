@@ -1,6 +1,6 @@
 // backend/src/ingestion/lifecycle/candidates.ts
 import type { QueryFilter } from "mongoose";
-import { Tor, type ITor } from "../../models";
+import { Tor, type ITor, type ProcurementStage } from "../../models";
 import { gprocEnabled } from "../../scraper/gprocClient";
 
 /**
@@ -43,9 +43,10 @@ export function maxDeadlineExtractionsPerRun(env: NodeJS.ProcessEnv = process.en
  * finished or cancelled included, so the file keeps being re-checked until a day is known or an
  * admin overrides the value.
  *
- * `onlyOpen` (manual runs only) selects enriched, reachable TORs with `procurement.stage === "inviting"` and nothing else.
+ * `onlyOpen` / `onlyDraft` (manual runs only) select enriched, reachable TORs whose stored `procurement.stage` is
+ * "inviting" / "draft" and nothing else; both together select either stage.
  */
-export function lifecycleFilter(opts: { gproc?: boolean; onlyOpen?: boolean } = {}): QueryFilter<ITor> {
+export function lifecycleFilter(opts: { gproc?: boolean; onlyOpen?: boolean; onlyDraft?: boolean } = {}): QueryFilter<ITor> {
   const useGproc = opts.gproc ?? gprocEnabled();
   // process5 needs only the 11-digit project number, so a TOR without a listing URL is reachable too.
   const reachable: QueryFilter<ITor> = useGproc
@@ -56,10 +57,11 @@ export function lifecycleFilter(opts: { gproc?: boolean; onlyOpen?: boolean } = 
         ],
       }
     : { sourceListingUrl: { $type: "string", $ne: "" } };
-  // Manual "only open TORs": the stored stage replaces the finished/cancelled rules, so a stale
+  // Manual "only open / only draft TORs": the stored stage replaces the finished/cancelled rules, so a stale
   // "inviting" TOR whose contract status already reads finished is still re-checked.
-  if (opts.onlyOpen) {
-    return { pipelineStatus: "enriched", $and: [reachable], "procurement.stage": "inviting" };
+  if (opts.onlyOpen || opts.onlyDraft) {
+    const stages: ProcurementStage[] = [...(opts.onlyOpen ? (["inviting"] as const) : []), ...(opts.onlyDraft ? (["draft"] as const) : [])];
+    return { pipelineStatus: "enriched", $and: [reachable], "procurement.stage": { $in: stages } };
   }
   return {
     pipelineStatus: "enriched",
@@ -87,8 +89,8 @@ export function lifecycleFilter(opts: { gproc?: boolean; onlyOpen?: boolean } = 
   };
 }
 
-export function countLifecycleCandidates(opts: { onlyOpen?: boolean } = {}): Promise<number> {
-  return Tor.countDocuments(lifecycleFilter({ onlyOpen: opts.onlyOpen }));
+export function countLifecycleCandidates(opts: { onlyOpen?: boolean; onlyDraft?: boolean } = {}): Promise<number> {
+  return Tor.countDocuments(lifecycleFilter({ onlyOpen: opts.onlyOpen, onlyDraft: opts.onlyDraft }));
 }
 
 /**

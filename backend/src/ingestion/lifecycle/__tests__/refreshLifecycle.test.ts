@@ -134,6 +134,24 @@ describe("refreshLifecycle", () => {
     expect(run2?.outcomeSummary).not.toContain("only open");
   });
 
+  it("with onlyDraft checks only draft TORs, with both open and draft TORs, and suffixes the summary", async () => {
+    const stale = new Date("2026-09-01T00:00:00Z");
+    await seedTor("open", { procurement: { stage: "inviting", announcements: [], lastCheckedAt: stale } });
+    await seedTor("draft", { procurement: oldProcurement("2026-09-01T00:00:00Z") });
+    await seedTor("won", { procurement: { stage: "awarded", announcements: [], lastCheckedAt: stale } });
+    const draftOnly = fakeClient();
+    const out = await refreshLifecycle(deps(draftOnly, { onlyDraft: true }));
+    expect(out.selected).toBe(1);
+    expect(draftOnly.detailCalls).toEqual(["draft"]);
+    expect((await IngestionRun.findById(out.runId).lean())?.outcomeSummary).toMatch(/; only draft TORs$/);
+
+    const both = fakeClient();
+    const out2 = await refreshLifecycle(deps(both, { onlyOpen: true, onlyDraft: true }));
+    expect(out2.selected).toBe(2);
+    expect([...both.detailCalls].sort()).toEqual(["draft", "open"]);
+    expect((await IngestionRun.findById(out2.runId).lean())?.outcomeSummary).toMatch(/; only open and draft TORs$/);
+  });
+
   it("with onlyOpen and torIds still restricts to inviting TORs", async () => {
     const open = await seedTor("open", { procurement: { stage: "inviting", announcements: [], lastCheckedAt: new Date("2026-09-01T00:00:00Z") } });
     const draft = await seedTor("draft", { procurement: oldProcurement("2026-09-01T00:00:00Z") });
