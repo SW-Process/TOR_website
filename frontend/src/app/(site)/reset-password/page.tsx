@@ -1,15 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useSyncExternalStore } from "react";
 import { ArrowUpRight, Lock } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
 
+/**
+ * The reset token arrives in the URL fragment (`#token=…`), which the browser never sends
+ * to a server, so it can't end up in access logs, proxies or a Referer header (ASVS 14.2.1).
+ * An older `?token=` link still works. Either way it is read once and then wiped from the
+ * address bar and history, so it doesn't linger in the browser.
+ */
+let capturedToken: string | null = null;
+
+function captureToken(): string {
+  if (capturedToken === null) {
+    const fromHash = new URLSearchParams(window.location.hash.slice(1)).get("token");
+    const fromQuery = new URLSearchParams(window.location.search).get("token");
+    capturedToken = fromHash ?? fromQuery ?? "";
+    if (fromHash !== null || fromQuery !== null) window.history.replaceState(null, "", window.location.pathname);
+  }
+  return capturedToken;
+}
+
+const subscribeNothing = () => () => {};
+
 function ResetPasswordForm() {
   const { resetPassword } = useAuth();
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
+  // null on the server and during hydration; the token (or "") once in the browser.
+  const token = useSyncExternalStore(subscribeNothing, captureToken, () => null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +54,7 @@ function ResetPasswordForm() {
           ตั้งรหัสผ่านใหม่
         </h1>
 
-        {!token ? (
+        {token === null ? null : !token ? (
           <>
             <p className="mt-3 rounded-2xl bg-[var(--color-rose-light)] px-4 py-3 text-sm font-medium text-[var(--color-rose-dark)]">
               ลิงก์นี้ไม่ถูกต้อง กรุณาขอลิงก์ตั้งรหัสผ่านใหม่อีกครั้ง

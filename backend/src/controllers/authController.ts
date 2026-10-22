@@ -119,7 +119,8 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
     user.resetPasswordExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
     await user.save();
 
-    const link = clientUrl(`/reset-password?token=${user.id}.${rawToken}`);
+    // In the fragment, not the query: browsers never send `#…` to a server (ASVS 14.2.1).
+    const link = clientUrl(`/reset-password#token=${user.id}.${rawToken}`);
     try {
       await getEmailSender().send({ to: user.email, ...buildPasswordResetEmail(link) });
     } catch (err) {

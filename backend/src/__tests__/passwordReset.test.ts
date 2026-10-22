@@ -35,7 +35,7 @@ async function requestResetToken(email = creds.email): Promise<string> {
   setEmailSenderForTest({ send: async (m) => { sent.push(m as { to: string; text: string }); } });
 
   await request(app).post("/api/auth/forgot-password").send({ email });
-  const link = sent[0]?.text.match(/reset-password\?token=([^\s]+)/)?.[1];
+  const link = sent[0]?.text.match(/reset-password#token=([^\s"]+)/)?.[1];
   if (!link) throw new Error("no reset link captured");
   return link;
 }
@@ -51,8 +51,8 @@ describe("POST /api/auth/forgot-password", () => {
     expect(res.status).toBe(200);
     expect(sent).toHaveLength(1);
     expect(sent[0]?.to).toBe(creds.email);
-    expect(sent[0]?.text).toContain("/reset-password?token=");
-    expect(sent[0]?.html).toContain("/reset-password?token=");
+    expect(sent[0]?.text).toContain("/reset-password#token=");
+    expect(sent[0]?.html).toContain("/reset-password#token=");
 
     const user = await User.findOne({ email: creds.email }).select("+resetPasswordTokenHash +resetPasswordExpiresAt");
     expect(user?.resetPasswordTokenHash).toBeTruthy();
