@@ -396,6 +396,10 @@ export async function streamAvatar(req: Request, res: Response): Promise<void> {
 
   res.setHeader("Content-Type", user.avatarContentType ?? "application/octet-stream");
   res.setHeader("Cache-Control", "private, max-age=300");
+  // A user-uploaded file: even if someone opens it directly, it renders sandboxed with
+  // no script, as an image and nothing else (ASVS 3.2.1). <img> tags are unaffected.
+  res.setHeader("Content-Security-Policy", "default-src 'none'; img-src 'self'; sandbox");
+  res.setHeader("Content-Disposition", 'inline; filename="avatar"');
   stream.on("error", () => res.destroy());
   stream.pipe(res);
 }
