@@ -1,5 +1,6 @@
 import { Schema, model, type HydratedDocument, type Model } from "mongoose";
 import bcrypt from "bcrypt";
+import { MAX_PASSWORD_BYTES, passwordByteLength } from "../utils/passwordPolicy";
 
 const SALT_ROUNDS = 12;
 
@@ -95,6 +96,9 @@ userSchema.pre("save", async function () {
  */
 userSchema.methods.comparePassword = function (this: UserDocument, candidate: string) {
   if (!this.passwordHash) return Promise.resolve(false);
+  // bcrypt would compare only the first 72 bytes, so a longer candidate could match a
+  // stored password it merely starts with. No password that long can be set, so refuse it.
+  if (passwordByteLength(candidate) > MAX_PASSWORD_BYTES) return Promise.resolve(false);
   return bcrypt.compare(candidate, this.passwordHash);
 };
 
