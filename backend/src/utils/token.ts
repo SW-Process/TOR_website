@@ -3,6 +3,8 @@ import type { UserRole } from "../models/User";
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 export const COOKIE_NAME = "token";
+/** The only algorithm sessions are signed with; verification rejects every other one, `none` included. */
+const JWT_ALGORITHM = "HS256" as const;
 
 export interface TokenPayload extends JwtPayload {
   sub: string;
@@ -28,6 +30,7 @@ function getSecret(): string {
 /** Sign a JWT carrying the user id, role, token version and (when known) session id. */
 export function signToken(user: TokenUser, sessionId?: string): string {
   const options: SignOptions = {
+    algorithm: JWT_ALGORITHM,
     subject: String(user._id),
     expiresIn: JWT_EXPIRES_IN as SignOptions["expiresIn"],
   };
@@ -37,7 +40,7 @@ export function signToken(user: TokenUser, sessionId?: string): string {
 
 /** Verify a JWT and return its payload, or throw. */
 export function verifyToken(token: string): TokenPayload {
-  return jwt.verify(token, getSecret()) as TokenPayload;
+  return jwt.verify(token, getSecret(), { algorithms: [JWT_ALGORITHM] }) as TokenPayload;
 }
 
 export interface CookieOptions {
