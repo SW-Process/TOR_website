@@ -33,3 +33,25 @@ describe("session token algorithm (ASVS 9.1.2)", () => {
     expect(() => verifyToken(hs512)).toThrow();
   });
 });
+
+describe("cookie names (ASVS 3.3.1)", () => {
+  const env = process.env.NODE_ENV;
+  afterEach(() => {
+    process.env.NODE_ENV = env;
+  });
+
+  it("uses the __Host- prefix with Secure, Path=/ and no Domain in production", async () => {
+    process.env.NODE_ENV = "production";
+    const { cookieOptions, sessionCookieName, cookieName } = await import("../token");
+    expect(sessionCookieName()).toBe("__Host-token");
+    expect(cookieName("oauth_state")).toBe("__Host-oauth_state");
+    expect(cookieOptions()).toMatchObject({ secure: true, httpOnly: true, path: "/" });
+    expect(cookieOptions()).not.toHaveProperty("domain");
+  });
+
+  it("keeps the bare name over plain HTTP in development", async () => {
+    process.env.NODE_ENV = "development";
+    const { sessionCookieName } = await import("../token");
+    expect(sessionCookieName()).toBe("token");
+  });
+});
