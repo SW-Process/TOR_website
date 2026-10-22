@@ -30,6 +30,8 @@ export interface IVendorProfile {
   emailAlertsEnabled: boolean;
   // TORs the vendor chose not to see in search and recommendations
   hiddenTors: IHiddenTor[];
+  /** Calendar notes keyed by local day (`YYYY-MM-DD`); kept here so none stay in the browser. */
+  dayNotes: Map<string, string>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -89,6 +91,7 @@ const vendorProfileSchema = new Schema<IVendorProfile>(
     savedSearches: { type: [savedSearchSchema], default: [] },
     emailAlertsEnabled: { type: Boolean, default: true },
     hiddenTors: { type: [hiddenTorSchema], default: [] },
+    dayNotes: { type: Map, of: { type: String, maxlength: 2000 }, default: {} },
   },
   { timestamps: true }
 );
