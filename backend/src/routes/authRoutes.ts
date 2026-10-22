@@ -23,6 +23,15 @@ import {
 } from "../controllers/authController";
 import { listMyReports } from "../controllers/errorReportController";
 import { requireAuth } from "../middleware/auth";
+import {
+  forgotPasswordPerAccount,
+  forgotPasswordPerIp,
+  loginPerAccount,
+  loginPerIp,
+  reauthLimit,
+  registerLimit,
+  resetPasswordLimit,
+} from "../middleware/rateLimits";
 
 const avatarUpload = multer({
   storage: multer.memoryStorage(),
@@ -32,7 +41,7 @@ const avatarUpload = multer({
 const router = Router();
 
 router.post("/register", register);
-router.post("/login", login);
+router.post("/login", loginPerIp, loginPerAccount, login);
 router.post("/logout", logout);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
