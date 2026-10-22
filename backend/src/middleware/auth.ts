@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { isValidObjectId } from "mongoose";
 import { Session, User } from "../models";
-import { verifyToken, COOKIE_NAME } from "../utils/token";
+import { verifyToken, sessionCookieName } from "../utils/token";
 import { LAST_SEEN_RESOLUTION_MS, adoptLegacySession, legacyKeyOf } from "../services/sessions";
 import type { UserRole } from "../models/User";
 import type { AuthUser } from "../types/http";
@@ -50,7 +50,7 @@ export async function sessionUser(token: string | undefined): Promise<AuthUser |
  * serves server-side fetches whose Set-Cookie would be thrown away, minting orphans.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const token = req.cookies?.[COOKIE_NAME] as string | undefined;
+  const token = req.cookies?.[sessionCookieName()] as string | undefined;
   if (!token) {
     res.status(401).json({ message: "Authentication required" });
     return;
@@ -82,7 +82,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
  * A signed-out or invalid session proceeds as anonymous.
  */
 export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
-  const user = await sessionUser(req.cookies?.[COOKIE_NAME] as string | undefined);
+  const user = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined);
   if (user) req.user = user;
   next();
 }

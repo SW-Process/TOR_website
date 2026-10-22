@@ -3,7 +3,7 @@ import { isValidObjectId } from "mongoose";
 import type { Request, Response } from "express";
 import { Bookmark, ChatConversation, ChatMessage, ErrorReport, Notification, Session, User, VendorProfile } from "../models";
 import type { UserDocument } from "../models/User";
-import { cookieOptions, COOKIE_NAME, sessionLifetimeMs } from "../utils/token";
+import { cookieName, cookieOptions, sessionCookieName, sessionLifetimeMs } from "../utils/token";
 import { endSessions, setSessionCookie, startSession } from "../services/sessions";
 import { parseUserAgent } from "../utils/userAgent";
 import { httpError } from "../utils/httpError";
@@ -22,7 +22,8 @@ import {
 } from "../config/google";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const OAUTH_STATE_COOKIE = "oauth_state";
+/** The OAuth `state` cookie, `__Host-` prefixed in production like the session cookie. */
+const oauthStateCookie = () => cookieName("oauth_state");
 /**
  * Marks an OAuth round trip that links Google to the signed-in account rather than
  * signing in. It rides in `state` (echoed back by Google, checked against the state
@@ -167,9 +168,9 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
 /** POST /api/auth/logout — clear the session cookie. */
 export async function logout(req: Request, res: Response): Promise<void> {
   // Drop this device's session row too, so it leaves the session list at once.
-  const current = await sessionUser(req.cookies?.[COOKIE_NAME] as string | undefined);
+  const current = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined);
   if (current?.sessionId) await endSessions({ _id: current.sessionId, userId: current.id });
-  res.clearCookie(COOKIE_NAME, cookieOptions());
+  res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(200).json({ message: "Logged out" });
 }
 
@@ -238,7 +239,7 @@ export async function revokeSession(req: Request, res: Response): Promise<void> 
   if (!isValidObjectId(id)) throw httpError(400, "Invalid session id");
   const ended = await endSessions({ _id: id, userId: req.user!.id });
   if (!ended) throw httpError(404, "Session not found");
-  if (id === req.user!.sessionId) res.clearCookie(COOKIE_NAME, cookieOptions());
+  if (id === req.user!.sessionId) res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(204).end();
 }
 
@@ -359,7 +360,7 @@ export async function deleteAccount(req: Request, res: Response): Promise<void> 
   }
   await user.deleteOne();
 
-  res.clearCookie(COOKIE_NAME, cookieOptions());
+  res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(200).json({ message: "Account deleted" });
 }
 
@@ -415,7 +416,7 @@ export async function googleStart(_req: Request, res: Response): Promise<void> {
   if (!isGoogleOAuthConfigured()) throw httpError(503, "Google sign-in is not available");
 
   const state = crypto.randomBytes(16).toString("hex");
-  res.cookie(OAUTH_STATE_COOKIE, state, {
+  res.cookie(oauthStateCookie(), state, {
     ...cookieOptions(),
     maxAge: 10 * 60 * 1000,
   });
@@ -430,7 +431,7 @@ export async function googleLinkStart(_req: Request, res: Response): Promise<voi
   if (!isGoogleOAuthConfigured()) throw httpError(503, "Google sign-in is not available");
 
   const state = LINK_STATE_PREFIX + crypto.randomBytes(16).toString("hex");
-  res.cookie(OAUTH_STATE_COOKIE, state, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
+  res.cookie(oauthStateCookie(), state, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
   res.redirect(buildGoogleAuthUrl(state));
 }
 
@@ -442,7 +443,7 @@ export async function googleLinkStart(_req: Request, res: Response): Promise<voi
 async function linkGoogleToSession(req: Request, res: Response, identity: GoogleIdentity): Promise<void> {
   const done = (outcome: string) => res.redirect(clientUrl(LINK_RETURN_PATH + outcome));
 
-  const session = await sessionUser(req.cookies?.[COOKIE_NAME] as string | undefined);
+  const session = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined);
   if (!session) return done("session");
   const user = await User.findById(session.id);
   if (!user) return done("session");
@@ -481,8 +482,8 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
 
   if (!isGoogleOAuthConfigured()) return fail("google_unavailable");
 
-  const expectedState = req.cookies?.[OAUTH_STATE_COOKIE] as string | undefined;
-  res.clearCookie(OAUTH_STATE_COOKIE, cookieOptions());
+  const expectedState = req.cookies?.[oauthStateCookie()] as string | undefined;
+  res.clearCookie(oauthStateCookie(), cookieOptions());
 
   if (typeof code !== "string" || typeof state !== "string" || state !== expectedState) {
     return fail("google_state");
