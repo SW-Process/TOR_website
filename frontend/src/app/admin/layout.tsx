@@ -1,6 +1,7 @@
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminMobileNav from "@/components/admin/AdminMobileNav";
 import AdminTopbar from "@/components/admin/AdminTopbar";
+import AdminMfaGate from "@/components/admin/AdminMfaGate";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,7 +11,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex-1 min-w-0 flex flex-col bg-[var(--color-surface-alt)]">
           <AdminMobileNav />
           <AdminTopbar />
-          <main className="flex-1 pb-8">{children}</main>
+          <main className="flex-1 pb-8">
+            <AdminMfaGate>{children}</AdminMfaGate>
+          </main>
         </div>
       </div>
     </div>

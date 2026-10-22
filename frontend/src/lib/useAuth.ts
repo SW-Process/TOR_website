@@ -16,6 +16,13 @@ export interface AuthUser {
   /** false for Google-only accounts, which have never set a password. */
   hasPassword: boolean;
   googleLinked: boolean;
+  /** Two-step verification (authenticator app) is on. */
+  mfaEnabled: boolean;
+  recoveryCodesLeft: number;
+  /** Admin accounts need two-step verification for the admin panel. */
+  mfaRequired: boolean;
+  /** This session passed two-step verification. */
+  sessionMfa: boolean;
 }
 
 interface ApiUser {
@@ -27,6 +34,10 @@ interface ApiUser {
   avatarUrl?: string | null;
   hasPassword?: boolean;
   googleLinked?: boolean;
+  mfaEnabled?: boolean;
+  recoveryCodesLeft?: number;
+  mfaRequired?: boolean;
+  sessionMfa?: boolean;
 }
 
 function toAuthUser(u: ApiUser): AuthUser {
@@ -38,12 +49,20 @@ function toAuthUser(u: ApiUser): AuthUser {
     avatarUrl: u.avatarUrl ?? null,
     hasPassword: u.hasPassword ?? true,
     googleLinked: u.googleLinked ?? false,
+    mfaEnabled: u.mfaEnabled ?? false,
+    recoveryCodesLeft: u.recoveryCodesLeft ?? 0,
+    mfaRequired: u.mfaRequired ?? false,
+    sessionMfa: u.sessionMfa ?? false,
   };
 }
 
 export interface AuthResult {
   ok: boolean;
   error?: string;
+  /** The password was right; a code from the authenticator app is needed next (/login/verify). */
+  mfaRequired?: boolean;
+  /** The pending sign-in step expired: start again from the password. */
+  restart?: boolean;
 }
 
 // Module-level cache so every useAuth() shares one session check, and a
@@ -202,15 +221,36 @@ export function useAuth() {
       } catch {
         return { ok: false, error: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่" };
       }
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string };
-        return { ok: false, error: readError(res.status, body) };
-      }
+      const body = (await res.json().catch(() => ({}))) as { message?: string; mfaRequired?: boolean };
+      if (!res.ok) return { ok: false, error: readError(res.status, body) };
+      if (body.mfaRequired) return { ok: true, mfaRequired: true };
       await refreshSession();
       return { ok: true };
     },
     []
   );
+
+  /** Second sign-in step: a 6-digit code from the authenticator app, or a recovery code. */
+  const verifyMfa = useCallback(async (code: string): Promise<AuthResult> => {
+    let res: Response;
+    try {
+      res = await apiFetch("/api/auth/mfa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code.trim() }),
+      });
+    } catch {
+      return { ok: false, error: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่" };
+    }
+    const body = (await res.json().catch(() => ({}))) as { code?: string; user?: ApiUser };
+    if (res.status === 429) return { ok: false, error: TOO_MANY_ATTEMPTS };
+    if (body.code === "mfa_expired") return { ok: false, restart: true, error: "หมดเวลายืนยันตัวตน กรุณาเข้าสู่ระบบใหม่อีกครั้ง" };
+    if (!res.ok) return { ok: false, error: "รหัสไม่ถูกต้อง หรือถูกใช้ไปแล้ว กรุณาลองรหัสใหม่" };
+    cachedUser = body.user ? toAuthUser(body.user) : null;
+    checked = true;
+    emit();
+    return { ok: true };
+  }, []);
 
   const login = useCallback(
     (email: string, password: string) => submitCredentials("/api/auth/login", email, password),
@@ -328,6 +368,7 @@ export function useAuth() {
     ready,
     isLoggedIn: !!user,
     login,
+    verifyMfa,
     register,
     forgotPassword,
     resetPassword,
