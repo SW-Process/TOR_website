@@ -40,6 +40,19 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Known vulnerabilities in what ships (ASVS 15.2.1): fail on high or critical.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      # Inventory of every third-party package in the image (ASVS 15.1.2), kept with the run.
+      - name: Software bill of materials
+        run: npm sbom --sbom-format cyclonedx --omit dev > sbom-backend.cdx.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-backend
+          path: backend/sbom-backend.cdx.json
+
   frontend:
     name: frontend (build)
     runs-on: ubuntu-latest
@@ -62,3 +75,14 @@ jobs:
       # `npm run lint` is NOT gated yet — see .github/workflows/README.md.
       - name: Build
         run: npm run build
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Software bill of materials
+        run: npm sbom --sbom-format cyclonedx --omit dev > sbom-frontend.cdx.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-frontend
+          path: frontend/sbom-frontend.cdx.json
