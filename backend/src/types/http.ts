@@ -4,8 +4,12 @@ import type { UserRole } from "../models/User";
 export interface AuthUser {
   id: string;
   role: UserRole;
-  /** The sessions row behind this request's cookie; absent for a not-yet-upgraded legacy token. */
-  sessionId?: string;
+  /** The sessions row behind this request's cookie. */
+  sessionId: string;
+  /** The second factor was checked when this session started. */
+  mfa: boolean;
+  /** When this session signed in. */
+  signedInAt: Date;
 }
 
 declare global {

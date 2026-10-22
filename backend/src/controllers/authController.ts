@@ -3,7 +3,7 @@ import { isValidObjectId } from "mongoose";
 import type { Request, Response } from "express";
 import { Bookmark, ChatConversation, ChatMessage, ErrorReport, Notification, Session, User, VendorProfile } from "../models";
 import type { UserDocument } from "../models/User";
-import { cookieName, cookieOptions, sessionCookieName, sessionLifetimeMs } from "../utils/token";
+import { cookieName, cookieOptions, sessionCookieName } from "../utils/token";
 import { endSessions, setSessionCookie, startSession } from "../services/sessions";
 import { parseUserAgent } from "../utils/userAgent";
 import { httpError } from "../utils/httpError";
@@ -199,8 +199,8 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
 /** POST /api/auth/logout — clear the session cookie. */
 export async function logout(req: Request, res: Response): Promise<void> {
   // Drop this device's session row too, so it leaves the session list at once.
-  const current = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined);
-  if (current?.sessionId) await endSessions({ _id: current.sessionId, userId: current.id });
+  const current = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined, req);
+  if (current) await endSessions({ _id: current.sessionId, userId: current.id });
   securityLog(req, { event: "auth.logout", outcome: "success", userId: current?.id ?? null, sessionId: current?.sessionId });
   res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(200).json({ message: "Logged out" });
@@ -244,7 +244,7 @@ const SESSION_ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
  * gets the parsed device, browser and OS.
  */
 export async function listSessions(req: Request, res: Response): Promise<void> {
-  const sessions = await Session.find({ userId: req.user!.id, revokedAt: null, expiresAt: { $gt: new Date() } })
+  const sessions = await Session.find({ userId: req.user!.id, expiresAt: { $gt: new Date() } })
     .sort({ lastSeenAt: -1 })
     .lean();
   const now = Date.now();
@@ -301,12 +301,11 @@ export async function updateAccount(req: Request, res: Response): Promise<void> 
 async function saveAndRevokeOtherSessions(req: Request, res: Response, user: UserDocument): Promise<void> {
   user.tokenVersion = (user.tokenVersion ?? 0) + 1;
   await user.save();
-  const current = req.user!.sessionId!; // requireAuth guarantees a session row
+  const current = req.user!.sessionId; // requireAuth guarantees a session row
   await endSessions({ userId: user._id, _id: { $ne: current } });
-  // The re-issued cookie/JWT get a fresh lifetime; give the row the same one, or its TTL
-  // would sign this device out at the old expiry while the cookie still looks valid.
-  await Session.updateOne({ _id: current }, { $set: { expiresAt: new Date(Date.now() + sessionLifetimeMs()) } });
-  setSessionCookie(res, user, current);
+  // Same session, same absolute end: a re-issued cookie never extends the session.
+  const row = await Session.findById(current).select("expiresAt").lean();
+  if (row) setSessionCookie(res, user, current, row.expiresAt);
 }
 
 /**
@@ -485,7 +484,7 @@ export async function googleLinkStart(_req: Request, res: Response): Promise<voi
 async function linkGoogleToSession(req: Request, res: Response, identity: GoogleIdentity): Promise<void> {
   const done = (outcome: string) => res.redirect(clientUrl(LINK_RETURN_PATH + outcome));
 
-  const session = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined);
+  const session = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined, req);
   if (!session) return done("session");
   const user = await User.findById(session.id);
   if (!user) return done("session");

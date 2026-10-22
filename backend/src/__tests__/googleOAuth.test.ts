@@ -3,7 +3,6 @@ import request from "supertest";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 process.env.JWT_SECRET = "test-secret";
-process.env.JWT_EXPIRES_IN = "7d";
 process.env.CLIENT_ORIGIN = "http://localhost:3000";
 
 let googleConfigured = true;
@@ -17,6 +16,7 @@ jest.mock("../config/google", () => ({
 }));
 
 import app from "../app";
+import { sessionCookieFor } from "./helpers/sessionCookie";
 import { User } from "../models";
 
 let mongod: MongoMemoryServer;
@@ -219,8 +219,7 @@ describe("linking Google from account settings", () => {
 
   it("refuses to unlink Google from a Google-only account", async () => {
     const user = await User.create({ email: "g@test.com", role: "vendor", googleOAuthId: "g-9" });
-    const { signToken } = await import("../utils/token");
-    await request(app).delete("/api/auth/google").set("Cookie", `token=${signToken(user)}`).expect(400);
+    await request(app).delete("/api/auth/google").set("Cookie", await sessionCookieFor(user)).expect(400);
     expect((await User.findById(user._id))?.googleOAuthId).toBe("g-9");
   });
 });
