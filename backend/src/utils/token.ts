@@ -2,7 +2,10 @@ import jwt, { type JwtPayload, type SignOptions } from "jsonwebtoken";
 import type { UserRole } from "../models/User";
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+/** Base name of the session cookie; see sessionCookieName() for the name actually used. */
 export const COOKIE_NAME = "token";
+/** The only algorithm sessions are signed with; verification rejects every other one, `none` included. */
+const JWT_ALGORITHM = "HS256" as const;
 
 export interface TokenPayload extends JwtPayload {
   sub: string;
@@ -28,6 +31,7 @@ function getSecret(): string {
 /** Sign a JWT carrying the user id, role, token version and (when known) session id. */
 export function signToken(user: TokenUser, sessionId?: string): string {
   const options: SignOptions = {
+    algorithm: JWT_ALGORITHM,
     subject: String(user._id),
     expiresIn: JWT_EXPIRES_IN as SignOptions["expiresIn"],
   };
@@ -37,13 +41,15 @@ export function signToken(user: TokenUser, sessionId?: string): string {
 
 /** Verify a JWT and return its payload, or throw. */
 export function verifyToken(token: string): TokenPayload {
-  return jwt.verify(token, getSecret()) as TokenPayload;
+  return jwt.verify(token, getSecret(), { algorithms: [JWT_ALGORITHM] }) as TokenPayload;
 }
 
 export interface CookieOptions {
   httpOnly: boolean;
   secure: boolean;
   sameSite: "lax";
+  /** Always "/": required for `__Host-` cookies. */
+  path: "/";
   maxAge: number;
 }
 
@@ -58,6 +64,23 @@ export function cookieOptions(): CookieOptions {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
+    path: "/",
     maxAge: sessionLifetimeMs(),
   };
+}
+
+/**
+ * A cookie name with the `__Host-` prefix whenever cookies are Secure (production). The
+ * browser then only accepts the cookie if it is Secure, has Path=/ and no Domain, so a
+ * sibling subdomain or a plain-HTTP page can't plant or overwrite it (ASVS 3.3.1).
+ * Local HTTP development and the tests keep the bare name, which browsers would refuse
+ * with the prefix.
+ */
+export function cookieName(base: string): string {
+  return cookieOptions().secure ? `__Host-${base}` : base;
+}
+
+/** The session cookie's name: `__Host-token` in production, `token` elsewhere. */
+export function sessionCookieName(): string {
+  return cookieName(COOKIE_NAME);
 }

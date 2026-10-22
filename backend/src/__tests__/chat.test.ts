@@ -32,9 +32,9 @@ afterAll(async () => {
 
 async function agentWithRole(email: string, role: "admin" | "vendor") {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email, password: "secret123" });
+  await agent.post("/api/auth/register").send({ email, password: "vendor-test-pass-17" });
   await User.updateOne({ email }, { role });
-  await agent.post("/api/auth/login").send({ email, password: "secret123" });
+  await agent.post("/api/auth/login").send({ email, password: "vendor-test-pass-17" });
   return agent;
 }
 

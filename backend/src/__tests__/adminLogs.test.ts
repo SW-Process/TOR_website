@@ -26,9 +26,9 @@ afterAll(async () => {
 
 async function adminAgent() {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email: "admin@test.com", password: "secret123" });
+  await agent.post("/api/auth/register").send({ email: "admin@test.com", password: "vendor-test-pass-17" });
   await User.updateOne({ email: "admin@test.com" }, { role: "admin" });
-  await agent.post("/api/auth/login").send({ email: "admin@test.com", password: "secret123" });
+  await agent.post("/api/auth/login").send({ email: "admin@test.com", password: "vendor-test-pass-17" });
   return agent;
 }
 

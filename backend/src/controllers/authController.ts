@@ -3,10 +3,12 @@ import { isValidObjectId } from "mongoose";
 import type { Request, Response } from "express";
 import { Bookmark, ChatConversation, ChatMessage, ErrorReport, Notification, Session, User, VendorProfile } from "../models";
 import type { UserDocument } from "../models/User";
-import { cookieOptions, COOKIE_NAME, sessionLifetimeMs } from "../utils/token";
+import { cookieName, cookieOptions, sessionCookieName, sessionLifetimeMs } from "../utils/token";
 import { endSessions, setSessionCookie, startSession } from "../services/sessions";
 import { parseUserAgent } from "../utils/userAgent";
 import { httpError } from "../utils/httpError";
+import { detectImageType } from "../utils/imageType";
+import { MIN_PASSWORD_LENGTH, passwordProblem } from "../utils/passwordPolicy";
 import { getStorage } from "../storage";
 import { getEmailSender } from "../email";
 import { clientUrl } from "../utils/clientUrl";
@@ -20,8 +22,8 @@ import {
 } from "../config/google";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 8;
-const OAUTH_STATE_COOKIE = "oauth_state";
+/** The OAuth `state` cookie, `__Host-` prefixed in production like the session cookie. */
+const oauthStateCookie = () => cookieName("oauth_state");
 /**
  * Marks an OAuth round trip that links Google to the signed-in account rather than
  * signing in. It rides in `state` (echoed back by Google, checked against the state
@@ -62,6 +64,8 @@ async function sendSession(req: Request, res: Response, user: UserDocument, stat
 /** POST /api/auth/register — create a vendor account and start a session. */
 export async function register(req: Request, res: Response): Promise<void> {
   const { email, password } = validateCredentials(req.body);
+  const problem = passwordProblem(password);
+  if (problem) throw httpError(400, problem);
 
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) throw httpError(409, "Email is already registered");
@@ -115,7 +119,8 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
     user.resetPasswordExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
     await user.save();
 
-    const link = clientUrl(`/reset-password?token=${user.id}.${rawToken}`);
+    // In the fragment, not the query: browsers never send `#…` to a server (ASVS 14.2.1).
+    const link = clientUrl(`/reset-password#token=${user.id}.${rawToken}`);
     try {
       await getEmailSender().send({ to: user.email, ...buildPasswordResetEmail(link) });
     } catch (err) {
@@ -135,9 +140,8 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
  */
 export async function resetPassword(req: Request, res: Response): Promise<void> {
   const { token, password } = (req.body ?? {}) as Record<string, unknown>;
-  if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
-    throw httpError(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-  }
+  const problem = passwordProblem(password);
+  if (problem || typeof password !== "string") throw httpError(400, problem ?? "A password is required");
 
   const invalidLink = () => httpError(400, "This reset link is invalid or has expired");
   if (typeof token !== "string" || token.split(".").length !== 2) throw invalidLink();
@@ -165,9 +169,9 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
 /** POST /api/auth/logout — clear the session cookie. */
 export async function logout(req: Request, res: Response): Promise<void> {
   // Drop this device's session row too, so it leaves the session list at once.
-  const current = await sessionUser(req.cookies?.[COOKIE_NAME] as string | undefined);
+  const current = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined);
   if (current?.sessionId) await endSessions({ _id: current.sessionId, userId: current.id });
-  res.clearCookie(COOKIE_NAME, cookieOptions());
+  res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(200).json({ message: "Logged out" });
 }
 
@@ -236,7 +240,7 @@ export async function revokeSession(req: Request, res: Response): Promise<void> 
   if (!isValidObjectId(id)) throw httpError(400, "Invalid session id");
   const ended = await endSessions({ _id: id, userId: req.user!.id });
   if (!ended) throw httpError(404, "Session not found");
-  if (id === req.user!.sessionId) res.clearCookie(COOKIE_NAME, cookieOptions());
+  if (id === req.user!.sessionId) res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(204).end();
 }
 
@@ -279,9 +283,8 @@ async function saveAndRevokeOtherSessions(req: Request, res: Response, user: Use
  */
 export async function changePassword(req: Request, res: Response): Promise<void> {
   const { currentPassword, newPassword } = (req.body ?? {}) as Record<string, unknown>;
-  if (typeof newPassword !== "string" || newPassword.length < MIN_PASSWORD_LENGTH) {
-    throw httpError(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-  }
+  const problem = passwordProblem(newPassword);
+  if (problem || typeof newPassword !== "string") throw httpError(400, problem ?? "A new password is required");
 
   const user = await loadAccount(req);
   await confirmPassword(user, currentPassword);
@@ -358,7 +361,7 @@ export async function deleteAccount(req: Request, res: Response): Promise<void> 
   }
   await user.deleteOne();
 
-  res.clearCookie(COOKIE_NAME, cookieOptions());
+  res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(200).json({ message: "Account deleted" });
 }
 
@@ -369,14 +372,17 @@ export async function uploadAvatar(req: Request, res: Response): Promise<void> {
   if (!ALLOWED_AVATAR_TYPES.has(file.mimetype)) {
     throw httpError(400, "Avatar must be a JPEG, PNG, WebP, or GIF image");
   }
+  // The declared type comes from the client; trust only what the bytes say.
+  const contentType = detectImageType(file.buffer);
+  if (!contentType) throw httpError(400, "Avatar must be a JPEG, PNG, WebP, or GIF image");
 
   const user = await User.findById(req.user!.id);
   if (!user) throw httpError(401, "Account no longer exists");
 
   const key = `avatars/${user.id}`;
-  await getStorage().put(key, file.buffer, { contentType: file.mimetype });
+  await getStorage().put(key, file.buffer, { contentType });
   user.avatarKey = key;
-  user.avatarContentType = file.mimetype;
+  user.avatarContentType = contentType;
   await user.save();
 
   res.status(200).json({ user });
@@ -396,6 +402,10 @@ export async function streamAvatar(req: Request, res: Response): Promise<void> {
 
   res.setHeader("Content-Type", user.avatarContentType ?? "application/octet-stream");
   res.setHeader("Cache-Control", "private, max-age=300");
+  // A user-uploaded file: even if someone opens it directly, it renders sandboxed with
+  // no script, as an image and nothing else (ASVS 3.2.1). <img> tags are unaffected.
+  res.setHeader("Content-Security-Policy", "default-src 'none'; img-src 'self'; sandbox");
+  res.setHeader("Content-Disposition", 'inline; filename="avatar"');
   stream.on("error", () => res.destroy());
   stream.pipe(res);
 }
@@ -407,7 +417,7 @@ export async function googleStart(_req: Request, res: Response): Promise<void> {
   if (!isGoogleOAuthConfigured()) throw httpError(503, "Google sign-in is not available");
 
   const state = crypto.randomBytes(16).toString("hex");
-  res.cookie(OAUTH_STATE_COOKIE, state, {
+  res.cookie(oauthStateCookie(), state, {
     ...cookieOptions(),
     maxAge: 10 * 60 * 1000,
   });
@@ -422,7 +432,7 @@ export async function googleLinkStart(_req: Request, res: Response): Promise<voi
   if (!isGoogleOAuthConfigured()) throw httpError(503, "Google sign-in is not available");
 
   const state = LINK_STATE_PREFIX + crypto.randomBytes(16).toString("hex");
-  res.cookie(OAUTH_STATE_COOKIE, state, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
+  res.cookie(oauthStateCookie(), state, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
   res.redirect(buildGoogleAuthUrl(state));
 }
 
@@ -434,7 +444,7 @@ export async function googleLinkStart(_req: Request, res: Response): Promise<voi
 async function linkGoogleToSession(req: Request, res: Response, identity: GoogleIdentity): Promise<void> {
   const done = (outcome: string) => res.redirect(clientUrl(LINK_RETURN_PATH + outcome));
 
-  const session = await sessionUser(req.cookies?.[COOKIE_NAME] as string | undefined);
+  const session = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined);
   if (!session) return done("session");
   const user = await User.findById(session.id);
   if (!user) return done("session");
@@ -473,8 +483,8 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
 
   if (!isGoogleOAuthConfigured()) return fail("google_unavailable");
 
-  const expectedState = req.cookies?.[OAUTH_STATE_COOKIE] as string | undefined;
-  res.clearCookie(OAUTH_STATE_COOKIE, cookieOptions());
+  const expectedState = req.cookies?.[oauthStateCookie()] as string | undefined;
+  res.clearCookie(oauthStateCookie(), cookieOptions());
 
   if (typeof code !== "string" || typeof state !== "string" || state !== expectedState) {
     return fail("google_state");

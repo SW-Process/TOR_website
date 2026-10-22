@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { Request, Response } from "express";
 import { Session, type SessionMethod } from "../models";
 import type { UserDocument } from "../models/User";
-import { COOKIE_NAME, cookieOptions, sessionLifetimeMs, signToken } from "../utils/token";
+import { sessionCookieName, cookieOptions, sessionLifetimeMs, signToken } from "../utils/token";
 
 /** Longest User-Agent kept per session; real ones are well under this. */
 const MAX_USER_AGENT_LENGTH = 400;
@@ -11,7 +11,7 @@ export const LAST_SEEN_RESOLUTION_MS = 5 * 60 * 1000;
 
 /** Set the session cookie for `user`, bound to session row `sessionId`. */
 export function setSessionCookie(res: Response, user: UserDocument, sessionId: string): void {
-  res.cookie(COOKIE_NAME, signToken(user, sessionId), cookieOptions());
+  res.cookie(sessionCookieName(), signToken(user, sessionId), cookieOptions());
 }
 
 /** The fields a new session row records about this request's device. */

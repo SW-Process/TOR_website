@@ -16,6 +16,7 @@ import {
 } from "../controllers/bookmarkController";
 import { listHiddenTors, hideTor, unhideTor } from "../controllers/hiddenTorController";
 import { listNotifications, markNotificationRead } from "../controllers/notificationController";
+import { listDayNotes, putDayNote } from "../controllers/dayNoteController";
 import { requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
@@ -45,6 +46,9 @@ router.delete("/bookmarks/:torId", vendorOrAdmin, deleteBookmark);
 router.get("/hidden-tors", vendorOnly, listHiddenTors);
 router.put("/hidden-tors/:torId", vendorOnly, hideTor);
 router.delete("/hidden-tors/:torId", vendorOnly, unhideTor);
+
+router.get("/day-notes", vendorOrAdmin, listDayNotes);
+router.put("/day-notes/:date", vendorOrAdmin, putDayNote);
 
 router.get("/notifications", vendorOrAdmin, listNotifications);
 router.patch("/notifications/:id/read", vendorOrAdmin, markNotificationRead);
