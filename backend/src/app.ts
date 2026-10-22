@@ -12,6 +12,7 @@ import chatRoutes from "./routes/chatRoutes";
 import helpRoutes from "./routes/helpRoutes";
 import { notFound, errorHandler } from "./middleware/errorHandler";
 import { securityHeaders } from "./middleware/securityHeaders";
+import { originCheck } from "./middleware/originCheck";
 import { parseTrustProxy } from "./utils/trustProxy";
 
 const app = express();
@@ -30,6 +31,8 @@ app.use(
     credentials: true,
   })
 );
+// Before any route: refuse state-changing requests that another site's page made.
+app.use(originCheck);
 app.use(express.json());
 app.use(cookieParser());
 
