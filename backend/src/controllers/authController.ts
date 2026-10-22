@@ -23,6 +23,7 @@ import {
   reauthMethods,
   requireRecentAuth,
 } from "../services/reauth";
+import { adminMfaRequired, beginMfaLogin, recoveryCodesLeft } from "../services/mfa";
 import {
   isGoogleOAuthConfigured,
   buildGoogleAuthUrl,
@@ -104,6 +105,13 @@ export async function login(req: Request, res: Response): Promise<void> {
       ...(user ? { userId: user.id } : { email: maskEmail(email) }),
     });
     throw httpError(401, "Invalid email or password");
+  }
+  if (user.mfaEnabled) {
+    // First factor done; no session until the second (POST /api/auth/mfa/verify).
+    securityLog(req, { event: "auth.login", outcome: "success", method: "password", userId: user.id, step: "password", mfaPending: true });
+    await beginMfaLogin(res, user, "password");
+    res.status(200).json({ mfaRequired: true });
+    return;
   }
   securityLog(req, { event: "auth.login", outcome: "success", method: "password", userId: user.id });
 
@@ -216,14 +224,23 @@ export async function logout(req: Request, res: Response): Promise<void> {
 
 /** The caller's User with its password hash loaded (for account checks), or 401. */
 async function loadAccount(req: Request): Promise<UserDocument> {
-  const user = await User.findById(req.user!.id).select("+passwordHash");
+  const user = await User.findById(req.user!.id).select("+passwordHash +mfaRecoveryCodes");
   if (!user) throw httpError(401, "Account no longer exists");
   return user;
 }
 
 /** Public user JSON plus the account-settings flags the hash itself must never leak. */
-function accountView(user: UserDocument) {
-  return { ...user.toJSON(), hasPassword: !!user.passwordHash, googleLinked: !!user.googleOAuthId };
+export function accountView(user: UserDocument, req?: Request) {
+  return {
+    ...user.toJSON(),
+    hasPassword: !!user.passwordHash,
+    googleLinked: !!user.googleOAuthId,
+    mfaEnabled: !!user.mfaEnabled,
+    recoveryCodesLeft: user.mfaEnabled ? recoveryCodesLeft(user) : 0,
+    // Admins need MFA for the admin panel; `sessionMfa` says whether this session has it.
+    mfaRequired: user.role === "admin" && adminMfaRequired(),
+    sessionMfa: req?.user?.mfa ?? false,
+  };
 }
 
 /** Accounts with a password must confirm it; Google-only accounts (no hash) have none to give. */
@@ -238,7 +255,7 @@ async function confirmPassword(user: UserDocument, candidate: unknown, req?: Req
 /** GET /api/auth/me — return the authenticated user. */
 export async function me(req: Request, res: Response): Promise<void> {
   const user = await loadAccount(req);
-  res.status(200).json({ user: accountView(user) });
+  res.status(200).json({ user: accountView(user, req) });
 }
 
 /** GET /api/auth/reauth — whether this session may make sensitive changes now, and how to re-authenticate. */
@@ -323,7 +340,7 @@ export async function updateAccount(req: Request, res: Response): Promise<void> 
   const user = await loadAccount(req);
   user.displayName = name || null;
   await user.save();
-  res.status(200).json({ user: accountView(user) });
+  res.status(200).json({ user: accountView(user, req) });
 }
 
 /**
@@ -359,7 +376,7 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   user.set("password", newPassword);
   await saveAndRevokeOtherSessions(req, res, user);
   securityLog(req, { event: firstPassword ? "auth.password_set" : "auth.password_change", outcome: "success", sessionsEnded: "others" });
-  res.status(200).json({ user: accountView(user) });
+  res.status(200).json({ user: accountView(user, req) });
 }
 
 /** POST /api/auth/logout-others — sign out every device except this one. */
@@ -368,7 +385,7 @@ export async function logoutOthers(req: Request, res: Response): Promise<void> {
   await requireRecentAuth(req, user);
   await saveAndRevokeOtherSessions(req, res, user);
   securityLog(req, { event: "session.revoke_others", outcome: "success" });
-  res.status(200).json({ user: accountView(user) });
+  res.status(200).json({ user: accountView(user, req) });
 }
 
 /**
@@ -394,7 +411,7 @@ export async function changeEmail(req: Request, res: Response): Promise<void> {
     await user.save();
     securityLog(req, { event: "account.email_change", outcome: "success" });
   }
-  res.status(200).json({ user: accountView(user) });
+  res.status(200).json({ user: accountView(user, req) });
 }
 
 /**
@@ -556,7 +573,7 @@ export async function googleUnlink(req: Request, res: Response): Promise<void> {
   user.googleOAuthId = undefined; // unset, not null — see the sparse unique index on User
   await user.save();
   securityLog(req, { event: "auth.google_unlink", outcome: "success" });
-  res.status(200).json({ user: accountView(user) });
+  res.status(200).json({ user: accountView(user, req) });
 }
 
 /**
@@ -606,6 +623,11 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
       isNew = true;
       securityLog(req, { event: "auth.register", outcome: "success", userId: user.id, method: "google" });
     }
+  }
+  if (user.mfaEnabled) {
+    securityLog(req, { event: "auth.login", outcome: "success", method: "google", userId: user.id, step: "google", mfaPending: true });
+    await beginMfaLogin(res, user, "google");
+    return res.redirect(clientUrl("/login/verify"));
   }
   securityLog(req, { event: "auth.login", outcome: "success", method: "google", userId: user.id });
 

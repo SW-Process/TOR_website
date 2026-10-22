@@ -24,12 +24,15 @@ import {
   reauthenticate,
 } from "../controllers/authController";
 import { listMyReports } from "../controllers/errorReportController";
+import { enableMfa, regenerateRecoveryCodes, startMfaSetup, turnOffMfa, verifyMfaLogin } from "../controllers/mfaController";
 import { requireAuth } from "../middleware/auth";
 import {
   forgotPasswordPerAccount,
   forgotPasswordPerIp,
   loginPerAccount,
   loginPerIp,
+  mfaVerifyPerAccount,
+  mfaVerifyPerIp,
   reauthLimit,
   registerLimit,
   resetPasswordLimit,
@@ -45,6 +48,11 @@ const router = Router();
 router.post("/register", registerLimit, register);
 router.post("/login", loginPerIp, loginPerAccount, login);
 router.post("/logout", logout);
+router.post("/mfa/verify", mfaVerifyPerIp, mfaVerifyPerAccount, verifyMfaLogin);
+router.post("/mfa/setup", requireAuth, reauthLimit, startMfaSetup);
+router.post("/mfa/enable", requireAuth, reauthLimit, enableMfa);
+router.post("/mfa/disable", requireAuth, reauthLimit, turnOffMfa);
+router.post("/mfa/recovery-codes", requireAuth, reauthLimit, regenerateRecoveryCodes);
 router.post("/forgot-password", forgotPasswordPerIp, forgotPasswordPerAccount, forgotPassword);
 router.post("/reset-password", resetPasswordLimit, resetPassword);
 router.get("/me", requireAuth, me);

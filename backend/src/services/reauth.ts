@@ -3,6 +3,7 @@ import { Session } from "../models";
 import type { UserDocument } from "../models/User";
 import { httpError } from "../utils/httpError";
 import { securityLog } from "../utils/securityLog";
+import { verifyAndConsume } from "./mfa";
 
 /**
  * Re-authentication before sensitive account changes (ASVS 7.5.1, 7.5.2): changing the
@@ -20,23 +21,13 @@ import { securityLog } from "../utils/securityLog";
 export const REAUTH_WINDOW_MS = 10 * 60 * 1000;
 export const REAUTH_REQUIRED = "reauth_required";
 
-/** Second-factor check, filled in by the MFA service; without MFA there is none. */
-export type SecondFactorCheck = (user: UserDocument, code: unknown, req: Request) => Promise<boolean>;
-let checkSecondFactor: SecondFactorCheck | null = null;
-let hasSecondFactor: (user: UserDocument) => boolean = () => false;
-
-export function registerSecondFactor(isEnabled: (user: UserDocument) => boolean, check: SecondFactorCheck): void {
-  hasSecondFactor = isEnabled;
-  checkSecondFactor = check;
-}
-
 export type ReauthMethod = "password" | "totp" | "google";
 
 /** What this account must present to re-authenticate. */
 export function reauthMethods(user: UserDocument): ReauthMethod[] {
   const methods: ReauthMethod[] = [];
   if (user.passwordHash) methods.push("password");
-  if (hasSecondFactor(user)) methods.push("totp");
+  if (user.mfaEnabled) methods.push("totp");
   // A Google-only account without MFA has nothing to type in: it signs in with Google again.
   if (methods.length === 0) methods.push("google");
   return methods;
@@ -54,7 +45,7 @@ export async function factorsPresent(user: UserDocument, body: Record<string, un
     }
   }
   if (methods.includes("totp")) {
-    if (!checkSecondFactor || !(await checkSecondFactor(user, body.mfaCode, req))) {
+    if (!(await verifyAndConsume(user._id, body.mfaCode))) {
       if (body.mfaCode !== undefined) securityLog(req, { event: "auth.reauth", outcome: "failure", userId: user.id, reason: "bad_mfa_code" });
       return false;
     }

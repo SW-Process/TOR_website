@@ -21,8 +21,29 @@ export interface IUser {
   resetPasswordTokenHash: string | null;
   /** When the current reset token stops being accepted. */
   resetPasswordExpiresAt: Date | null;
+  /** TOTP second factor is on: every sign-in also needs a code (services/mfa). */
+  mfaEnabled: boolean;
+  mfaEnabledAt: Date | null;
+  /** The TOTP seed, sealed with AES-256-GCM (utils/secretBox). */
+  mfaSecretEnc: string | null;
+  /** A seed being set up, not yet confirmed with a code. */
+  mfaPendingSecretEnc: string | null;
+  mfaPendingAt: Date | null;
+  /** Last accepted TOTP step: a code is accepted once only (ASVS 6.5.1). */
+  mfaLastStep: number | null;
+  /** Single-use recovery codes, bcrypt-hashed (ASVS 6.5.2). */
+  mfaRecoveryCodes: IRecoveryCode[];
+  /** Id of the one password/Google step that may still be completed with a code. */
+  mfaPendingLoginJti: string | null;
+  /** Wrong codes entered on that pending step. */
+  mfaPendingFailures: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface IRecoveryCode {
+  hash: string;
+  usedAt: Date | null;
 }
 
 export interface IUserMethods {
@@ -71,6 +92,20 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     // Never selected by default — only authController's reset flow reads these.
     resetPasswordTokenHash: { type: String, default: null, select: false },
     resetPasswordExpiresAt: { type: Date, default: null, select: false },
+    mfaEnabled: { type: Boolean, default: false },
+    mfaEnabledAt: { type: Date, default: null },
+    // Never selected by default — only services/mfa reads these.
+    mfaSecretEnc: { type: String, default: null, select: false },
+    mfaPendingSecretEnc: { type: String, default: null, select: false },
+    mfaPendingAt: { type: Date, default: null, select: false },
+    mfaLastStep: { type: Number, default: null, select: false },
+    mfaRecoveryCodes: {
+      type: [new Schema<IRecoveryCode>({ hash: { type: String, required: true }, usedAt: { type: Date, default: null } }, { _id: false })],
+      default: [],
+      select: false,
+    },
+    mfaPendingLoginJti: { type: String, default: null, select: false },
+    mfaPendingFailures: { type: Number, default: 0, select: false },
   },
   { timestamps: true }
 );
@@ -113,6 +148,13 @@ userSchema.set("toJSON", {
     delete out.tokenVersion;
     delete out.resetPasswordTokenHash;
     delete out.resetPasswordExpiresAt;
+    delete out.mfaSecretEnc;
+    delete out.mfaPendingSecretEnc;
+    delete out.mfaPendingAt;
+    delete out.mfaLastStep;
+    delete out.mfaRecoveryCodes;
+    delete out.mfaPendingLoginJti;
+    delete out.mfaPendingFailures;
     delete out.__v;
     return out;
   },
