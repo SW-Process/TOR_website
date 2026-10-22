@@ -268,7 +268,7 @@ export default function ScraperHealth() {
     triggerIngestion,
     triggerEnrichment,
     triggerLifecycle,
-    setLifecycleOnlyOpen,
+    setLifecycleScope,
     lastRunFor,
   } = useIngestionRuns();
 
@@ -286,6 +286,7 @@ export default function ScraperHealth() {
   const [lifecycleMaxDeadlines, setLifecycleMaxDeadlines] = useState<number | null>(null);
   const effectiveMaxDeadlines = lifecycleMaxDeadlines ?? lifecycleQueue?.maxDeadlineExtractions ?? null;
   const [lifecycleOnlyOpen, setLifecycleOnlyOpenChecked] = useState(false);
+  const [lifecycleOnlyDraft, setLifecycleOnlyDraftChecked] = useState(false);
 
   function runIngestion() {
     triggerIngestion({
@@ -333,10 +334,11 @@ export default function ScraperHealth() {
                 pending: lifecyclePending,
                 onTrigger: () =>
                   triggerLifecycle(
-                    lifecycleMaxTors === null && lifecycleMaxDeadlines === null && !lifecycleOnlyOpen
+                    lifecycleMaxTors === null && lifecycleMaxDeadlines === null && !lifecycleOnlyOpen && !lifecycleOnlyDraft
                       ? undefined
                       : {
                           ...(lifecycleOnlyOpen ? { onlyOpen: true } : {}),
+                          ...(lifecycleOnlyDraft ? { onlyDraft: true } : {}),
                           ...(lifecycleMaxTors === null ? {} : { maxTors: lifecycleMaxTors }),
                           ...(lifecycleMaxDeadlines === null
                             ? {}
@@ -535,11 +537,23 @@ export default function ScraperHealth() {
                         checked={lifecycleOnlyOpen}
                         onChange={(e) => {
                           setLifecycleOnlyOpenChecked(e.target.checked);
-                          setLifecycleOnlyOpen(e.target.checked);
+                          setLifecycleScope({ onlyOpen: e.target.checked, onlyDraft: lifecycleOnlyDraft });
                         }}
                         disabled={pending}
                       />
                       ตรวจเฉพาะ TOR ที่เปิดรับ
+                    </label>
+                    <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-text-faint)]">
+                      <input
+                        type="checkbox"
+                        checked={lifecycleOnlyDraft}
+                        onChange={(e) => {
+                          setLifecycleOnlyDraftChecked(e.target.checked);
+                          setLifecycleScope({ onlyOpen: lifecycleOnlyOpen, onlyDraft: e.target.checked });
+                        }}
+                        disabled={pending}
+                      />
+                      ตรวจเฉพาะร่าง TOR
                     </label>
                     <LifecycleStatus
                       pending={pending}

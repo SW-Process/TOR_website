@@ -233,3 +233,42 @@ describe("lifecycleFilter onlyOpen", () => {
     expect(await countLifecycleCandidates()).toBe(2);
   });
 });
+
+describe("lifecycleFilter onlyDraft", () => {
+  const url = (id: string) => `https://egp.test/project-detail/${id}`;
+  const proc = (stage: string, over: Record<string, unknown> = {}) => ({
+    stage,
+    announcements: [],
+    lastCheckedAt: new Date("2026-09-01T00:00:00Z"),
+    ...over,
+  });
+  const seed = () =>
+    Tor.create([
+      { title: "draft", pipelineStatus: "enriched", sourceListingUrl: url("a"), procurement: proc("draft") },
+      { title: "draft finished contract", pipelineStatus: "enriched", sourceListingUrl: url("b"), procurement: proc("draft", { contractStatus: "ส่งงานครบถ้วน" }) },
+      { title: "inviting", pipelineStatus: "enriched", sourceListingUrl: url("c"), procurement: proc("inviting") },
+      { title: "awarded", pipelineStatus: "enriched", sourceListingUrl: url("d"), procurement: proc("awarded") },
+      { title: "cancelled", pipelineStatus: "enriched", sourceListingUrl: url("e"), procurement: proc("cancelled") },
+      { title: "never checked", pipelineStatus: "enriched", sourceListingUrl: url("f") },
+      { title: "draft not enriched", pipelineStatus: "pending", sourceListingUrl: url("g"), procurement: proc("draft") },
+    ] as any);
+  const titles = async (opts: { onlyOpen?: boolean; onlyDraft?: boolean }) =>
+    (await Tor.find(lifecycleFilter(opts) as any).sort({ title: 1 }).lean()).map((t) => t.title);
+
+  it("selects only enriched draft TORs (a finished contract does not hide one)", async () => {
+    await seed();
+    expect(await titles({ onlyDraft: true })).toEqual(["draft", "draft finished contract"]);
+    expect(await countLifecycleCandidates({ onlyDraft: true })).toBe(2);
+  });
+
+  it("with onlyOpen as well selects either stage", async () => {
+    await seed();
+    expect(await titles({ onlyOpen: true, onlyDraft: true })).toEqual(["draft", "draft finished contract", "inviting"]);
+    expect(await countLifecycleCandidates({ onlyOpen: true, onlyDraft: true })).toBe(3);
+  });
+
+  it("leaves the default filter unchanged when onlyDraft is absent or false", async () => {
+    await seed();
+    expect(await titles({ onlyDraft: false })).toEqual(await titles({}));
+  });
+});

@@ -71,9 +71,9 @@ function parseLifecycleMaxDeadlineExtractions(raw: unknown): number | undefined 
   return n;
 }
 
-function parseLifecycleOnlyOpen(raw: unknown): boolean | undefined {
+function parseLifecycleStageFlag(raw: unknown, name: "onlyOpen" | "onlyDraft"): boolean | undefined {
   if (raw === undefined) return undefined; // check every stage
-  if (typeof raw !== "boolean") throw httpError(400, "onlyOpen must be a boolean");
+  if (typeof raw !== "boolean") throw httpError(400, `${name} must be a boolean`);
   return raw;
 }
 
@@ -144,7 +144,8 @@ export async function createLifecycleRun(req: Request, res: Response): Promise<v
   const body = (req.body ?? {}) as Record<string, unknown>;
   const maxTors = parseLifecycleMaxTors(body.maxTors);
   const maxDeadlineExtractions = parseLifecycleMaxDeadlineExtractions(body.maxDeadlineExtractions);
-  const onlyOpen = parseLifecycleOnlyOpen(body.onlyOpen);
+  const onlyOpen = parseLifecycleStageFlag(body.onlyOpen, "onlyOpen");
+  const onlyDraft = parseLifecycleStageFlag(body.onlyDraft, "onlyDraft");
 
   // A run whose worker died (e.g. backend restart) must not block new runs forever.
   await sweepStaleRuns("lifecycle");
@@ -166,6 +167,7 @@ export async function createLifecycleRun(req: Request, res: Response): Promise<v
     maxDeadlineExtractions,
     deadlineExtractor,
     onlyOpen,
+    onlyDraft,
   }).catch((err) => {
     console.error("lifecycle run failed:", err);
   });
@@ -175,8 +177,8 @@ export async function createLifecycleRun(req: Request, res: Response): Promise<v
 
 /** GET /api/ingestion/lifecycle/pending — how many TORs the next refresh would check. */
 export async function getLifecyclePending(req: Request, res: Response): Promise<void> {
-  const onlyOpen = req.query.onlyOpen === "1" || req.query.onlyOpen === "true";
-  const candidates = await countLifecycleCandidates({ onlyOpen });
+  const flag = (v: unknown) => v === "1" || v === "true";
+  const candidates = await countLifecycleCandidates({ onlyOpen: flag(req.query.onlyOpen), onlyDraft: flag(req.query.onlyDraft) });
   const maxTors = maxLifecycleRefreshPerRun();
   res.status(200).json({
     candidates,

@@ -43,6 +43,8 @@ export interface RefreshLifecycleDeps {
   torIds?: ReadonlyArray<string | Types.ObjectId>;
   /** Manual option: check only TORs whose stored stage is "inviting" (open for bids). */
   onlyOpen?: boolean;
+  /** Manual option: check only TORs whose stored stage is "draft" (alone or together with onlyOpen). */
+  onlyDraft?: boolean;
 }
 
 export interface RefreshLifecycleResult {
@@ -77,6 +79,14 @@ export function procurementChanged(
   if ((before.contractStatus ?? null) !== (after.contractStatus ?? null)) return true;
   if ((before.hearingEndDate?.getTime() ?? null) !== (after.hearingEndDate?.getTime() ?? null)) return true;
   return announcementSignature(before) !== announcementSignature(after);
+}
+
+/** "; only open TORs", "; only draft TORs", "; only open and draft TORs", or nothing. */
+function stageScopeSuffix(deps: { onlyOpen?: boolean; onlyDraft?: boolean }): string {
+  if (deps.onlyOpen && deps.onlyDraft) return "; only open and draft TORs";
+  if (deps.onlyOpen) return "; only open TORs";
+  if (deps.onlyDraft) return "; only draft TORs";
+  return "";
 }
 
 /**
@@ -123,7 +133,7 @@ export async function refreshLifecycle(
 
   await sweepStaleRuns("lifecycle");
 
-  const candidateFilter = lifecycleFilter({ gproc: Boolean(gproc), onlyOpen: deps.onlyOpen });
+  const candidateFilter = lifecycleFilter({ gproc: Boolean(gproc), onlyOpen: deps.onlyOpen, onlyDraft: deps.onlyDraft });
   // A missing lastCheckedAt sorts before any date, so never-checked TORs come first.
   const tors = await Tor.find(
     deps.torIds ? { $and: [candidateFilter, { _id: { $in: [...deps.torIds] } }] } : candidateFilter
@@ -343,7 +353,7 @@ export async function refreshLifecycle(
     const stageSummary = gproc
       ? `; stage source: process5 ok ${gprocStage.ok}, fell back to BMA portal ${fellBack} (project unknown to process5 ${gprocStage["not-found"]}, process5 error ${gprocStage.error})${gprocPaused ? `; process5 paused after ${GPROC_BREAKER} consecutive errors` : ""}`
       : "";
-    const outcomeSummary = `checked ${tors.length}, changed ${changed}, unchanged ${unchanged}, skipped ${skipped}, failed ${failed}${stageSummary}${deadlineSummary}${deps.onlyOpen ? "; only open TORs" : ""}`;
+    const outcomeSummary = `checked ${tors.length}, changed ${changed}, unchanged ${unchanged}, skipped ${skipped}, failed ${failed}${stageSummary}${deadlineSummary}${stageScopeSuffix(deps)}`;
     await IngestionRun.updateOne(
       { _id: runId },
       { $set: { completedAt: new Date(), status, outcomeSummary } }

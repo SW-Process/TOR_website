@@ -386,6 +386,24 @@ describe("POST /api/ingestion/lifecycle/runs", () => {
     expect(refreshLifecycleMock.mock.calls[0][0].onlyOpen).toBeUndefined();
   });
 
+  it("passes a boolean onlyDraft through and leaves it undefined when absent", async () => {
+    refreshLifecycleMock.mockResolvedValue(settled);
+    const agent = await adminAgent();
+    expect((await agent.post("/api/ingestion/lifecycle/runs").send({ onlyDraft: true })).status).toBe(202);
+    expect(refreshLifecycleMock.mock.calls[0][0].onlyDraft).toBe(true);
+    refreshLifecycleMock.mockClear();
+    expect((await agent.post("/api/ingestion/lifecycle/runs").send({})).status).toBe(202);
+    expect(refreshLifecycleMock.mock.calls[0][0].onlyDraft).toBeUndefined();
+  });
+
+  it.each(["yes", 1, "true", null])("400 when onlyDraft is %p", async (onlyDraft) => {
+    const agent = await adminAgent();
+    const res = await agent.post("/api/ingestion/lifecycle/runs").send({ onlyDraft });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toMatch(/onlyDraft/);
+    expect(refreshLifecycleMock).not.toHaveBeenCalled();
+  });
+
   it.each(["yes", 1, "true", null])("400 when onlyOpen is %p", async (onlyOpen) => {
     const agent = await adminAgent();
     const res = await agent.post("/api/ingestion/lifecycle/runs").send({ onlyOpen });
@@ -489,6 +507,20 @@ describe("GET /api/ingestion/lifecycle/pending", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ candidates: 3, maxTors: 2, willCheck: 2, maxDeadlineExtractions: 20 });
+  });
+
+  it("counts only draft TORs with onlyDraft=1, and either stage with both", async () => {
+    const url = (id: string) => `https://egp.test/project-detail/${id}`;
+    const p = (stage: string) => ({ stage, announcements: [], lastCheckedAt: new Date() });
+    await Tor.create([
+      { title: "open", pipelineStatus: "enriched", sourceListingUrl: url("a"), procurement: p("inviting") },
+      { title: "draft", pipelineStatus: "enriched", sourceListingUrl: url("b"), procurement: p("draft") },
+      { title: "unchecked", pipelineStatus: "enriched", sourceListingUrl: url("c") },
+    ] as any);
+    const agent = await adminAgent();
+    expect((await agent.get("/api/ingestion/lifecycle/pending?onlyDraft=1")).body).toMatchObject({ candidates: 1, willCheck: 1 });
+    expect((await agent.get("/api/ingestion/lifecycle/pending?onlyOpen=1&onlyDraft=1")).body.candidates).toBe(2);
+    expect((await agent.get("/api/ingestion/lifecycle/pending?onlyDraft=0")).body.candidates).toBe(3);
   });
 
   it("counts only inviting TORs with onlyOpen=1 / true", async () => {
