@@ -85,10 +85,22 @@ async function refreshSession(): Promise<void> {
   await ensureLoaded();
 }
 
+const TOO_MANY_ATTEMPTS = "ลองหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่";
+
+/** Thai copy for the backend's password-policy messages, or null for any other message. */
+function passwordPolicyError(message: string | undefined): string | null {
+  if (!message) return null;
+  if (message.startsWith("Password must be")) return "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
+  if (message.startsWith("Password is too long")) return "รหัสผ่านยาวเกินไป (ไม่เกิน 72 ตัวอักษรภาษาอังกฤษ หรือ 24 ตัวอักษรภาษาไทย)";
+  if (message.startsWith("This password is too common")) return "รหัสผ่านนี้ถูกใช้บ่อยเกินไปและเดาง่าย กรุณาตั้งรหัสผ่านอื่น";
+  return null;
+}
+
 function readError(status: number, body: { message?: string }): string {
   if (status === 409) return "อีเมลนี้ถูกใช้สมัครแล้ว";
   if (status === 401) return "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
-  return body.message || "เกิดข้อผิดพลาด กรุณาลองใหม่";
+  if (status === 429) return TOO_MANY_ATTEMPTS;
+  return passwordPolicyError(body.message) ?? (body.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
 }
 
 /** Thai copy for the account-settings endpoints' errors (backend messages are English). */
@@ -96,8 +108,10 @@ function readAccountError(status: number, body: { message?: string }): string {
   if (status === 401) return "รหัสผ่านปัจจุบันไม่ถูกต้อง";
   if (status === 409) return "อีเมลนี้ถูกใช้กับบัญชีอื่นแล้ว";
   if (status === 403) return "บัญชีผู้ดูแลระบบลบจากหน้านี้ไม่ได้";
+  if (status === 429) return TOO_MANY_ATTEMPTS;
   const msg = body.message ?? "";
-  if (msg.startsWith("Password must be")) return "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
+  const passwordError = passwordPolicyError(msg);
+  if (passwordError) return passwordError;
   if (msg.startsWith("Display name")) return "ชื่อต้องไม่เกิน 60 ตัวอักษร";
   if (msg.startsWith("A valid email")) return "รูปแบบอีเมลไม่ถูกต้อง";
   if (msg.startsWith("Set a password")) return "กรุณาตั้งรหัสผ่านก่อนเปลี่ยนอีเมล";
@@ -198,9 +212,11 @@ export function useAuth() {
   /** Always resolves ok on a valid-looking email — the backend answers the same way either way. */
   const forgotPassword = useCallback(
     (email: string) =>
-      sendPublic("/api/auth/forgot-password", { email }, (body) =>
-        body.message?.startsWith("A valid email") ? "รูปแบบอีเมลไม่ถูกต้อง" : "เกิดข้อผิดพลาด กรุณาลองใหม่"
-      ),
+      sendPublic("/api/auth/forgot-password", { email }, (body) => {
+        if (body.message?.startsWith("A valid email")) return "รูปแบบอีเมลไม่ถูกต้อง";
+        if (body.message?.startsWith("Too many")) return TOO_MANY_ATTEMPTS;
+        return "เกิดข้อผิดพลาด กรุณาลองใหม่";
+      }),
     []
   );
 
@@ -208,7 +224,9 @@ export function useAuth() {
   const resetPassword = useCallback(
     (token: string, password: string) =>
       sendPublic("/api/auth/reset-password", { token, password }, (body) => {
-        if (body.message?.startsWith("Password must be")) return "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
+        const passwordError = passwordPolicyError(body.message);
+        if (passwordError) return passwordError;
+        if (body.message?.startsWith("Too many")) return TOO_MANY_ATTEMPTS;
         if (body.message?.includes("invalid or has expired")) return "ลิงก์นี้ไม่ถูกต้องหรือหมดอายุแล้ว กรุณาขอลิงก์ใหม่อีกครั้ง";
         return "เกิดข้อผิดพลาด กรุณาลองใหม่";
       }),
