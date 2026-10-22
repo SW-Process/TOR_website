@@ -40,11 +40,11 @@ const avatarUpload = multer({
 
 const router = Router();
 
-router.post("/register", register);
+router.post("/register", registerLimit, register);
 router.post("/login", loginPerIp, loginPerAccount, login);
 router.post("/logout", logout);
-router.post("/forgot-password", forgotPassword);
-router.post("/reset-password", resetPassword);
+router.post("/forgot-password", forgotPasswordPerIp, forgotPasswordPerAccount, forgotPassword);
+router.post("/reset-password", resetPasswordLimit, resetPassword);
 router.get("/me", requireAuth, me);
 router.patch("/me", requireAuth, updateAccount);
 router.delete("/me", requireAuth, deleteAccount);
