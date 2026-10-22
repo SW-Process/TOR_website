@@ -13,6 +13,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      /** Correlates this request's log entries (middleware/requestId). */
+      requestId?: string;
     }
   }
 }
