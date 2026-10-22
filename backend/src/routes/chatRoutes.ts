@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getMyConversation, markMyConversationRead, sendMyMessage } from "../controllers/chatController";
 import { requireAuth } from "../middleware/auth";
+import { chatMessageLimit } from "../middleware/rateLimits";
 
 const router = Router();
 
@@ -8,7 +9,7 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/conversation", getMyConversation);
-router.post("/messages", sendMyMessage);
+router.post("/messages", chatMessageLimit, sendMyMessage);
 router.post("/read", markMyConversationRead);
 
 export default router;

@@ -11,9 +11,10 @@ import adminRoutes from "./routes/adminRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import helpRoutes from "./routes/helpRoutes";
 import { notFound, errorHandler } from "./middleware/errorHandler";
-import { securityHeaders } from "./middleware/securityHeaders";
+import { rejectUnsupportedMethods, securityHeaders } from "./middleware/securityHeaders";
 import { originCheck } from "./middleware/originCheck";
 import { parseTrustProxy } from "./utils/trustProxy";
+import { requestId } from "./middleware/requestId";
 
 const app = express();
 
@@ -24,7 +25,9 @@ app.disable("x-powered-by");
 const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
 if (trustProxy !== undefined) app.set("trust proxy", trustProxy);
 
+app.use(requestId);
 app.use(securityHeaders);
+app.use(rejectUnsupportedMethods);
 app.use(
   cors({
     origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",

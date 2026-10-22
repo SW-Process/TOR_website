@@ -3,13 +3,13 @@ import request from "supertest";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 process.env.JWT_SECRET = "test-secret";
-process.env.JWT_EXPIRES_IN = "7d";
 process.env.CLIENT_ORIGIN = "http://localhost:3000";
 
 let googleConfigured = true;
 const exchangeMock = jest.fn();
 
 jest.mock("../config/google", () => ({
+  newFlowSecrets: jest.requireActual("../config/google").newFlowSecrets,
   isGoogleOAuthConfigured: () => googleConfigured,
   buildGoogleAuthUrl: (state: string) =>
     `https://accounts.google.com/o/oauth2/v2/auth?state=${state}`,
@@ -17,6 +17,7 @@ jest.mock("../config/google", () => ({
 }));
 
 import app from "../app";
+import { sessionCookieFor } from "./helpers/sessionCookie";
 import { User } from "../models";
 
 let mongod: MongoMemoryServer;
@@ -61,6 +62,23 @@ describe("GET /api/auth/google", () => {
 });
 
 describe("GET /api/auth/google/callback", () => {
+  it("hands the exchange this attempt's PKCE verifier and nonce (ASVS 10.1.2)", async () => {
+    exchangeMock.mockResolvedValue({ googleId: "g-1", email: "p@gmail.com", emailVerified: true });
+    const { agent, state } = await beginFlow();
+    await agent.get(`/api/auth/google/callback?code=abc&state=${state}`).expect(302);
+    const [code, secrets] = exchangeMock.mock.calls[0]!;
+    expect(code).toBe("abc");
+    expect(secrets.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(secrets.nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
+  it("rejects a callback whose state cookie was tampered with", async () => {
+    const { state } = await beginFlow();
+    const res = await request(app).get(`/api/auth/google/callback?code=abc&state=${state}`).set("Cookie", `oauth_state=${state}`);
+    expect(res.headers.location).toBe("http://localhost:3000/login?error=google_state");
+    expect(exchangeMock).not.toHaveBeenCalled();
+  });
+
   it("rejects a mismatched state", async () => {
     const { agent } = await beginFlow();
     const res = await agent.get("/api/auth/google/callback?code=abc&state=wrong");
@@ -143,7 +161,7 @@ describe("GET /api/auth/google/callback", () => {
 });
 
 describe("linking Google from account settings", () => {
-  const creds = { email: "vendor@test.com", password: "vendor-test-pass-17" };
+  const creds = { email: "vendor@test.com", password: "plum-orchard-ladder-17" };
   const identity = { googleId: "g-123", email: "someone.else@gmail.com", emailVerified: true };
 
   /** A signed-in agent that has started the link flow; returns it with the state value. */
@@ -219,8 +237,7 @@ describe("linking Google from account settings", () => {
 
   it("refuses to unlink Google from a Google-only account", async () => {
     const user = await User.create({ email: "g@test.com", role: "vendor", googleOAuthId: "g-9" });
-    const { signToken } = await import("../utils/token");
-    await request(app).delete("/api/auth/google").set("Cookie", `token=${signToken(user)}`).expect(400);
+    await request(app).delete("/api/auth/google").set("Cookie", await sessionCookieFor(user)).expect(400);
     expect((await User.findById(user._id))?.googleOAuthId).toBe("g-9");
   });
 });

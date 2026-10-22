@@ -14,6 +14,7 @@ import {
   LogOut,
   Mail,
   MonitorSmartphone,
+  ShieldCheck,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -22,7 +23,7 @@ import { useAuth } from "@/lib/useAuth";
 import { Avatar } from "./ui";
 
 /** Every page reachable from the settings sidebar; `/account/settings?section=<id>` unless noted. */
-export type SettingsPageId = "profile" | "email" | "password" | "sessions" | "shortcuts" | "saved" | "hidden" | "reports" | "delete" | "business";
+export type SettingsPageId = "profile" | "email" | "password" | "mfa" | "sessions" | "shortcuts" | "saved" | "hidden" | "reports" | "delete" | "business";
 
 export const SETTINGS_ROOT = "/account/settings";
 
@@ -139,6 +140,12 @@ export default function SettingsShell({
                 label="รหัสผ่านและความปลอดภัย"
                 href={settingsHref("password")}
                 active={active === "password"}
+              />
+              <NavItem
+                icon={ShieldCheck}
+                label="ยืนยันตัวตนสองขั้นตอน"
+                href={settingsHref("mfa")}
+                active={active === "mfa"}
               />
               <NavItem
                 icon={MonitorSmartphone}

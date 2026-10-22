@@ -4,7 +4,6 @@ import jwt from "jsonwebtoken";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 process.env.JWT_SECRET = "test-secret";
-process.env.JWT_EXPIRES_IN = "7d";
 
 import app from "../app";
 import { Session, Tor, User, VendorProfile } from "../models";
@@ -27,7 +26,7 @@ afterAll(async () => {
   await mongod.stop();
 });
 
-const creds = { email: "vendor@test.com", password: "vendor-test-pass-17" };
+const creds = { email: "vendor@test.com", password: "plum-orchard-ladder-17" };
 
 /** Two independent "devices" signed in to the same account. */
 const MAC_SAFARI =
@@ -85,16 +84,23 @@ describe("changing the password", () => {
 });
 
 describe("session checks against the database", () => {
-  it("keeps a token issued before token versions existed working until the first sign-out", async () => {
+  it("refuses a token without a session id, or one that is not a session token (ASVS 9.2.2, 9.2.3)", async () => {
     const laptop = request.agent(app);
     await laptop.post("/api/auth/register").send(creds).expect(201);
     const user = (await User.findOne({ email: creds.email }))!;
-    // a pre-upgrade cookie: no `tv` claim at all
-    const legacy = jwt.sign({ role: "vendor" }, "test-secret", { subject: String(user._id), expiresIn: "7d" });
+    const sid = String((await Session.findOne({ userId: user._id }))!._id);
+    const sign = (claims: object, opts: jwt.SignOptions = {}) =>
+      jwt.sign({ role: "vendor", tv: 0, ...claims }, "test-secret", { subject: String(user._id), expiresIn: "1h", ...opts });
+    const ok = { issuer: "tor-checker-api", audience: "tor-checker-session" };
 
-    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(200);
-    await laptop.post("/api/auth/logout-others").expect(200);
-    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(401);
+    // the pre-session cookie format, with no sid, issuer or audience
+    await request(app).get("/api/auth/me").set("Cookie", `token=${sign({})}`).expect(401);
+    // right claims but meant for something else
+    await request(app).get("/api/auth/me").set("Cookie", `token=${sign({ sid, use: "mfa" }, ok)}`).expect(401);
+    // wrong audience
+    await request(app).get("/api/auth/me").set("Cookie", `token=${sign({ sid, use: "session" }, { ...ok, audience: "x" })}`).expect(401);
+    // the real thing
+    await request(app).get("/api/auth/me").set("Cookie", `token=${sign({ sid, use: "session" }, ok)}`).expect(200);
   });
 
   it("rejects the token of a deleted account everywhere, not just on /me", async () => {
@@ -149,7 +155,7 @@ describe("GET /api/auth/sessions", () => {
   it("only shows the caller's own sessions", async () => {
     await twoDevices();
     const stranger = request.agent(app);
-    await stranger.post("/api/auth/register").send({ email: "other@test.com", password: "vendor-test-pass-17" }).expect(201);
+    await stranger.post("/api/auth/register").send({ email: "other@test.com", password: "plum-orchard-ladder-17" }).expect(201);
     expect((await stranger.get("/api/auth/sessions")).body.data).toHaveLength(1);
   });
 });
@@ -176,7 +182,7 @@ describe("DELETE /api/auth/sessions/:id", () => {
   it("will not touch another user's session", async () => {
     const { laptop } = await twoDevices();
     const stranger = request.agent(app);
-    await stranger.post("/api/auth/register").send({ email: "other@test.com", password: "vendor-test-pass-17" }).expect(201);
+    await stranger.post("/api/auth/register").send({ email: "other@test.com", password: "plum-orchard-ladder-17" }).expect(201);
     const theirs = (await stranger.get("/api/auth/sessions")).body.data[0];
 
     await laptop.delete(`/api/auth/sessions/${theirs.id}`).expect(404);
@@ -215,28 +221,6 @@ describe("session rows follow sign-in and sign-out", () => {
     expect(await Session.countDocuments({})).toBe(0);
   });
 
-  it("upgrades a pre-session cookie on its next signed-in request, without signing it out", async () => {
-    const laptop = request.agent(app);
-    await laptop.post("/api/auth/register").send(creds).expect(201);
-    const user = (await User.findOne({ email: creds.email }))!;
-    const legacy = jwt.sign({ role: "vendor", tv: 0 }, "test-secret", { subject: String(user._id), expiresIn: "7d" });
-
-    const res = await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(200);
-    const upgraded = String(res.headers["set-cookie"]).match(/token=([^;]+)/)![1]!;
-    expect((jwt.decode(upgraded) as { sid?: string }).sid).toBeDefined();
-    expect(await Session.countDocuments({ userId: user._id })).toBe(2);
-  });
-
-  it("does not mint sessions from optional-auth reads of a legacy cookie", async () => {
-    const laptop = request.agent(app);
-    await laptop.post("/api/auth/register").send(creds).expect(201);
-    const user = (await User.findOne({ email: creds.email }))!;
-    const legacy = jwt.sign({ role: "vendor", tv: 0 }, "test-secret", { subject: String(user._id), expiresIn: "7d" });
-
-    await request(app).get("/api/tors").set("Cookie", `token=${legacy}`).expect(200);
-    expect(await Session.countDocuments({ userId: user._id })).toBe(1);
-  });
-
   it("rejects a token whose session row is gone (e.g. expired by TTL)", async () => {
     const { laptop } = await twoDevices();
     await Session.deleteMany({});
@@ -266,63 +250,68 @@ describe("parseUserAgent", () => {
   });
 });
 
-describe("review fixes", () => {
-  async function legacyCookie() {
-    const laptop = request.agent(app);
-    await laptop.post("/api/auth/register").send(creds).expect(201);
-    const user = (await User.findOne({ email: creds.email }))!;
-    const legacy = jwt.sign({ role: "vendor", tv: 0 }, "test-secret", { subject: String(user._id), expiresIn: "7d" });
-    return { laptop, user, legacy };
-  }
-  const sidOf = (res: request.Response) => {
-    const token = String(res.headers["set-cookie"] ?? "").match(/token=([^;]+)/)?.[1];
-    return token ? (jwt.decode(token) as { sid?: string }).sid : undefined;
-  };
+describe("session lifetime (ASVS 7.3)", () => {
+  it("ends a session after 30 minutes without a request, and deletes it", async () => {
+    const { laptop, phone } = await twoDevices();
+    const mine = (await laptop.get("/api/auth/sessions")).body.data.find((s: { current: boolean }) => s.current);
+    await Session.updateOne({ _id: mine.id }, { lastSeenAt: new Date(Date.now() - 31 * 60_000) });
 
-  it("adopts a legacy cookie into ONE session even when a page fires requests at once", async () => {
-    await Session.syncIndexes();
-    const { user, legacy } = await legacyCookie();
-    const responses = await Promise.all(
-      ["/api/auth/me", "/api/auth/me", "/api/vendor/bookmarks", "/api/vendor/hidden-tors", "/api/auth/sessions"].map((p) =>
-        request(app).get(p).set("Cookie", `token=${legacy}`)
-      )
-    );
-    expect(responses.map((r) => r.status)).toEqual([200, 200, 200, 200, 200]);
-    const sids = new Set(responses.map(sidOf).filter(Boolean));
-    expect(sids.size).toBe(1);
-    expect(await Session.countDocuments({ userId: user._id })).toBe(2); // the register session + the adopted one
+    await laptop.get("/api/auth/me").expect(401);
+    expect(await Session.exists({ _id: mine.id })).toBeNull();
+    await phone.get("/api/auth/me").expect(200); // other devices are unaffected
   });
 
-  it("keeps a signed-out legacy device signed out instead of re-adopting it", async () => {
-    await Session.syncIndexes();
-    const { laptop, user, legacy } = await legacyCookie();
-    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(200);
-    const adopted = (await laptop.get("/api/auth/sessions")).body.data.find((s: { current: boolean }) => !s.current);
-
-    await laptop.delete(`/api/auth/sessions/${adopted.id}`).expect(204);
-    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(401);
-    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(401);
-    // the tombstone isn't listed, and revoking it again is a 404
-    expect((await laptop.get("/api/auth/sessions")).body.data).toHaveLength(1);
-    await laptop.delete(`/api/auth/sessions/${adopted.id}`).expect(404);
-    expect(await Session.countDocuments({ userId: user._id, revokedAt: null })).toBe(1);
-  });
-
-  it("logging out an adopted legacy device keeps its old cookie dead", async () => {
-    await Session.syncIndexes();
-    const { legacy } = await legacyCookie();
-    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(200);
-    await request(app).post("/api/auth/logout").set("Cookie", `token=${legacy}`).expect(200);
-    await request(app).get("/api/auth/me").set("Cookie", `token=${legacy}`).expect(401);
-  });
-
-  it("gives this device's session row a fresh expiry when the cookie is re-issued", async () => {
+  it("keeps an active session alive", async () => {
     const { laptop } = await twoDevices();
     const mine = (await laptop.get("/api/auth/sessions")).body.data.find((s: { current: boolean }) => s.current);
-    await Session.updateOne({ _id: mine.id }, { expiresAt: new Date(Date.now() + 60_000) }); // about to lapse
-    await laptop.post("/api/auth/logout-others").expect(200);
+    await Session.updateOne({ _id: mine.id }, { lastSeenAt: new Date(Date.now() - 20 * 60_000) });
+    await laptop.get("/api/auth/me").expect(200);
     const row = await Session.findById(mine.id).lean();
-    expect(row!.expiresAt.getTime()).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
+    expect(Date.now() - row!.lastSeenAt.getTime()).toBeLessThan(5_000);
+  });
+
+  it("does not count background polling as activity", async () => {
+    const { laptop } = await twoDevices();
+    const mine = (await laptop.get("/api/auth/sessions")).body.data.find((s: { current: boolean }) => s.current);
+    const idleSince = new Date(Date.now() - 20 * 60_000);
+    await Session.updateOne({ _id: mine.id }, { lastSeenAt: idleSince });
+    await laptop.get("/api/auth/me").set("X-Background-Request", "1").expect(200);
+    expect((await Session.findById(mine.id).lean())!.lastSeenAt.getTime()).toBe(idleSince.getTime());
+  });
+
+  it("ends every session 12 hours after sign-in, however active", async () => {
+    const { laptop } = await twoDevices();
+    const row = await Session.findOne({}).sort({ createdAt: 1 }).lean();
+    expect(Math.abs(row!.expiresAt.getTime() - row!.createdAt.getTime() - 12 * 60 * 60 * 1000)).toBeLessThan(1000);
+    const mine = (await laptop.get("/api/auth/sessions")).body.data.find((s: { current: boolean }) => s.current);
+    await Session.updateOne({ _id: mine.id }, { expiresAt: new Date(Date.now() - 1000) });
+    await laptop.get("/api/auth/me").expect(401);
+  });
+
+  it("never extends a session when its cookie is re-issued", async () => {
+    const { laptop } = await twoDevices();
+    const mine = (await laptop.get("/api/auth/sessions")).body.data.find((s: { current: boolean }) => s.current);
+    const end = new Date(Date.now() + 60 * 60_000);
+    await Session.updateOne({ _id: mine.id }, { expiresAt: end });
+    const res = await laptop.post("/api/auth/logout-others").expect(200);
+
+    expect((await Session.findById(mine.id).lean())!.expiresAt.getTime()).toBe(end.getTime());
+    const token = String(res.headers["set-cookie"]).match(/token=([^;]+)/)![1]!;
+    const exp = (jwt.decode(token) as { exp: number }).exp * 1000;
+    expect(Math.abs(exp - end.getTime())).toBeLessThan(2_000);
+  });
+});
+
+describe("concurrent sessions (ASVS 7.1.2)", () => {
+  it("keeps at most 10 sessions per account, ending the least recently used", async () => {
+    const first = request.agent(app);
+    await first.post("/api/auth/register").send(creds).expect(201);
+    const user = (await User.findOne({ email: creds.email }))!;
+    await Session.updateOne({ userId: user._id }, { lastSeenAt: new Date(Date.now() - 10 * 60_000) });
+    for (let i = 0; i < 10; i++) await request(app).post("/api/auth/login").send(creds).expect(200);
+
+    expect(await Session.countDocuments({ userId: user._id })).toBe(10);
+    await first.get("/api/auth/me").expect(401); // the oldest one went
   });
 });
 

@@ -2,22 +2,35 @@ import crypto from "crypto";
 import { isValidObjectId } from "mongoose";
 import type { Request, Response } from "express";
 import { Bookmark, ChatConversation, ChatMessage, ErrorReport, Notification, Session, User, VendorProfile } from "../models";
-import type { UserDocument } from "../models/User";
-import { cookieName, cookieOptions, sessionCookieName, sessionLifetimeMs } from "../utils/token";
+import { isLegacyPasswordHash, type UserDocument } from "../models/User";
+import { cookieName, cookieOptions, sessionCookieName } from "../utils/token";
 import { endSessions, setSessionCookie, startSession } from "../services/sessions";
 import { parseUserAgent } from "../utils/userAgent";
 import { httpError } from "../utils/httpError";
 import { detectImageType } from "../utils/imageType";
-import { MIN_PASSWORD_LENGTH, passwordProblem } from "../utils/passwordPolicy";
+import { MIN_PASSWORD_LENGTH, newPasswordProblem } from "../utils/passwordPolicy";
 import { getStorage } from "../storage";
 import { getEmailSender } from "../email";
 import { clientUrl } from "../utils/clientUrl";
 import { buildPasswordResetEmail } from "../email/passwordResetEmail";
 import { sessionUser } from "../middleware/auth";
+import { maskEmail, securityLog } from "../utils/securityLog";
+import { withTransaction } from "../utils/transaction";
+import {
+  REAUTH_WINDOW_MS,
+  factorsPresent,
+  isRecentlyAuthenticated,
+  markReauthenticated,
+  reauthMethods,
+  requireRecentAuth,
+} from "../services/reauth";
+import { adminMfaRequired, beginMfaLogin, recoveryCodesLeft } from "../services/mfa";
 import {
   isGoogleOAuthConfigured,
   buildGoogleAuthUrl,
   exchangeCodeForIdentity,
+  newFlowSecrets,
+  type GoogleFlowSecrets,
   type GoogleIdentity,
 } from "../config/google";
 
@@ -32,6 +45,33 @@ const oauthStateCookie = () => cookieName("oauth_state");
 const LINK_STATE_PREFIX = "link.";
 /** Where the link flow lands: the security page, with `google=<outcome>` for the banner. */
 const LINK_RETURN_PATH = "/account/settings?section=password&google=";
+
+/**
+ * The state cookie holds the state plus this attempt's PKCE verifier and nonce, as
+ * base64url JSON. It is HttpOnly, `__Host-` in production and lives 10 minutes, so only
+ * the browser that started the flow can finish it (ASVS 10.1.2).
+ */
+interface OAuthFlowCookie extends GoogleFlowSecrets {
+  state: string;
+}
+
+function startGoogleFlow(res: Response, state: string): GoogleFlowSecrets {
+  const secrets = newFlowSecrets();
+  const value = Buffer.from(JSON.stringify({ state, ...secrets } satisfies OAuthFlowCookie)).toString("base64url");
+  res.cookie(oauthStateCookie(), value, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
+  return secrets;
+}
+
+function readGoogleFlow(raw: unknown): OAuthFlowCookie | null {
+  if (typeof raw !== "string") return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as Partial<OAuthFlowCookie>;
+    if (typeof parsed.state !== "string" || typeof parsed.codeVerifier !== "string" || typeof parsed.nonce !== "string") return null;
+    return parsed as OAuthFlowCookie;
+  } catch {
+    return null;
+  }
+}
 const ALLOWED_AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 /** How long an emailed "forgot password" link stays valid. */
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
@@ -64,15 +104,22 @@ async function sendSession(req: Request, res: Response, user: UserDocument, stat
 /** POST /api/auth/register — create a vendor account and start a session. */
 export async function register(req: Request, res: Response): Promise<void> {
   const { email, password } = validateCredentials(req.body);
-  const problem = passwordProblem(password);
-  if (problem) throw httpError(400, problem);
+  const problem = await newPasswordProblem(password, { email });
+  if (problem) {
+    securityLog(req, { event: "auth.register", outcome: "failure", reason: "password_policy", email: maskEmail(email) });
+    throw httpError(400, problem);
+  }
 
   const existing = await User.findOne({ email: email.toLowerCase() });
-  if (existing) throw httpError(409, "Email is already registered");
+  if (existing) {
+    securityLog(req, { event: "auth.register", outcome: "failure", reason: "email_taken", userId: existing.id });
+    throw httpError(409, "Email is already registered");
+  }
 
   const user = new User({ email, role: "vendor" });
   user.set("password", password);
   await user.save();
+  securityLog(req, { event: "auth.register", outcome: "success", userId: user.id, method: "password" });
 
   await sendSession(req, res, user, 201);
 }
@@ -83,8 +130,29 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   const user = await User.findOne({ email: email.toLowerCase() }).select("+passwordHash");
   if (!user || !(await user.comparePassword(password))) {
+    securityLog(req, {
+      event: "auth.login",
+      outcome: "failure",
+      method: "password",
+      reason: user ? "bad_password" : "unknown_account",
+      ...(user ? { userId: user.id } : { email: maskEmail(email) }),
+    });
     throw httpError(401, "Invalid email or password");
   }
+  if (isLegacyPasswordHash(user.passwordHash)) {
+    // Re-hash with the current scheme now that we have the password (see models/User).
+    user.set("password", password);
+    await user.save();
+    securityLog(req, { event: "auth.password_rehash", outcome: "success", severity: "INFO", userId: user.id });
+  }
+  if (user.mfaEnabled) {
+    // First factor done; no session until the second (POST /api/auth/mfa/verify).
+    securityLog(req, { event: "auth.login", outcome: "success", method: "password", userId: user.id, step: "password", mfaPending: true });
+    await beginMfaLogin(res, user, "password");
+    res.status(200).json({ mfaRequired: true });
+    return;
+  }
+  securityLog(req, { event: "auth.login", outcome: "success", method: "password", userId: user.id });
 
   await sendSession(req, res, user, 200);
 }
@@ -113,6 +181,11 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
   const issuedAt = user?.resetPasswordExpiresAt ? user.resetPasswordExpiresAt.getTime() - RESET_TOKEN_TTL_MS : -Infinity;
   const onCooldown = Date.now() - issuedAt < RESET_REQUEST_COOLDOWN_MS;
 
+  if (!user) {
+    securityLog(req, { event: "auth.password_reset_request", outcome: "failure", reason: "unknown_account", email: maskEmail(email) });
+  } else if (onCooldown) {
+    securityLog(req, { event: "auth.password_reset_request", outcome: "blocked", reason: "cooldown", userId: user.id });
+  }
   if (user && !onCooldown) {
     const rawToken = crypto.randomBytes(RESET_TOKEN_BYTES).toString("hex");
     user.resetPasswordTokenHash = hashResetToken(rawToken);
@@ -121,11 +194,19 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
 
     // In the fragment, not the query: browsers never send `#…` to a server (ASVS 14.2.1).
     const link = clientUrl(`/reset-password#token=${user.id}.${rawToken}`);
+    securityLog(req, { event: "auth.password_reset_request", outcome: "success", userId: user.id });
     try {
       await getEmailSender().send({ to: user.email, ...buildPasswordResetEmail(link) });
     } catch (err) {
       // The caller gets the same generic response either way; only the server sees this.
-      console.error("forgot-password email failed:", err);
+      securityLog(req, {
+        event: "email.send",
+        outcome: "failure",
+        severity: "ERROR",
+        userId: user.id,
+        purpose: "password_reset",
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -140,10 +221,12 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
  */
 export async function resetPassword(req: Request, res: Response): Promise<void> {
   const { token, password } = (req.body ?? {}) as Record<string, unknown>;
-  const problem = passwordProblem(password);
-  if (problem || typeof password !== "string") throw httpError(400, problem ?? "A password is required");
+  if (typeof password !== "string") throw httpError(400, "A password is required");
 
-  const invalidLink = () => httpError(400, "This reset link is invalid or has expired");
+  const invalidLink = () => {
+    securityLog(req, { event: "auth.password_reset", outcome: "failure", reason: "invalid_or_expired_token" });
+    return httpError(400, "This reset link is invalid or has expired");
+  };
   if (typeof token !== "string" || token.split(".").length !== 2) throw invalidLink();
   const [userId, rawToken] = token.split(".") as [string, string];
   if (!isValidObjectId(userId) || !rawToken) throw invalidLink();
@@ -155,6 +238,9 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
   const candidate = Buffer.from(hashResetToken(rawToken));
   const stored = Buffer.from(user.resetPasswordTokenHash);
   if (candidate.length !== stored.length || !crypto.timingSafeEqual(candidate, stored)) throw invalidLink();
+  // Checked once the link is known to be good, so it can use the account's own email and name.
+  const problem = await newPasswordProblem(password, user);
+  if (problem) throw httpError(400, problem);
 
   user.set("password", password);
   user.resetPasswordTokenHash = null;
@@ -162,6 +248,7 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
   user.tokenVersion = (user.tokenVersion ?? 0) + 1; // sign out every device, including whoever requested this
   await user.save();
   await Session.deleteMany({ userId: user._id });
+  securityLog(req, { event: "auth.password_reset", outcome: "success", userId: user.id, sessionsEnded: "all" });
 
   res.status(200).json({ message: "Password has been reset" });
 }
@@ -169,28 +256,39 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
 /** POST /api/auth/logout — clear the session cookie. */
 export async function logout(req: Request, res: Response): Promise<void> {
   // Drop this device's session row too, so it leaves the session list at once.
-  const current = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined);
-  if (current?.sessionId) await endSessions({ _id: current.sessionId, userId: current.id });
+  const current = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined, req);
+  if (current) await endSessions({ _id: current.sessionId, userId: current.id });
+  securityLog(req, { event: "auth.logout", outcome: "success", userId: current?.id ?? null, sessionId: current?.sessionId });
   res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(200).json({ message: "Logged out" });
 }
 
 /** The caller's User with its password hash loaded (for account checks), or 401. */
 async function loadAccount(req: Request): Promise<UserDocument> {
-  const user = await User.findById(req.user!.id).select("+passwordHash");
+  const user = await User.findById(req.user!.id).select("+passwordHash +mfaRecoveryCodes");
   if (!user) throw httpError(401, "Account no longer exists");
   return user;
 }
 
 /** Public user JSON plus the account-settings flags the hash itself must never leak. */
-function accountView(user: UserDocument) {
-  return { ...user.toJSON(), hasPassword: !!user.passwordHash, googleLinked: !!user.googleOAuthId };
+export function accountView(user: UserDocument, req?: Request) {
+  return {
+    ...user.toJSON(),
+    hasPassword: !!user.passwordHash,
+    googleLinked: !!user.googleOAuthId,
+    mfaEnabled: !!user.mfaEnabled,
+    recoveryCodesLeft: user.mfaEnabled ? recoveryCodesLeft(user) : 0,
+    // Admins need MFA for the admin panel; `sessionMfa` says whether this session has it.
+    mfaRequired: user.role === "admin" && adminMfaRequired(),
+    sessionMfa: req?.user?.mfa ?? false,
+  };
 }
 
 /** Accounts with a password must confirm it; Google-only accounts (no hash) have none to give. */
-async function confirmPassword(user: UserDocument, candidate: unknown): Promise<void> {
+async function confirmPassword(user: UserDocument, candidate: unknown, req?: Request): Promise<void> {
   if (!user.passwordHash) return;
   if (typeof candidate !== "string" || !(await user.comparePassword(candidate))) {
+    securityLog(req, { event: "auth.reauth", outcome: "failure", userId: user.id, reason: "bad_password" });
     throw httpError(401, "Current password is incorrect");
   }
 }
@@ -198,7 +296,31 @@ async function confirmPassword(user: UserDocument, candidate: unknown): Promise<
 /** GET /api/auth/me — return the authenticated user. */
 export async function me(req: Request, res: Response): Promise<void> {
   const user = await loadAccount(req);
-  res.status(200).json({ user: accountView(user) });
+  res.status(200).json({ user: accountView(user, req) });
+}
+
+/** GET /api/auth/reauth — whether this session may make sensitive changes now, and how to re-authenticate. */
+export async function reauthStatus(req: Request, res: Response): Promise<void> {
+  const user = await loadAccount(req);
+  res.status(200).json({ fresh: await isRecentlyAuthenticated(req), methods: reauthMethods(user), windowMs: REAUTH_WINDOW_MS });
+}
+
+/**
+ * POST /api/auth/reauth — confirm the account's factors (password, and the authenticator
+ * code when MFA is on) so this session may make sensitive changes for the next 10 minutes
+ * (ASVS 7.5.1). A Google-only account without MFA re-authenticates by signing in again.
+ */
+export async function reauthenticate(req: Request, res: Response): Promise<void> {
+  const user = await loadAccount(req);
+  if (reauthMethods(user).includes("google")) {
+    throw httpError(400, "Sign in with Google again to continue", { code: "reauth_google" });
+  }
+  if (!(await factorsPresent(user, (req.body ?? {}) as Record<string, unknown>, req))) {
+    throw httpError(401, "The password or code is incorrect", { code: "bad_credentials" });
+  }
+  await markReauthenticated(req);
+  securityLog(req, { event: "auth.reauth", outcome: "success", methods: reauthMethods(user) });
+  res.status(200).json({ fresh: true, windowMs: REAUTH_WINDOW_MS });
 }
 
 const MAX_DISPLAY_NAME_LENGTH = 60;
@@ -212,7 +334,7 @@ const SESSION_ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
  * gets the parsed device, browser and OS.
  */
 export async function listSessions(req: Request, res: Response): Promise<void> {
-  const sessions = await Session.find({ userId: req.user!.id, revokedAt: null, expiresAt: { $gt: new Date() } })
+  const sessions = await Session.find({ userId: req.user!.id, expiresAt: { $gt: new Date() } })
     .sort({ lastSeenAt: -1 })
     .lean();
   const now = Date.now();
@@ -238,8 +360,11 @@ export async function listSessions(req: Request, res: Response): Promise<void> {
 export async function revokeSession(req: Request, res: Response): Promise<void> {
   const id = String(req.params.id);
   if (!isValidObjectId(id)) throw httpError(400, "Invalid session id");
+  // Signing this device out is a logout; signing another one out is a sensitive change (7.5.2).
+  if (id !== req.user!.sessionId) await requireRecentAuth(req, await loadAccount(req));
   const ended = await endSessions({ _id: id, userId: req.user!.id });
   if (!ended) throw httpError(404, "Session not found");
+  securityLog(req, { event: "session.revoke", outcome: "success", revokedSessionId: id });
   if (id === req.user!.sessionId) res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(204).end();
 }
@@ -256,7 +381,7 @@ export async function updateAccount(req: Request, res: Response): Promise<void> 
   const user = await loadAccount(req);
   user.displayName = name || null;
   await user.save();
-  res.status(200).json({ user: accountView(user) });
+  res.status(200).json({ user: accountView(user, req) });
 }
 
 /**
@@ -268,12 +393,11 @@ export async function updateAccount(req: Request, res: Response): Promise<void> 
 async function saveAndRevokeOtherSessions(req: Request, res: Response, user: UserDocument): Promise<void> {
   user.tokenVersion = (user.tokenVersion ?? 0) + 1;
   await user.save();
-  const current = req.user!.sessionId!; // requireAuth guarantees a session row
+  const current = req.user!.sessionId; // requireAuth guarantees a session row
   await endSessions({ userId: user._id, _id: { $ne: current } });
-  // The re-issued cookie/JWT get a fresh lifetime; give the row the same one, or its TTL
-  // would sign this device out at the old expiry while the cookie still looks valid.
-  await Session.updateOne({ _id: current }, { $set: { expiresAt: new Date(Date.now() + sessionLifetimeMs()) } });
-  setSessionCookie(res, user, current);
+  // Same session, same absolute end: a re-issued cookie never extends the session.
+  const row = await Session.findById(current).select("expiresAt").lean();
+  if (row) setSessionCookie(res, user, current, row.expiresAt);
 }
 
 /**
@@ -283,21 +407,27 @@ async function saveAndRevokeOtherSessions(req: Request, res: Response, user: Use
  */
 export async function changePassword(req: Request, res: Response): Promise<void> {
   const { currentPassword, newPassword } = (req.body ?? {}) as Record<string, unknown>;
-  const problem = passwordProblem(newPassword);
-  if (problem || typeof newPassword !== "string") throw httpError(400, problem ?? "A new password is required");
+  if (typeof newPassword !== "string") throw httpError(400, "A new password is required");
 
   const user = await loadAccount(req);
-  await confirmPassword(user, currentPassword);
+  const problem = await newPasswordProblem(newPassword, user);
+  if (problem) throw httpError(400, problem);
+  await confirmPassword(user, currentPassword, req); // always, when there is one (6.2.3)
+  await requireRecentAuth(req, user);
+  const firstPassword = !user.passwordHash;
   user.set("password", newPassword);
   await saveAndRevokeOtherSessions(req, res, user);
-  res.status(200).json({ user: accountView(user) });
+  securityLog(req, { event: firstPassword ? "auth.password_set" : "auth.password_change", outcome: "success", sessionsEnded: "others" });
+  res.status(200).json({ user: accountView(user, req) });
 }
 
 /** POST /api/auth/logout-others — sign out every device except this one. */
 export async function logoutOthers(req: Request, res: Response): Promise<void> {
   const user = await loadAccount(req);
+  await requireRecentAuth(req, user);
   await saveAndRevokeOtherSessions(req, res, user);
-  res.status(200).json({ user: accountView(user) });
+  securityLog(req, { event: "session.revoke_others", outcome: "success" });
+  res.status(200).json({ user: accountView(user, req) });
 }
 
 /**
@@ -314,14 +444,16 @@ export async function changeEmail(req: Request, res: Response): Promise<void> {
 
   const user = await loadAccount(req);
   if (!user.passwordHash) throw httpError(400, "Set a password before changing your email");
-  await confirmPassword(user, currentPassword);
+  await confirmPassword(user, currentPassword, req);
+  await requireRecentAuth(req, user);
 
   if (next !== user.email) {
     if (await User.exists({ email: next })) throw httpError(409, "Email is already registered");
     user.email = next;
     await user.save();
+    securityLog(req, { event: "account.email_change", outcome: "success" });
   }
-  res.status(200).json({ user: accountView(user) });
+  res.status(200).json({ user: accountView(user, req) });
 }
 
 /**
@@ -333,33 +465,38 @@ export async function changeEmail(req: Request, res: Response): Promise<void> {
 export async function deleteAccount(req: Request, res: Response): Promise<void> {
   const { currentPassword, confirmEmail } = (req.body ?? {}) as Record<string, unknown>;
   const user = await loadAccount(req);
-  if (user.role === "admin") throw httpError(403, "Admin accounts cannot be deleted here");
+  if (user.role === "admin") {
+    securityLog(req, { event: "account.delete", outcome: "blocked", reason: "admin_account" });
+    throw httpError(403, "Admin accounts cannot be deleted here");
+  }
 
   if (user.passwordHash) {
-    await confirmPassword(user, currentPassword);
+    await confirmPassword(user, currentPassword, req);
   } else if (typeof confirmEmail !== "string" || confirmEmail.trim().toLowerCase() !== user.email) {
     throw httpError(400, "Type your account email to confirm");
   }
+  await requireRecentAuth(req, user);
 
-  const profile = await VendorProfile.findOne({ userId: user._id }).select("_id");
-  if (profile) {
-    await Promise.all([
-      Bookmark.deleteMany({ vendorId: profile._id }),
-      Notification.deleteMany({ vendorId: profile._id }),
-    ]);
-    await profile.deleteOne();
-  }
-
-  const conversations = await ChatConversation.find({ user: user._id }).distinct("_id");
-  await ChatMessage.deleteMany({ conversation: { $in: conversations } });
-  await ChatConversation.deleteMany({ _id: { $in: conversations } });
-  await ErrorReport.updateMany({ reportedBy: user._id }, { $set: { reportedBy: null } });
-  await Session.deleteMany({ userId: user._id });
-
+  // All the account's rows go together or not at all (ASVS 2.3.3); the avatar blob is
+  // removed only after the commit, since it can't be rolled back (an orphan is harmless).
+  await withTransaction(async (session) => {
+    const profile = await VendorProfile.findOne({ userId: user._id }).select("_id").session(session ?? null);
+    if (profile) {
+      await Bookmark.deleteMany({ vendorId: profile._id }, { session });
+      await Notification.deleteMany({ vendorId: profile._id }, { session });
+      await profile.deleteOne({ session });
+    }
+    const conversations = await ChatConversation.find({ user: user._id }).session(session ?? null).distinct("_id");
+    await ChatMessage.deleteMany({ conversation: { $in: conversations } }, { session });
+    await ChatConversation.deleteMany({ _id: { $in: conversations } }, { session });
+    await ErrorReport.updateMany({ reportedBy: user._id }, { $set: { reportedBy: null } }, { session });
+    await Session.deleteMany({ userId: user._id }, { session });
+    await User.deleteOne({ _id: user._id }, { session });
+  });
   if (user.avatarKey) {
-    await getStorage().delete?.(user.avatarKey).catch(() => {}); // an orphaned blob is harmless
+    await getStorage().delete?.(user.avatarKey).catch(() => {});
   }
-  await user.deleteOne();
+  securityLog(req, { event: "account.delete", outcome: "success" });
 
   res.clearCookie(sessionCookieName(), cookieOptions());
   res.status(200).json({ message: "Account deleted" });
@@ -417,23 +554,24 @@ export async function googleStart(_req: Request, res: Response): Promise<void> {
   if (!isGoogleOAuthConfigured()) throw httpError(503, "Google sign-in is not available");
 
   const state = crypto.randomBytes(16).toString("hex");
-  res.cookie(oauthStateCookie(), state, {
-    ...cookieOptions(),
-    maxAge: 10 * 60 * 1000,
-  });
-  res.redirect(buildGoogleAuthUrl(state));
+  res.redirect(buildGoogleAuthUrl(state, startGoogleFlow(res, state)));
 }
 
 /**
  * GET /api/auth/google/link — start linking Google to the signed-in account. Same
  * consent screen as sign-in; the callback tells the two apart by the state prefix.
  */
-export async function googleLinkStart(_req: Request, res: Response): Promise<void> {
+export async function googleLinkStart(req: Request, res: Response): Promise<void> {
   if (!isGoogleOAuthConfigured()) throw httpError(503, "Google sign-in is not available");
+  // Linking adds a way to sign in, so it needs a fresh re-authentication (7.5.1). This is a
+  // page navigation: send the browser back to settings to confirm, rather than a JSON 401.
+  if (!(await isRecentlyAuthenticated(req))) {
+    securityLog(req, { event: "auth.reauth_required", outcome: "blocked", severity: "NOTICE", for: "google_link" });
+    return res.redirect(clientUrl(LINK_RETURN_PATH + "reauth"));
+  }
 
   const state = LINK_STATE_PREFIX + crypto.randomBytes(16).toString("hex");
-  res.cookie(oauthStateCookie(), state, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
-  res.redirect(buildGoogleAuthUrl(state));
+  res.redirect(buildGoogleAuthUrl(state, startGoogleFlow(res, state)));
 }
 
 /**
@@ -444,16 +582,20 @@ export async function googleLinkStart(_req: Request, res: Response): Promise<voi
 async function linkGoogleToSession(req: Request, res: Response, identity: GoogleIdentity): Promise<void> {
   const done = (outcome: string) => res.redirect(clientUrl(LINK_RETURN_PATH + outcome));
 
-  const session = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined);
+  const session = await sessionUser(req.cookies?.[sessionCookieName()] as string | undefined, req);
   if (!session) return done("session");
   const user = await User.findById(session.id);
   if (!user) return done("session");
 
   const owner = await User.findOne({ googleOAuthId: identity.googleId }).select("_id").lean();
-  if (owner && String(owner._id) !== user.id) return done("taken");
+  if (owner && String(owner._id) !== user.id) {
+    securityLog(req, { event: "auth.google_link", outcome: "failure", userId: user.id, reason: "google_account_taken" });
+    return done("taken");
+  }
 
   user.googleOAuthId = identity.googleId;
   await user.save();
+  securityLog(req, { event: "auth.google_link", outcome: "success", userId: user.id });
   done("linked");
 }
 
@@ -464,9 +606,11 @@ async function linkGoogleToSession(req: Request, res: Response, identity: Google
 export async function googleUnlink(req: Request, res: Response): Promise<void> {
   const user = await loadAccount(req);
   if (!user.passwordHash) throw httpError(400, "Set a password before disconnecting Google");
+  await requireRecentAuth(req, user);
   user.googleOAuthId = undefined; // unset, not null — see the sparse unique index on User
   await user.save();
-  res.status(200).json({ user: accountView(user) });
+  securityLog(req, { event: "auth.google_unlink", outcome: "success" });
+  res.status(200).json({ user: accountView(user, req) });
 }
 
 /**
@@ -478,21 +622,23 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
   const { code, state } = req.query;
   // A link round trip reports back to the security settings page, a sign-in to /login.
   const linking = typeof state === "string" && state.startsWith(LINK_STATE_PREFIX);
-  const fail = (reason: string) =>
+  const fail = (reason: string) => {
+    securityLog(req, { event: linking ? "auth.google_link" : "auth.login", outcome: "failure", method: "google", reason });
     res.redirect(clientUrl(linking ? `${LINK_RETURN_PATH}error` : `/login?error=${reason}`));
+  };
 
   if (!isGoogleOAuthConfigured()) return fail("google_unavailable");
 
-  const expectedState = req.cookies?.[oauthStateCookie()] as string | undefined;
+  const flow = readGoogleFlow(req.cookies?.[oauthStateCookie()]);
   res.clearCookie(oauthStateCookie(), cookieOptions());
 
-  if (typeof code !== "string" || typeof state !== "string" || state !== expectedState) {
+  if (typeof code !== "string" || typeof state !== "string" || !flow || state !== flow.state) {
     return fail("google_state");
   }
 
   let identity: GoogleIdentity;
   try {
-    identity = await exchangeCodeForIdentity(code);
+    identity = await exchangeCodeForIdentity(code, { codeVerifier: flow.codeVerifier, nonce: flow.nonce });
   } catch {
     return fail("google_exchange");
   }
@@ -508,11 +654,19 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
     if (user) {
       user.googleOAuthId = identity.googleId; // link Google to the existing account
       await user.save();
+      securityLog(req, { event: "auth.google_link", outcome: "success", userId: user.id, via: "verified_email_match" });
     } else {
       user = await User.create({ email, role: "vendor", googleOAuthId: identity.googleId });
       isNew = true;
+      securityLog(req, { event: "auth.register", outcome: "success", userId: user.id, method: "google" });
     }
   }
+  if (user.mfaEnabled) {
+    securityLog(req, { event: "auth.login", outcome: "success", method: "google", userId: user.id, step: "google", mfaPending: true });
+    await beginMfaLogin(res, user, "google");
+    return res.redirect(clientUrl("/login/verify"));
+  }
+  securityLog(req, { event: "auth.login", outcome: "success", method: "google", userId: user.id });
 
   await startSession(req, res, user, "google");
   res.redirect(clientUrl(isNew ? "/account/profile?onboarding=1" : "/dashboard"));

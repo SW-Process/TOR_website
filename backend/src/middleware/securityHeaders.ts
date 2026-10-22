@@ -26,5 +26,20 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  // API answers can hold account data: no browser or shared cache keeps them (ASVS 14.2.2,
+  // 14.3.2). A route that is safe to cache (avatars) sets its own Cache-Control.
+  res.setHeader("Cache-Control", "no-store");
   next();
+}
+
+const ALLOWED_METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]);
+
+/**
+ * Refuse every method the API doesn't use, TRACE included (ASVS 13.4.4), with 405 and an
+ * Allow header, before any route or body parser sees the request.
+ */
+export function rejectUnsupportedMethods(req: Request, res: Response, next: NextFunction): void {
+  if (ALLOWED_METHODS.has(req.method)) return next();
+  res.setHeader("Allow", [...ALLOWED_METHODS].join(", "));
+  res.status(405).json({ message: "Method not allowed" });
 }

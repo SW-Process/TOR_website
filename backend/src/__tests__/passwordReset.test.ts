@@ -3,7 +3,6 @@ import request from "supertest";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 process.env.JWT_SECRET = "test-secret";
-process.env.JWT_EXPIRES_IN = "7d";
 
 import app from "../app";
 import { Session, User } from "../models";
@@ -26,7 +25,7 @@ afterAll(async () => {
   await mongod.stop();
 });
 
-const creds = { email: "vendor@test.com", password: "vendor-test-pass-17" };
+const creds = { email: "vendor@test.com", password: "plum-orchard-ladder-17" };
 
 /** Register `creds`, grab the mailed reset link's token from the fake sender, and return it. */
 async function requestResetToken(email = creds.email): Promise<string> {

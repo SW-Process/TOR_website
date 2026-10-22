@@ -25,7 +25,7 @@ afterAll(async () => {
 
 async function signedIn() {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email: "avatar@test.com", password: "avatar-test-pass-1" }).expect(201);
+  await agent.post("/api/auth/register").send({ email: "avatar@test.com", password: "plum-orchard-ladder-17" }).expect(201);
   return agent;
 }
 

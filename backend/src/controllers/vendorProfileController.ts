@@ -2,6 +2,10 @@ import type { Request, Response } from "express";
 import { VendorProfile } from "../models";
 import type { IVendorProfile } from "../models";
 import { httpError } from "../utils/httpError";
+import { savedFilterProblem } from "./torController";
+
+/** Business limits per vendor (ASVS 2.1.3, 2.3.2); see docs/security/business-logic.md. */
+export const MAX_SAVED_SEARCHES = 50;
 
 const MAX_STR = 200;
 const MAX_ITEMS = 100;
@@ -110,9 +114,8 @@ function validateSavedSearch(body: Record<string, unknown>, partial: boolean): S
     out.name = name;
   }
   if (body.filters !== undefined) {
-    if (typeof body.filters !== "object" || body.filters === null || Array.isArray(body.filters)) {
-      throw httpError(400, "filters must be an object");
-    }
+    const problem = savedFilterProblem(body.filters);
+    if (problem) throw httpError(400, problem);
     out.filters = body.filters as Record<string, unknown>;
   }
   if (body.alertsEnabled !== undefined) {
@@ -170,6 +173,9 @@ export async function addSavedSearch(req: Request, res: Response): Promise<void>
   const input = validateSavedSearch((req.body ?? {}) as Record<string, unknown>, false);
 
   const profile = await loadOrCreateProfile(req.user!.id);
+  if (profile.savedSearches.length >= MAX_SAVED_SEARCHES) {
+    throw httpError(400, `You can keep at most ${MAX_SAVED_SEARCHES} saved searches`);
+  }
   profile.savedSearches.push({
     name: input.name!,
     filters: input.filters ?? {},

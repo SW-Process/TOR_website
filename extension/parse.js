@@ -20,7 +20,21 @@
       return [];
     }
   }
-  const api = { parseSearchResults };
+  const PAGE_ORIGIN = "https://process5.gprocurement.go.th";
+  const MARK = "tor-capture:search";
+
+  /**
+   * Whether a window message is one of ours from hook-main.js (ASVS 3.5.5): sent by this
+   * very window, from the e-GP origin, with our mark and an object body. Anything else,
+   * from another frame, window or site, or shaped differently, is ignored.
+   */
+  function isCaptureMessage(event, self) {
+    if (!event || event.source !== self || event.origin !== PAGE_ORIGIN) return false;
+    const data = event.data;
+    return !!data && typeof data === "object" && data.mark === MARK && !!data.body && typeof data.body === "object";
+  }
+
+  const api = { parseSearchResults, isCaptureMessage };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.TorCapture = Object.assign(root.TorCapture || {}, api);
 })(typeof globalThis !== "undefined" ? globalThis : this);

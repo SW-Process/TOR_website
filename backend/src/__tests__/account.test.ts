@@ -3,9 +3,9 @@ import request from "supertest";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 process.env.JWT_SECRET = "test-secret";
-process.env.JWT_EXPIRES_IN = "7d";
 
 import app from "../app";
+import { sessionCookieFor } from "./helpers/sessionCookie";
 import { Bookmark, ChatConversation, ChatMessage, ErrorReport, User, VendorProfile } from "../models";
 
 let mongod: MongoMemoryServer;
@@ -28,7 +28,7 @@ afterAll(async () => {
   await mongod.stop();
 });
 
-const creds = { email: "vendor@test.com", password: "vendor-test-pass-17" };
+const creds = { email: "vendor@test.com", password: "plum-orchard-ladder-17" };
 
 /** Register `creds` and return an agent carrying its session cookie. */
 async function signedIn() {
@@ -40,9 +40,8 @@ async function signedIn() {
 /** A Google-only account (no password) with a session cookie. */
 async function googleOnly() {
   const user = await User.create({ email: "g@test.com", role: "vendor", googleOAuthId: "gid-1" });
-  const { signToken } = await import("../utils/token");
   const agent = request.agent(app);
-  agent.set("Cookie", `token=${signToken(user)}`);
+  agent.set("Cookie", await sessionCookieFor(user));
   return { agent, user };
 }
 

@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { securityLog } from "../utils/securityLog";
 
 export interface RateLimitOptions {
   /** Length of one counting window, in milliseconds. */
@@ -7,6 +8,8 @@ export interface RateLimitOptions {
   max: number;
   /** What to count by. Defaults to the client IP (see TRUST_PROXY for proxies). */
   key?: (req: Request) => string;
+  /** Names the limiter in the security log. */
+  name?: string;
 }
 
 interface Window {
@@ -36,7 +39,7 @@ export function clientIp(req: Request): string {
  * with several Cloud Run instances an attacker gets `max` per instance, still a hard cap.
  * Answers 429 with Retry-After once a key is over the limit.
  */
-export function rateLimit({ windowMs, max, key = clientIp }: RateLimitOptions) {
+export function rateLimit({ windowMs, max, key = clientIp, name = "unnamed" }: RateLimitOptions) {
   const windows = new Map<string, Window>();
   let lastSweep = Date.now();
 
@@ -64,6 +67,8 @@ export function rateLimit({ windowMs, max, key = clientIp }: RateLimitOptions) {
     res.setHeader("RateLimit-Reset", String(resetSeconds));
 
     if (w.count > max) {
+      // Once per window and key, so a flood doesn't become a flood of log lines too.
+      if (w.count === max + 1) securityLog(req, { event: "ratelimit.exceeded", outcome: "blocked", limiter: name, max, windowMs });
       res.setHeader("Retry-After", String(resetSeconds));
       res.status(429).json({ message: "Too many attempts. Please wait a few minutes and try again." });
       return;

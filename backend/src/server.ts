@@ -17,6 +17,11 @@ function assertSecrets(): void {
     console.error(`JWT_SECRET must be set and at least ${MIN_JWT_SECRET_LENGTH} characters (try: openssl rand -hex 32)`);
     process.exit(1);
   }
+  // TOTP seeds are encrypted with this key (utils/secretBox); without it MFA can't work.
+  if (process.env.NODE_ENV === "production" && !/^[0-9a-f]{64}$/i.test(process.env.MFA_ENCRYPTION_KEY ?? "")) {
+    console.error("MFA_ENCRYPTION_KEY must be set to 64 hex characters in production (try: openssl rand -hex 32)");
+    process.exit(1);
+  }
 }
 
 async function start(): Promise<void> {

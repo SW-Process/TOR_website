@@ -13,6 +13,7 @@ import {
   LogOut,
   MessageSquareWarning,
   MessagesSquare,
+  ShieldCheck,
   Terminal,
 } from "lucide-react";
 import RunStatusBadge from "./RunStatusBadge";
@@ -43,6 +44,7 @@ export const adminNavItems = [
   { href: "/admin/chats", label: "แชทจากผู้ใช้", icon: MessagesSquare },
   { href: "/admin/help", label: "ศูนย์ช่วยเหลือ", icon: LifeBuoy },
   { href: "/admin/logs", label: "System Logs", icon: Terminal },
+  { href: "/admin/security", label: "ความปลอดภัย", icon: ShieldCheck },
 ];
 
 export default function AdminSidebar() {

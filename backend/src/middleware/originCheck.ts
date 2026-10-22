@@ -1,5 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 
+import { securityLog } from "../utils/securityLog";
+
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /** The capture route the admin Chrome extension posts to (extension/background.js). */
@@ -29,11 +31,13 @@ export function originCheck(req: Request, res: Response, next: NextFunction): vo
   if (origin) {
     if (allowedOrigins().has(origin)) return next();
     if (origin.startsWith("chrome-extension://") && req.path === EXTENSION_ROUTE) return next();
+    securityLog(req, { event: "csrf.blocked", outcome: "blocked", origin });
     res.status(403).json({ message: "Cross-site request blocked" });
     return;
   }
 
   if (req.get("sec-fetch-site") === "cross-site") {
+    securityLog(req, { event: "csrf.blocked", outcome: "blocked", secFetchSite: "cross-site" });
     res.status(403).json({ message: "Cross-site request blocked" });
     return;
   }

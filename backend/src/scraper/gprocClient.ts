@@ -12,6 +12,8 @@ export interface GprocConfig {
   fetchFn?: typeof fetch;
 }
 
+import { OutboundBlockedError, hostOf, safeFetch } from "../utils/outbound";
+
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /** `GPROC_ENABLED` turns the process5 source off with false/0/off/no (default on). */
@@ -76,15 +78,19 @@ export class GprocClient implements GprocCaptureClientLike {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), this.cfg.timeoutMs);
       try {
-        const res = await fetchFn(url.toString(), {
-          method,
-          signal: controller.signal,
-          headers: {
-            "User-Agent": this.cfg.userAgent,
-            Accept: "application/json",
-            ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+        const res = await safeFetch(
+          url.toString(),
+          {
+            method,
+            signal: controller.signal,
+            headers: {
+              "User-Agent": this.cfg.userAgent,
+              Accept: "application/json",
+              ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+            },
           },
-        });
+          { allowedHosts: [hostOf(this.cfg.baseUrl)], fetchFn }
+        );
         if (!res.ok) throw new GprocHttpError(res.status, `gprocurement ${res.status} for ${method} ${path}`);
         const body = await parse(res);
         await sleep(this.cfg.delayMs); // politeness: pause after every successful call
@@ -92,6 +98,7 @@ export class GprocClient implements GprocCaptureClientLike {
       } catch (err) {
         lastError = err;
         if (err instanceof NonRetryable) throw err;
+        if (err instanceof OutboundBlockedError) throw err;
         if (err instanceof GprocHttpError && !err.retryable) throw err;
         if (attempt === this.cfg.maxRetries - 1) break;
         await sleep(2 ** attempt * 1000);

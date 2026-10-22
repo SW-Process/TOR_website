@@ -17,7 +17,7 @@
     try {
       const url = args[0] instanceof Request ? args[0].url : String(args[0]);
       if (isSearch(url)) {
-        p.then((res) => res.clone().json()).then((body) => window.postMessage({ mark: MARK, body }, "*")).catch(() => {});
+        p.then((res) => res.clone().json()).then((body) => window.postMessage({ mark: MARK, body }, location.origin)).catch(() => {});
       }
     } catch {}
     return p;
@@ -29,7 +29,7 @@
         this.addEventListener("load", () => {
           try {
             const body = this.responseType === "json" ? this.response : JSON.parse(this.responseText);
-            window.postMessage({ mark: MARK, body }, "*");
+            window.postMessage({ mark: MARK, body }, location.origin);
           } catch {}
         });
       }

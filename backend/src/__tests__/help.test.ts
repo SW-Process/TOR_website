@@ -3,7 +3,6 @@ import request from "supertest";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 process.env.JWT_SECRET = "test-secret";
-process.env.JWT_EXPIRES_IN = "7d";
 
 import app from "../app";
 import { Announcement, Faq, Session, User } from "../models";
@@ -32,7 +31,7 @@ const DAY = 24 * 60 * 60 * 1000;
 
 async function adminAgent() {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email: "admin@test.com", password: "vendor-test-pass-17" }).expect(201);
+  await agent.post("/api/auth/register").send({ email: "admin@test.com", password: "plum-orchard-ladder-17" }).expect(201);
   await User.updateOne({ email: "admin@test.com" }, { role: "admin" });
   return agent;
 }
@@ -127,7 +126,7 @@ describe("admin help API", () => {
   it("is admin-only", async () => {
     await request(app).get("/api/admin/help/faqs").expect(401);
     const vendor = request.agent(app);
-    await vendor.post("/api/auth/register").send({ email: "v@test.com", password: "vendor-test-pass-17" }).expect(201);
+    await vendor.post("/api/auth/register").send({ email: "v@test.com", password: "plum-orchard-ladder-17" }).expect(201);
     await vendor.post("/api/admin/help/faqs").send({ question: "abc", answer: "x", category: "search" }).expect(403);
   });
 

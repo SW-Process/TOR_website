@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { parseSearchResults } = require("../parse.js");
+const { isCaptureMessage, parseSearchResults } = require("../parse.js");
 const sample = require("./fixtures/search-page-1.json");
 
 test("extracts project number, title and agency from the recorded page", () => {
@@ -33,4 +33,15 @@ test("truncates title to 200 and agency to 100 chars and still returns the row",
   assert.equal(rows.length, 1);
   assert.equal(rows[0].title.length, 200);
   assert.equal(rows[0].agency.length, 100);
+});
+
+test("accepts only its own messages from the e-GP page (ASVS 3.5.5)", () => {
+  const self = {};
+  const ok = { source: self, origin: "https://process5.gprocurement.go.th", data: { mark: "tor-capture:search", body: { data: [] } } };
+  assert.equal(isCaptureMessage(ok, self), true);
+  assert.equal(isCaptureMessage({ ...ok, source: {} }, self), false, "another window or frame");
+  assert.equal(isCaptureMessage({ ...ok, origin: "https://evil.example" }, self), false, "another origin");
+  assert.equal(isCaptureMessage({ ...ok, data: { mark: "other", body: {} } }, self), false, "not our mark");
+  assert.equal(isCaptureMessage({ ...ok, data: { mark: "tor-capture:search", body: "x" } }, self), false, "body not an object");
+  assert.equal(isCaptureMessage(null, self), false);
 });

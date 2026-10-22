@@ -1,14 +1,14 @@
 import type { NextConfig } from "next";
 
 /**
- * Browser security headers for every page (ASVS 3.4). No script-src policy yet: Next.js
- * injects inline scripts, so a script CSP needs nonces (a separate change). These
- * directives don't affect scripts and are safe for every page.
+ * Browser security headers for every response (ASVS 3.4). The Content-Security-Policy,
+ * which needs a fresh nonce per page, is set in src/proxy.ts.
  */
 const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
   { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "Content-Security-Policy", value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'" },
+  // Baseline for responses proxy.ts doesn't touch (static files); pages get the full nonce policy.
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'; object-src 'none'; base-uri 'none'" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },

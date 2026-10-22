@@ -16,9 +16,15 @@ const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
 const noteBodySchema = z.object({ note: z.string().max(2000) }).strict();
 
+/** A real calendar day: `2026-02-30` has the right shape but isn't one (ASVS 2.2.3). */
+function isCalendarDate(key: string): boolean {
+  const d = new Date(`${key}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === key;
+}
+
 function dateParam(req: Request): string {
   const date = String(req.params.date);
-  if (!DATE_KEY.test(date)) throw httpError(400, "date must be YYYY-MM-DD");
+  if (!DATE_KEY.test(date) || !isCalendarDate(date)) throw httpError(400, "date must be a real YYYY-MM-DD day");
   return date;
 }
 

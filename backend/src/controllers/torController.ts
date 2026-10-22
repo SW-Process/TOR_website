@@ -215,6 +215,28 @@ export function parseQuery(req: Request): ListQuery {
  * request's query string — a saved search's stored `filters` (FR-28/FR-30), not a
  * trusted request, so a malformed one is skipped (`null`) rather than thrown.
  */
+/** The search fields a saved search may keep (FR-28); paging is left out on purpose. */
+const SAVED_FILTER_KEYS = new Set([
+  "q", "agency", "category", "tech", "projectType", "budgetMin", "budgetMax",
+  "publishedFrom", "publishedTo", "deadlineFrom", "deadlineTo", "status", "sort", "order",
+]);
+const MAX_SAVED_FILTER_BYTES = 4096;
+
+/**
+ * Why `raw` can't be stored as a saved search's filters, or null. Saved filters are kept
+ * as free-form JSON and replayed into the TOR search later, so they must be exactly the
+ * search's own fields (no `__proto__`, `$where` or any other key: ASVS 15.3.3, 15.3.6),
+ * small, and accepted by the same schema the search uses (2.2.1, 2.2.3).
+ */
+export function savedFilterProblem(raw: unknown): string | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return "filters must be an object";
+  if (Object.getPrototypeOf(raw) !== Object.prototype) return "filters must be a plain object";
+  const unknown = Object.keys(raw).filter((k) => !SAVED_FILTER_KEYS.has(k));
+  if (unknown.length) return `filters has unknown fields: ${unknown.slice(0, 5).join(", ")}`;
+  if (Buffer.byteLength(JSON.stringify(raw)) > MAX_SAVED_FILTER_BYTES) return "filters is too large";
+  return tryBuildFilterFromRaw(raw) ? null : "filters is not a valid search";
+}
+
 export function tryBuildFilterFromRaw(raw: unknown): QueryFilter<ITor> | null {
   const parsed = listQuerySchema.safeParse(raw ?? {});
   if (!parsed.success) return null;

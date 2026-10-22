@@ -25,7 +25,7 @@ afterAll(async () => {
 
 async function vendor(email: string) {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email, password: "vendor-test-pass-17" }).expect(201);
+  await agent.post("/api/auth/register").send({ email, password: "plum-orchard-ladder-17" }).expect(201);
   return agent;
 }
 
@@ -54,6 +54,8 @@ describe("/api/vendor/day-notes (ASVS 14.3.1)", () => {
     const agent = await vendor("a@test.com");
     await agent.put("/api/vendor/day-notes/2026-11-20.x").send({ note: "x" }).expect(400);
     await agent.put("/api/vendor/day-notes/$where").send({ note: "x" }).expect(400);
+    await agent.put("/api/vendor/day-notes/2026-02-30").send({ note: "x" }).expect(400); // not a real day
+    await agent.put("/api/vendor/day-notes/2028-02-29").send({ note: "leap day" }).expect(204);
   });
 
   it("rejects a note over 2,000 characters", async () => {

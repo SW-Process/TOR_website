@@ -3,7 +3,6 @@ import request from "supertest";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 process.env.JWT_SECRET = "test-secret";
-process.env.JWT_EXPIRES_IN = "7d";
 
 import app from "../app";
 import { Notification, Tor, User, VendorProfile } from "../models";
@@ -31,7 +30,7 @@ afterAll(async () => {
 
 async function vendorAgent(email = "vendor@test.com") {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email, password: "vendor-test-pass-17" });
+  await agent.post("/api/auth/register").send({ email, password: "plum-orchard-ladder-17" });
   const user = await User.findOne({ email });
   const profile = await VendorProfile.findOneAndUpdate(
     { userId: user!._id },

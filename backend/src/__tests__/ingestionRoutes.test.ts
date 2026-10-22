@@ -3,7 +3,6 @@ import request from "supertest";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 process.env.JWT_SECRET = "test-secret";
-process.env.JWT_EXPIRES_IN = "7d";
 
 const runIngestionMock = jest.fn();
 jest.mock("../ingestion/runIngestion", () => ({
@@ -62,10 +61,10 @@ async function waitFor(cond: () => boolean, timeoutMs = 2000): Promise<void> {
 
 async function adminAgent() {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email: "admin@test.com", password: "vendor-test-pass-17" });
+  await agent.post("/api/auth/register").send({ email: "admin@test.com", password: "plum-orchard-ladder-17" });
   await User.updateOne({ email: "admin@test.com" }, { role: "admin" });
   // re-login so the session cookie carries role=admin
-  await agent.post("/api/auth/login").send({ email: "admin@test.com", password: "vendor-test-pass-17" });
+  await agent.post("/api/auth/login").send({ email: "admin@test.com", password: "plum-orchard-ladder-17" });
   return agent;
 }
 
@@ -77,7 +76,7 @@ describe("POST /api/ingestion/runs", () => {
 
   it("403 for a vendor", async () => {
     const agent = request.agent(app);
-    await agent.post("/api/auth/register").send({ email: "v@test.com", password: "vendor-test-pass-17" });
+    await agent.post("/api/auth/register").send({ email: "v@test.com", password: "plum-orchard-ladder-17" });
     const res = await agent.post("/api/ingestion/runs").send({});
     expect(res.status).toBe(403);
   });
@@ -139,7 +138,7 @@ describe("POST /api/ingestion/enrichment/runs", () => {
 
   it("403 for a vendor", async () => {
     const agent = request.agent(app);
-    await agent.post("/api/auth/register").send({ email: "v2@test.com", password: "vendor-test-pass-17" });
+    await agent.post("/api/auth/register").send({ email: "v2@test.com", password: "plum-orchard-ladder-17" });
     const res = await agent.post("/api/ingestion/enrichment/runs").send({});
     expect(res.status).toBe(403);
   });
@@ -283,7 +282,7 @@ describe("GET /api/ingestion/enrichment/pending", () => {
 
   it("403 for a vendor", async () => {
     const agent = request.agent(app);
-    await agent.post("/api/auth/register").send({ email: "v3@test.com", password: "vendor-test-pass-17" });
+    await agent.post("/api/auth/register").send({ email: "v3@test.com", password: "plum-orchard-ladder-17" });
     const res = await agent.get("/api/ingestion/enrichment/pending");
     expect(res.status).toBe(403);
   });
@@ -331,7 +330,7 @@ describe("POST /api/ingestion/lifecycle/runs", () => {
 
   it("403 for a vendor", async () => {
     const agent = request.agent(app);
-    await agent.post("/api/auth/register").send({ email: "v4@test.com", password: "vendor-test-pass-17" });
+    await agent.post("/api/auth/register").send({ email: "v4@test.com", password: "plum-orchard-ladder-17" });
     expect((await agent.post("/api/ingestion/lifecycle/runs").send({})).status).toBe(403);
   });
 
@@ -482,7 +481,7 @@ describe("GET /api/ingestion/lifecycle/pending", () => {
   it("401 without a session and 403 for a vendor", async () => {
     expect((await request(app).get("/api/ingestion/lifecycle/pending")).status).toBe(401);
     const agent = request.agent(app);
-    await agent.post("/api/auth/register").send({ email: "v5@test.com", password: "vendor-test-pass-17" });
+    await agent.post("/api/auth/register").send({ email: "v5@test.com", password: "plum-orchard-ladder-17" });
     expect((await agent.get("/api/ingestion/lifecycle/pending")).status).toBe(403);
   });
 
@@ -557,7 +556,7 @@ describe("GET /api/ingestion/capture/pending", () => {
   it("401 without a session and 403 for a vendor", async () => {
     expect((await request(app).get("/api/ingestion/capture/pending")).status).toBe(401);
     const agent = request.agent(app);
-    await agent.post("/api/auth/register").send({ email: "v6@test.com", password: "vendor-test-pass-17" });
+    await agent.post("/api/auth/register").send({ email: "v6@test.com", password: "plum-orchard-ladder-17" });
     expect((await agent.get("/api/ingestion/capture/pending")).status).toBe(403);
   });
 
@@ -645,7 +644,7 @@ describe("POST /api/ingestion/capture", () => {
   it("401 without a session and 403 for a non-admin", async () => {
     expect((await request(app).post("/api/ingestion/capture").send(body)).status).toBe(401);
     const a = request.agent(app);
-    await a.post("/api/auth/register").send({ email: "v@test.com", password: "vendor-test-pass-17" });
+    await a.post("/api/auth/register").send({ email: "v@test.com", password: "plum-orchard-ladder-17" });
     expect((await a.post("/api/ingestion/capture").send(body)).status).toBe(403);
   });
 

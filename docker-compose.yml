@@ -45,7 +45,7 @@ services:
       # Required, no default: a guessable signing secret would let anyone forge sessions.
       # Put it in the root .env (gitignored) — see .env.example.
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the root .env file (see .env.example)}
-      JWT_EXPIRES_IN: 7d
+      SESSION_MAX_HOURS: "12"
       CLIENT_ORIGIN: http://localhost:3000
       STORAGE_DRIVER: gcs
       STORAGE_LOCAL_DIR: /app/storage

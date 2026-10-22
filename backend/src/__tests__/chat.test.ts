@@ -3,7 +3,6 @@ import request from "supertest";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 process.env.JWT_SECRET = "test-secret";
-process.env.JWT_EXPIRES_IN = "7d";
 
 import app from "../app";
 import { ChatConversation, ChatMessage, User, VendorProfile } from "../models";
@@ -32,9 +31,9 @@ afterAll(async () => {
 
 async function agentWithRole(email: string, role: "admin" | "vendor") {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email, password: "vendor-test-pass-17" });
+  await agent.post("/api/auth/register").send({ email, password: "plum-orchard-ladder-17" });
   await User.updateOne({ email }, { role });
-  await agent.post("/api/auth/login").send({ email, password: "vendor-test-pass-17" });
+  await agent.post("/api/auth/login").send({ email, password: "plum-orchard-ladder-17" });
   return agent;
 }
 

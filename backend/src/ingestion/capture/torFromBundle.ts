@@ -6,6 +6,12 @@ export interface BundleTor {
 }
 
 const DEFAULT_MAX_ENTRY_BYTES = 50 * 1024 * 1024;
+/**
+ * Zip-bomb limits (ASVS 5.2.3), checked from the central directory before anything is
+ * inflated: a real e-GP bundle has a few dozen files and well under 200 MB unpacked.
+ */
+export const MAX_BUNDLE_ENTRIES = 500;
+export const MAX_BUNDLE_UNCOMPRESSED_BYTES = 200 * 1024 * 1024;
 const baseName = (name: string): string => name.split(/[\\/]/).pop() ?? name;
 
 /**
@@ -18,10 +24,14 @@ export function torFromBundle(zip: Buffer, opts: { maxEntryBytes?: number } = {}
   const max = opts.maxEntryBytes ?? DEFAULT_MAX_ENTRY_BYTES;
   if (zip.length < 4) return null;
   const candidates: { name: string; size: number; attach: boolean }[] = [];
+  let entries = 0;
+  let declaredTotal = 0;
   try {
     // A filter that always returns false lists the central directory without inflating anything.
     unzipSync(zip, {
       filter: (f) => {
+        entries += 1;
+        declaredTotal += f.originalSize;
         const base = baseName(f.name);
         if (/\.pdf$/i.test(base) && (/^Attach_TOR/i.test(base) || /(^|[^A-Za-z])TOR([^A-Za-z]|$)/i.test(base)) && f.originalSize <= max) {
           candidates.push({ name: f.name, size: f.originalSize, attach: /^Attach_TOR/i.test(base) });
@@ -29,6 +39,7 @@ export function torFromBundle(zip: Buffer, opts: { maxEntryBytes?: number } = {}
         return false;
       },
     });
+    if (entries > MAX_BUNDLE_ENTRIES || declaredTotal > MAX_BUNDLE_UNCOMPRESSED_BYTES) return null;
     if (candidates.length === 0) return null;
     candidates.sort((a, b) => Number(b.attach) - Number(a.attach) || b.size - a.size);
     const chosen = candidates[0]!;

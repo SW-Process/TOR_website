@@ -7,6 +7,7 @@ import { AlertTriangle, Bookmark, BookmarkX, Building2, CheckCircle2, ChevronDow
 import GoogleIcon from "@/components/GoogleIcon";
 import AccountTorCard, { CardAction } from "@/components/account/AccountTorCard";
 import SettingsShell from "@/components/account/SettingsShell";
+import MfaSection from "@/components/account/MfaSection";
 import { AvatarCard, FieldBlock, SubmitBar, inputClass, useSubmit } from "@/components/account/ui";
 import { formatThaiDate } from "@/lib/mockData";
 import { useAuth } from "@/lib/useAuth";
@@ -19,12 +20,13 @@ import { ShortcutKeys, ShortcutTable } from "@/components/KeyboardShortcuts";
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_NAME_LENGTH = 60;
 
-type SectionId = "profile" | "email" | "password" | "sessions" | "shortcuts" | "saved" | "hidden" | "reports" | "delete";
+type SectionId = "profile" | "email" | "password" | "mfa" | "sessions" | "shortcuts" | "saved" | "hidden" | "reports" | "delete";
 
 const SECTION_TITLES: Record<SectionId, string> = {
   profile: "แก้ไขโปรไฟล์",
   email: "อีเมล",
   password: "รหัสผ่านและความปลอดภัย",
+  mfa: "ยืนยันตัวตนสองขั้นตอน",
   sessions: "อุปกรณ์ที่เข้าสู่ระบบ",
   shortcuts: "ปุ่มลัดบนคีย์บอร์ด",
   saved: "รายการที่บันทึก",
@@ -549,6 +551,7 @@ const GOOGLE_LINK_OUTCOMES: Record<string, { ok: boolean; text: string }> = {
   linked: { ok: true, text: "เชื่อมต่อ Google แล้ว ครั้งหน้าเข้าสู่ระบบด้วย Google ได้เลย" },
   taken: { ok: false, text: "บัญชี Google นี้เชื่อมต่อกับบัญชี TOR Checker อื่นอยู่แล้ว" },
   session: { ok: false, text: "เซสชันหมดอายุระหว่างเชื่อมต่อ กรุณาเข้าสู่ระบบแล้วลองใหม่" },
+  reauth: { ok: false, text: "กรุณายืนยันตัวตนก่อนเชื่อมต่อ Google แล้วลองใหม่" },
   error: { ok: false, text: "เชื่อมต่อ Google ไม่สำเร็จ กรุณาลองใหม่" },
 };
 
@@ -586,7 +589,7 @@ function GoogleConnection() {
           {!linked ? (
             <button
               type="button"
-              onClick={linkGoogle}
+              onClick={() => void linkGoogle()}
               className="shrink-0 rounded-xl bg-[var(--color-ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-black"
             >
               เชื่อมต่อ
@@ -969,6 +972,7 @@ function SettingsContent() {
         {section === "profile" && <ProfileSection />}
         {section === "email" && <EmailSection />}
         {section === "password" && <PasswordSection />}
+        {section === "mfa" && <MfaSection />}
         {section === "sessions" && <SessionsSection />}
         {section === "shortcuts" && <ShortcutsSection />}
         {section === "saved" && <SavedSection />}
