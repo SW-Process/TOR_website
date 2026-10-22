@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { API_BASE, apiFetch } from "./api";
+import { API_BASE, SESSION_EXPIRED_EVENT, apiFetch } from "./api";
 
 export type UserRole = "vendor" | "admin";
 
@@ -77,6 +77,17 @@ async function ensureLoaded(): Promise<void> {
   await inFlight;
   inFlight = null;
   emit();
+}
+
+// The backend ended the session (idle or absolute timeout, signed out from another
+// device): drop the cached user so RequireAuth sends the visitor to the login page.
+if (typeof window !== "undefined") {
+  window.addEventListener(SESSION_EXPIRED_EVENT, () => {
+    if (!cachedUser) return;
+    cachedUser = null;
+    checked = true;
+    emit();
+  });
 }
 
 async function refreshSession(): Promise<void> {
