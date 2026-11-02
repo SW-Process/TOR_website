@@ -23,7 +23,7 @@
   "type": "commonjs",
   "dependencies": {
     "@google-cloud/storage": "^7.22.0",
-    "@google/genai": "^0.14.1",
+    "@google/genai": "^1.52.0",
     "@sendgrid/mail": "^8.1.6",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
@@ -38,7 +38,7 @@
     "multer": "^2.3.0",
     "pdf-parse": "^1.1.4",
     "qrcode": "1.5.4",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
