@@ -21,6 +21,7 @@ import {
 import { latestInvitation, runDeadlineStep } from "./deadlineStep";
 import type { DeadlineStepOutcome } from "./deadlineStep";
 import { loadFreshProcurement } from "./loadFresh";
+import { linkInvitationAsSourceDocument } from "../linkInvitationDocument";
 
 export interface RefreshLifecycleDeps {
   client?: EgpClientLike;
@@ -92,10 +93,12 @@ function stageScopeSuffix(deps: { onlyOpen?: boolean; onlyDraft?: boolean }): st
 /**
  * Re-check existing TORs and refresh their `procurement`: decides the stage from the national e-GP
  * (process5) with the BMA portal as fallback. Never touches the
- * source hash or pipeline status and never enqueues AI work — a status check itself costs no
+ * source hash or pipeline status — a status check itself costs no
  * Gemini call. The one exception is the optional deadline step: for a TOR with an invitation
  * (any stage) it reads the latest invitation PDF with one small, separate Gemini call, once per invitation id and
- * capped per run by MAX_DEADLINE_EXTRACTIONS_PER_RUN.
+ * capped per run by MAX_DEADLINE_EXTRACTIONS_PER_RUN. When that TOR has no source document yet, the
+ * invitation PDF just stored becomes it and the TOR is queued once for enrichment
+ * (`linkInvitationAsSourceDocument`), so it is summarised from the document instead of the project details.
  */
 export async function refreshLifecycle(
   deps: RefreshLifecycleDeps = {}
@@ -286,7 +289,31 @@ export async function refreshLifecycle(
                     filenames: loaded.filenames,
                     loadPdf: loaded.loadPdf,
                   },
-                  { client, storage, extractor, now }
+                  {
+                    client,
+                    storage,
+                    extractor,
+                    now,
+                    onInvitationStored: async (file) => {
+                      try {
+                        if (await linkInvitationAsSourceDocument({ torId: tor._id, ...file }, { storage: storage! })) {
+                          await logIngestionEvent({
+                            severity: "info",
+                            message: `TOR ${label}: had no document; its invitation PDF is now its document, queued for enrichment`,
+                            component: COMPONENT,
+                            ingestionRunId: runId,
+                          });
+                        }
+                      } catch (err) {
+                        await logIngestionEvent({
+                          severity: "warning",
+                          message: `TOR ${label}: invitation PDF not linked as its document (${(err as Error).message})`,
+                          component: COMPONENT,
+                          ingestionRunId: runId,
+                        });
+                      }
+                    },
+                  }
                 );
                 if (outcome === "read") {
                   deadlinesRead += 1;

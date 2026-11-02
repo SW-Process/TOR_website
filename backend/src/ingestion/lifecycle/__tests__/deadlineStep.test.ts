@@ -333,6 +333,31 @@ describe("runDeadlineStep", () => {
     expect(saved?.announcements.find((a) => a.announcementId === "inv-2")?.storageKey).toBe("tor-pdfs/code-1/inv-2.pdf");
   });
 
+  it("reports the stored invitation PDF once its result is written", async () => {
+    const p = procurementOf();
+    const tor = await seed(p);
+    const stored: { key: string; fileName: string; size: number }[] = [];
+
+    await runDeadlineStep(args(p, tor._id), {
+      ...harness(),
+      onInvitationStored: async (f) => {
+        stored.push({ key: f.key, fileName: f.fileName, size: f.content.length });
+      },
+    });
+
+    expect(stored).toEqual([{ key: "tor-pdfs/code-1/inv-1.pdf", fileName: "inv-1.pdf", size: Buffer.from("%PDF-1.4 fake").length }]);
+  });
+
+  it("does not report the stored PDF when the write lost to a concurrent change", async () => {
+    const p = procurementOf();
+    const tor = await seed(p);
+    await Tor.updateOne({ _id: tor._id }, { $set: { "procurement.lastCheckedAt": new Date("2026-10-03T00:00:05Z") } }, { timestamps: false });
+    const onInvitationStored = jest.fn();
+
+    expect(await runDeadlineStep(args(p, tor._id), { ...harness(), onInvitationStored })).toBe("conflict");
+    expect(onInvitationStored).not.toHaveBeenCalled();
+  });
+
   it("writes nothing and reports a conflict when procurement moved after the refresh wrote it", async () => {
     const p = procurementOf();
     const tor = await seed(p);

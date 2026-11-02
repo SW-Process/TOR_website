@@ -97,10 +97,13 @@ status) is derived from e-GP announcements by `ingestion/procurementStage.ts`. D
 fills it for sighted TORs; a separate daily batch (`refreshLifecycle`, entrypoint
 `dist/jobs/lifecycle.js`, admin `POST /api/ingestion/lifecycle/runs`) re-checks existing
 enriched, unfinished TORs oldest-first up to `MAX_LIFECYCLE_REFRESH_PER_RUN`. It writes only
-the refresh-owned `procurement` paths and never touches `sourceContentHash`,
-`pipelineStatus` or the AI queue — a status check costs no Gemini call. After refreshing a
+the refresh-owned `procurement` paths (plus a missing `sourceDocument`, see below) and never touches `sourceContentHash` or
+`pipelineStatus` — a status check costs no Gemini call. After refreshing a
 TOR that has an invitation with a file (any stage) the batch downloads its latest invitation PDF and
-reads the real bid deadline with one small Gemini call (`MAX_DEADLINE_EXTRACTIONS_PER_RUN`), once per
+reads the real bid deadline with one small Gemini call (`MAX_DEADLINE_EXTRACTIONS_PER_RUN`). If that TOR has
+no source document yet (discovery only takes a TOR-draft PDF), the stored invitation PDF becomes its
+`sourceDocument` (kind `invitation`) and the TOR is queued once for enrichment (`ingestion/linkInvitationDocument.ts`;
+`npm run link-stored-invitations` backfills TORs whose invitation was stored before this). The deadline is read once per
 invitation id (finished/cancelled TORs are picked up once for this, until a deadline attempt is
 recorded; the deadline only affects the status of `inviting` TORs). A PDF that states only a month and
 year is stored as the END of that month with `bidDeadline.precision: "month"` (shown as a month only,

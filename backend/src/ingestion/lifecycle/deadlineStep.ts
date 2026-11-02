@@ -29,6 +29,8 @@ export interface DeadlineStepDeps {
   storage: BlobStorage;
   extractor: BidDeadlineExtractor;
   now: () => Date;
+  /** Called after a newly read invitation PDF is stored and its result written (not on a conflict). */
+  onInvitationStored?: (file: { key: string; fileName: string; content: Buffer }) => Promise<void>;
 }
 
 /** "cleared": a stale AI deadline was removed because the latest invitation has no readable file yet. */
@@ -177,5 +179,6 @@ export async function runDeadlineStep(args: DeadlineStepArgs, deps: DeadlineStep
     { arrayFilters: [{ "a.announcementId": invitation.announcementId }], timestamps: false }
   );
   if (res.matchedCount === 0) return "conflict";
+  await deps.onInvitationStored?.({ key, fileName: file.fileName, content });
   return resolved ? "read" : "unreadable";
 }

@@ -7,6 +7,7 @@ import { logIngestionEvent } from "../log";
 import { claimNext, complete, countRunnable, fail, maxCallsPerRun } from "./enrichmentJobRepo";
 import { sweepStaleEnrichmentRuns } from "./sweepStaleRuns";
 import { applyExtractionToTor, type TorExtractor } from "./torExtractor";
+import { streamToBuffer } from "../../utils/streamToBuffer";
 
 export interface DrainDeps {
   extractor: TorExtractor;
@@ -26,13 +27,6 @@ export interface DrainResult {
   enrichedRejected: number;
   enrichedFailed: number;
   enrichedTorIds: string[];
-}
-
-async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  for await (const c of stream)
-    chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c as unknown as Uint8Array));
-  return Buffer.concat(chunks);
 }
 
 export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult> {

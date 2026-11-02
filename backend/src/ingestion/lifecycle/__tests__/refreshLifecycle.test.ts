@@ -109,7 +109,7 @@ function deadlineDeps(opts: { result?: { date: string | null; time: string | nul
       return opts.result ?? { date: "2026-10-20", time: null, confidence: 0.9 };
     },
   };
-  const storage = { async put(key: string) { return { key, size: 1 }; } } as unknown as BlobStorage;
+  const storage = { async put(key: string) { return { key, size: 1 }; }, publicUrl: () => null } as unknown as BlobStorage;
   return { extractor, storage, extractCalls };
 }
 
@@ -449,6 +449,23 @@ describe("refreshLifecycle", () => {
       );
     });
 
+    it("gives a TOR with no document its invitation PDF and queues it once for enrichment", async () => {
+      await seedTor("p1");
+      const d = deadlineDeps();
+      const out = await refreshLifecycle(
+        deps(withDownload(fakeClient({ announcements: { p1: [INV("p1")] } })), {
+          deadlineExtractor: d.extractor,
+          storage: d.storage,
+        })
+      );
+      const saved = await Tor.findOne({ projectCode: "code-p1" }).lean();
+      expect(saved?.sourceDocument).toMatchObject({ kind: "invitation", storageKey: "tor-pdfs/code-p1/p1-inv.pdf" });
+      expect(saved?.sourceContentHash).toBe("hash-p1");
+      expect(await EnrichmentJob.countDocuments({ torId: saved?._id, status: "queued" })).toBe(1);
+      const log = await SystemLog.findOne({ ingestionRunId: out.runId, message: /now its document/ }).lean();
+      expect(log?.message).toBe("TOR code-p1: had no document; its invitation PDF is now its document, queued for enrichment");
+    });
+
     it("is off when no extractor is supplied (unchanged behaviour)", async () => {
       await seedTor("p1");
       const out = await refreshLifecycle(
@@ -584,8 +601,10 @@ describe("refreshLifecycle", () => {
       }
     });
 
-    it("does not touch the hash, pipelineStatus or the enrichment queue", async () => {
-      const tor = await seedTor("p1");
+    it("does not touch the hash, pipelineStatus, document or enrichment queue of a TOR that has a document", async () => {
+      const tor = await seedTor("p1", {
+        sourceDocument: { egpUrl: "https://e/x", filename: "tor.pdf", storageKey: "tor-pdfs/code-p1/tor.pdf", textLayer: "digital", kind: "tor" },
+      });
       const d = deadlineDeps();
       await refreshLifecycle(
         deps(withDownload(fakeClient({ announcements: { p1: [TOR_DRAFT("p1"), INV("p1")] } })), {
@@ -596,6 +615,7 @@ describe("refreshLifecycle", () => {
       const after = await Tor.findById(tor.id).lean();
       expect(after?.sourceContentHash).toBe("hash-p1");
       expect(after?.pipelineStatus).toBe("enriched");
+      expect(after?.sourceDocument?.storageKey).toBe("tor-pdfs/code-p1/tor.pdf");
       expect(await EnrichmentJob.countDocuments({})).toBe(0);
     });
   });

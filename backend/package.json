@@ -11,6 +11,7 @@
     "test": "jest --runInBand",
     "create-admin": "tsx src/scripts/createAdmin.ts",
     "reset-mfa": "tsx src/scripts/resetMfa.ts",
+    "link-stored-invitations": "tsx src/scripts/linkStoredInvitations.ts",
     "seed:help": "tsx src/scripts/seedHelp.ts",
     "job:discovery": "node dist/jobs/discovery.js",
     "job:enrichment": "node dist/jobs/enrichment.js",
