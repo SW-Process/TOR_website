@@ -197,6 +197,60 @@ describe("applyExtractionToTor", () => {
     await expect(tor.save()).resolves.toBeDefined();
   });
 
+  it("stores the model's reasoning and data points, tagged as AI, after the TOR's own numbers (FR-19)", async () => {
+    const tor = await Tor.create({
+      title: "จ้างพัฒนาระบบ",
+      budget: 13_500_000,
+      referencePrice: 10_000_000,
+      announcementDate: new Date("2026-08-01T00:00:00Z"),
+    });
+    applyExtractionToTor(
+      tor,
+      ok({
+        fairnessSignals: [
+          {
+            field: "budget",
+            severity: "high",
+            message: "งบต่างจากราคากลาง",
+            reasoning: "  งบสูงกว่าราคากลางตามเอกสารข้อ 3  ",
+            dataPoints: [
+              { label: "ข้อ 3 ของ TOR", value: "วงเงิน 13.5 ล้านบาท" },
+              { label: "  ", value: "ค่าว่าง" },
+            ],
+          },
+        ],
+      }),
+      {
+        extractorId: "g",
+        fallbackText: "x",
+        fairnessThresholds: { budgetDeviationPercent: 30, minBidWindowDays: 7, minSeverity: "low" },
+      }
+    );
+    await tor.save();
+    const saved = (await Tor.findById(tor.id).lean())!.fairnessFlags[0]!;
+    expect(saved.reasoning).toBe("งบสูงกว่าราคากลางตามเอกสารข้อ 3");
+    expect(saved.dataPoints).toEqual([
+      { label: "งบประมาณ", value: "13,500,000 บาท", source: "system" },
+      { label: "ราคากลาง", value: "10,000,000 บาท", source: "system" },
+      { label: "ส่วนต่างจากราคากลาง", value: "สูงกว่า 35.0%", source: "system" },
+      { label: "เกณฑ์ที่ใช้ตรวจ", value: "ต่างจากราคากลางตั้งแต่ 30%", source: "system" },
+      { label: "ข้อ 3 ของ TOR", value: "วงเงิน 13.5 ล้านบาท", source: "ai" },
+    ]);
+  });
+
+  it("leaves reasoning unset when the model gave none", async () => {
+    const tor = await Tor.create({ title: "จ้างพัฒนาระบบ" });
+    applyExtractionToTor(
+      tor,
+      ok({ fairnessSignals: [{ field: "other", severity: "low", message: "ข้อสังเกต", reasoning: null, dataPoints: null }] }),
+      { extractorId: "g", fallbackText: "x" }
+    );
+    await tor.save();
+    const saved = (await Tor.findById(tor.id).lean())!.fairnessFlags[0]!;
+    expect(saved.reasoning).toBeUndefined();
+    expect(saved.dataPoints).toEqual([]);
+  });
+
   it("produces no fairness flags when the source document is only the invitation", async () => {
     const tor = await Tor.create({
       title: "จ้างพัฒนาระบบ",

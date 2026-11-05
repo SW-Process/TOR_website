@@ -63,6 +63,29 @@ export async function listAdminTors(req: Request, res: Response): Promise<void> 
   });
 }
 
+/**
+ * GET /api/admin/tors/:id/fairness-flags — each flag with the reasoning and data points behind
+ * it (FR-19). The public TOR API leaves these two out. Flags written before they existed have
+ * neither until the TOR is re-enriched.
+ */
+export async function getAdminTorFairnessFlags(req: Request, res: Response): Promise<void> {
+  const id = torIdParam(req);
+  const tor = await Tor.findOne({ _id: id, pipelineStatus: "enriched" })
+    .select("title agency projectCode fairnessFlags")
+    .lean();
+  if (!tor) throw httpError(404, "TOR not found");
+  const { fairnessFlags, ...summary } = tor;
+  res.status(200).json({
+    tor: summary,
+    flags: fairnessFlags.map((flag) => ({
+      ...flag,
+      confidence: flag.confidence ?? null,
+      reasoning: flag.reasoning ?? null,
+      dataPoints: flag.dataPoints ?? [],
+    })),
+  });
+}
+
 const updateSchema = z
   .object({
     title: z.string().trim().min(1).max(500).optional(),

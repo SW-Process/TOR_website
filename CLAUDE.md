@@ -88,7 +88,11 @@ Mongo lease and runs one Gemini (`@google/genai`, Vertex) multimodal call per TO
 that classifies software-relatedness, writes `aiSummary` + scalar fields, and sets
 `category` from `config/taxonomy.ts`. `Tor.pipelineStatus` gates the public read
 API (`GET /api/tors`, `/:id`, `/price-stats`) to `"enriched"` rows only. Extraction
-is behind the `TorExtractor` seam (`EXTRACTOR` env). Deploy: Cloud Run Jobs on
+is behind the `TorExtractor` seam (`EXTRACTOR` env). Each fairness flag also stores
+`reasoning` and `dataPoints` (a snapshot from generation time, `source: "system"` for the
+TOR's numbers and thresholds, `"ai"` for what the model read); these are admin-only
+(`GET /api/admin/tors/:id/fairness-flags`, FR-19) and excluded from `GET /api/tors/:id`.
+Deploy: Cloud Run Jobs on
 Cloud Scheduler (discovery, enrichment, lifecycle) — see `docs/deployment/gcp.md`.
 
 ### Lifecycle refresh (`backend/src/ingestion/lifecycle/`)

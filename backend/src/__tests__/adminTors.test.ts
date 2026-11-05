@@ -184,6 +184,70 @@ describe("/api/admin/tors", () => {
   });
 });
 
+describe("GET /api/admin/tors/:id/fairness-flags (FR-19)", () => {
+  const detailed = {
+    ...flag("open"),
+    confidence: "high",
+    reasoning: "งบประมาณสูงกว่าราคากลางมากกว่าเกณฑ์ที่กำหนด จึงควรตรวจสอบเพิ่มเติม",
+    dataPoints: [
+      { label: "งบประมาณ", value: "9,000,000 บาท", source: "system" },
+      { label: "ราคากลางในเอกสาร", value: "6,500,000 บาท", source: "ai" },
+    ],
+  };
+
+  it("is admin-only", async () => {
+    const { flagged } = await seed();
+    expect((await request(app).get(`/api/admin/tors/${flagged}/fairness-flags`)).status).toBe(401);
+    const vendor = await agentWithRole("vendor");
+    expect((await vendor.get(`/api/admin/tors/${flagged}/fairness-flags`)).status).toBe(403);
+  });
+
+  it("returns each flag with its reasoning and data points", async () => {
+    const { flagged } = await seed();
+    await Tor.updateOne({ _id: flagged }, { fairnessFlags: [detailed] });
+    const admin = await agentWithRole("admin");
+
+    const res = await admin.get(`/api/admin/tors/${flagged}/fairness-flags`);
+    expect(res.status).toBe(200);
+    expect(res.body.tor).toMatchObject({ _id: flagged, title: "ระบบสารบรรณ", agency: "สำนักการแพทย์" });
+    expect(res.body.flags).toHaveLength(1);
+    expect(res.body.flags[0]).toMatchObject({
+      field: "budget",
+      severity: "medium",
+      message: detailed.message,
+      confidence: "high",
+      status: "open",
+      reasoning: detailed.reasoning,
+      dataPoints: detailed.dataPoints,
+    });
+    expect(res.body.flags[0]._id).toEqual(expect.any(String));
+    expect(res.body.flags[0].detectedAt).toEqual(expect.any(String));
+  });
+
+  it("gives flags written before the details existed an explicit empty shape", async () => {
+    const { flagged } = await seed();
+    const admin = await agentWithRole("admin");
+    const res = await admin.get(`/api/admin/tors/${flagged}/fairness-flags`);
+    expect(res.body.flags[0]).toMatchObject({ confidence: null, reasoning: null, dataPoints: [] });
+  });
+
+  it("returns an empty list for a TOR with no flags", async () => {
+    const { clean } = await seed();
+    await Tor.updateOne({ _id: clean }, { fairnessFlags: [] });
+    const admin = await agentWithRole("admin");
+    const res = await admin.get(`/api/admin/tors/${clean}/fairness-flags`);
+    expect(res.status).toBe(200);
+    expect(res.body.flags).toEqual([]);
+  });
+
+  it("answers 404 for a TOR that is not public and 400 for a bad id", async () => {
+    const { hidden } = await seed();
+    const admin = await agentWithRole("admin");
+    expect((await admin.get(`/api/admin/tors/${hidden}/fairness-flags`)).status).toBe(404);
+    expect((await admin.get("/api/admin/tors/not-an-id/fairness-flags")).status).toBe(400);
+  });
+});
+
 describe("PATCH /api/admin/tors/:id — bidDeadline", () => {
   const inviting = (over: Record<string, unknown> = {}) => ({
     title: "ระบบ",

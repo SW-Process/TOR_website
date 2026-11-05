@@ -72,6 +72,13 @@ Each signal's "confidence" is how strongly the document and the known metadata s
 the observation (not how serious it is), as a decimal fraction between 0.0 and 1.0: high
 when the facts are stated plainly (e.g. both the budget and the reference price are
 given), lower when they are inferred or partly unreadable.
+Each signal's "reasoning" explains in 1-3 Thai sentences how the observation follows from
+the facts, for an administrator checking the signal.
+Each signal's "dataPoints" lists the specific facts it rests on, each with a short Thai
+"label" and a "value" as stated in the source: figures, dates, or the exact requirement
+wording, naming the section or page in the label when it is visible. Use [] when there is
+no such fact to cite; never invent one.
+"reasoning" and "dataPoints" follow the same neutral wording rule as "message".
 Respond with a single JSON object only.`;
 
 export const RESPONSE_SCHEMA: Schema = {
@@ -106,8 +113,17 @@ export const RESPONSE_SCHEMA: Schema = {
           severity: { type: Type.STRING, enum: ["low", "medium", "high"] },
           message: { type: Type.STRING },
           confidence: { type: Type.NUMBER },
+          reasoning: { type: Type.STRING },
+          dataPoints: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: { label: { type: Type.STRING }, value: { type: Type.STRING } },
+              required: ["label", "value"],
+            },
+          },
         },
-        required: ["field", "severity", "message", "confidence"],
+        required: ["field", "severity", "message", "confidence", "reasoning", "dataPoints"],
       },
     },
   },

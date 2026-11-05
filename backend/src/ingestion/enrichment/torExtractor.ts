@@ -3,7 +3,7 @@ import type { HydratedDocument } from "mongoose";
 import type { ITor } from "../../models";
 import { TAXONOMY_VERSION, isTaxonomyCategory, fallbackCategory } from "../../config/taxonomy";
 import { PROJECT_TYPES, type ProjectType } from "../../config/projectTypes";
-import { applyFairnessPrefilter, type FairnessPrefilterThresholds } from "./fairnessPrefilter";
+import { applyFairnessPrefilter, signalDataPoints, type FairnessPrefilterThresholds, type PrefilterFacts } from "./fairnessPrefilter";
 
 const strArray = z.preprocess((v) => (v == null ? [] : v), z.array(z.string()));
 
@@ -16,6 +16,9 @@ export const fairnessSignalSchema = z.object({
   message: z.string().min(1),
   /** How strongly the source supports this signal (FR-20). */
   confidence: optionalConfidence,
+  // FR-19. Lenient on purpose: a blank detail is dropped when stored, it should not cost a retry.
+  reasoning: z.string().nullable().optional(),
+  dataPoints: z.array(z.object({ label: z.string(), value: z.string() })).nullable().optional(),
 });
 
 export type FairnessSignal = z.infer<typeof fairnessSignalSchema>;
@@ -167,23 +170,27 @@ export function applyExtractionToTor(
   const raw = tor.sourceDocument?.kind === "invitation" ? [] : result.fairnessSignals;
   // The pre-filter checks each signal against the TOR's own numbers (FR-20). The invitation's
   // bid deadline is preferred over the one the model read from the TOR.
-  const signals = opts.fairnessThresholds
-    ? applyFairnessPrefilter(
-        raw,
-        {
-          budget: tor.budget,
-          referencePrice: tor.referencePrice,
-          announcementDate: tor.announcementDate,
-          bidDeadline: tor.procurement?.bidDeadline?.date ?? tor.submissionDeadline,
-        },
-        opts.fairnessThresholds
-      )
-    : raw;
+  const invitationDeadline = tor.procurement?.bidDeadline;
+  const facts: PrefilterFacts = {
+    budget: tor.budget,
+    referencePrice: tor.referencePrice,
+    announcementDate: tor.announcementDate,
+    bidDeadline: invitationDeadline?.date ?? tor.submissionDeadline,
+    bidDeadlinePrecision: invitationDeadline?.precision,
+  };
+  const signals = opts.fairnessThresholds ? applyFairnessPrefilter(raw, facts, opts.fairnessThresholds) : raw;
   tor.fairnessFlags = signals.map((s) => ({
     field: s.field,
     severity: s.severity,
     message: s.message,
     ...(s.confidence != null ? { confidence: bucketConfidence(s.confidence) } : {}),
+    ...(s.reasoning?.trim() ? { reasoning: s.reasoning.trim() } : {}),
+    dataPoints: [
+      ...signalDataPoints(s.field, facts, opts.fairnessThresholds).map((p) => ({ ...p, source: "system" })),
+      ...(s.dataPoints ?? [])
+        .map((p) => ({ label: p.label.trim(), value: p.value.trim(), source: "ai" }))
+        .filter((p) => p.label && p.value),
+    ],
     detectedAt: now,
     status: "open",
   })) as unknown as typeof tor.fairnessFlags;

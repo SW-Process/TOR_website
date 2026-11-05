@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listAdminTors, updateAdminTor, hideAdminTor } from "../controllers/adminTorController";
+import { getAdminTorFairnessFlags, listAdminTors, updateAdminTor, hideAdminTor } from "../controllers/adminTorController";
 import { listReportedTors } from "../controllers/adminReportedTorController";
 import { getAdminStats } from "../controllers/adminStatsController";
 import { listReports, updateReport } from "../controllers/adminReportController";
@@ -33,6 +33,7 @@ router.get("/notifications", listAdminNotifications);
 router.patch("/notifications/:id/read", markAdminNotificationRead);
 router.get("/tors", listAdminTors);
 router.get("/tors/reported", listReportedTors);
+router.get("/tors/:id/fairness-flags", getAdminTorFairnessFlags);
 router.patch("/tors/:id", updateAdminTor);
 router.delete("/tors/:id", hideAdminTor);
 router.get("/reports", listReports);
