@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeftRight, Bell, LogOut, MessageSquare, Search } from "lucide-react";
+import { ArrowLeftRight, LogOut, MessageSquare, Search } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
 import { CHAT_POLL_IDLE_MS, fetchAdminChats } from "@/lib/chat";
+import AdminAlertsBell from "@/components/admin/AdminAlertsBell";
 
 export default function AdminTopbar() {
   const router = useRouter();
@@ -79,14 +80,7 @@ export default function AdminTopbar() {
             </span>
           )}
         </Link>
-        <button
-          type="button"
-          aria-label="การแจ้งเตือน"
-          className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-[var(--shadow-sm)] text-[var(--color-ink-soft)] hover:text-[var(--color-rose-dark)] transition-colors"
-        >
-          <Bell size={15} />
-          <span className="absolute top-2 right-2.5 h-1.5 w-1.5 rounded-full bg-[var(--color-rose-dark)]" />
-        </button>
+        <AdminAlertsBell />
 
         <div className="relative">
           <button
