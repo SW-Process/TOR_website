@@ -15,18 +15,21 @@ import {
 import AdminPageHeader from "./AdminPageHeader";
 import FairnessFlagDetails from "./FairnessFlagDetails";
 import HideTorDialog from "./HideTorDialog";
+import ReportedTorQueue from "./ReportedTorQueue";
 import StatusBadge from "@/components/StatusBadge";
 import { categories, formatBudget, formatThaiDate, formatThaiMonthYear, type ConfidenceLevel, type TOR, type TORStatus } from "@/lib/mockData";
 import { apiFetch } from "@/lib/api";
+import { timeAgo } from "@/lib/adminStats";
 import { categoryToSlug, fetchAgencies, isUnknownDeadline, mapApiTor, toConfidenceLevel, type ApiTor } from "@/lib/torApi";
 import { STATUS_API, STATUSES } from "@/lib/torSearch";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
-type TabValue = TORStatus | "ทั้งหมด" | "ต้องตรวจสอบ";
+type TabValue = TORStatus | "ทั้งหมด" | "ต้องตรวจสอบ" | "ถูกรายงาน";
 
 const statusTabs: { label: string; value: TabValue }[] = [
   { label: "ทั้งหมด", value: "ทั้งหมด" },
   { label: "ต้องตรวจสอบ", value: "ต้องตรวจสอบ" },
+  { label: "ถูกรายงาน", value: "ถูกรายงาน" },
   ...STATUSES.map((s) => ({ label: s, value: s as TabValue })),
 ];
 
@@ -93,6 +96,19 @@ interface Draft {
   /** Month-only deadline read from the PDF (e.g. "ตุลาคม 2569"); the date input stays empty. */
   bidDeadlineMonthHint: string;
   openFlags: AdminTor["openFlags"];
+  /** Open user reports on this TOR (FR-40/FR-41); filled in after the form opens. */
+  reports: OpenReport[];
+  reportsError: boolean;
+  /** Mark the reports resolved when saving (on by default: saving a correction answers them). */
+  resolveReports: boolean;
+  resolutionNote: string;
+}
+
+interface OpenReport {
+  id: string;
+  description: string;
+  createdAt: string;
+  reporter: string;
 }
 
 function toAdminTor(raw: ApiAdminTor): AdminTor {
@@ -130,6 +146,10 @@ function toDraft(tor: AdminTor): Draft {
       monthOnly && tor.procurement?.bidDeadline ? formatThaiMonthYear(tor.procurement.bidDeadline) : "",
     canSetBidDeadline: tor.procurement?.stage === "inviting",
     openFlags: tor.openFlags,
+    reports: [],
+    reportsError: false,
+    resolveReports: true,
+    resolutionNote: "",
   };
 }
 
@@ -158,16 +178,35 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
     setHideError(null);
   }, []);
 
+  // Badge for the "ถูกรายงาน" tab: TORs with open reports.
+  const [reportedCount, setReportedCount] = useState(0);
+  const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
+  const [queueError, setQueueError] = useState<string | null>(null);
+
   const [agencyOptions, setAgencyOptions] = useState<string[]>([]);
   useEffect(() => {
     fetchAgencies().then((a) => setAgencyOptions(a.agencies));
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/api/admin/tors/reported?pageSize=1")
+      .then(async (res) => {
+        if (!res.ok) return;
+        const body = (await res.json()) as { totalCount: number };
+        if (!cancelled) setReportedCount(body.totalCount);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
   const apiQuery = useMemo(() => {
     const p = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
     if (debouncedQuery.trim()) p.set("q", debouncedQuery.trim());
     if (filter === "ต้องตรวจสอบ") p.set("flagged", "true");
-    else if (filter !== "ทั้งหมด") p.set("status", STATUS_API[filter]);
+    else if (filter !== "ทั้งหมด" && filter !== "ถูกรายงาน") p.set("status", STATUS_API[filter]);
     return p.toString();
   }, [debouncedQuery, filter, page]);
 
@@ -246,6 +285,53 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
     setActionError(null);
     setSavedId(null);
     setDraft(toDraft(tor));
+    void loadReports(tor.id);
+  }
+
+  /** The open reports on a TOR, shown in the form so the admin knows what to correct. */
+  async function loadReports(torId: string) {
+    const res = await apiFetch(`/api/admin/reports?status=open&torId=${torId}&pageSize=50`).catch(() => null);
+    const body = res?.ok
+      ? ((await res.json()) as {
+          data: {
+            id: string;
+            description: string;
+            createdAt: string;
+            reporter: { displayName: string; companyName: string | null } | null;
+            reporterEmail: string | null;
+          }[];
+        })
+      : null;
+    setDraft((d) =>
+      d && d.id === torId
+        ? body
+          ? {
+              ...d,
+              reportsError: false,
+              reports: body.data.map((r) => ({
+                id: r.id,
+                description: r.description,
+                createdAt: r.createdAt,
+                reporter: r.reporter ? (r.reporter.companyName ?? r.reporter.displayName) : (r.reporterEmail ?? "ผู้ใช้ทั่วไป"),
+              })),
+            }
+          : { ...d, reportsError: true }
+        : d
+    );
+  }
+
+  /** From the reported queue: fetch the full TOR row, then open the same form. */
+  async function openEditById(torId: string) {
+    setQueueError(null);
+    setLoadingEditId(torId);
+    const res = await apiFetch(`/api/admin/tors/${torId}`).catch(() => null);
+    setLoadingEditId(null);
+    if (!res?.ok) {
+      setQueueError("โหลดข้อมูล TOR ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+      return;
+    }
+    const body = (await res.json()) as { tor: ApiAdminTor };
+    openEdit(toAdminTor(body.tor));
   }
 
   async function saveDraft() {
@@ -268,6 +354,9 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
           ? { bidDeadline: draft.bidDeadline || null }
           : {}),
         resolveFlags: true,
+        ...(draft.reports.length > 0 && draft.resolveReports
+          ? { resolveReports: true, ...(draft.resolutionNote.trim() ? { resolutionNote: draft.resolutionNote.trim() } : {}) }
+          : {}),
       }),
     }).catch(() => null);
     setSaving(false);
@@ -311,13 +400,14 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
               className={`btn-pill px-4 py-2 text-xs font-semibold transition-colors ${
                 filter === tab.value
                   ? "btn-pill-primary"
-                  : tab.value === "ต้องตรวจสอบ" && totalFlagged > 0
+                  : (tab.value === "ต้องตรวจสอบ" && totalFlagged > 0) || (tab.value === "ถูกรายงาน" && reportedCount > 0)
                     ? "border border-[var(--color-danger)]/30 bg-[var(--color-danger-bg)] text-[var(--color-danger)]"
                     : "border border-[var(--color-border)] bg-white text-[var(--color-text-muted)] hover:border-[var(--color-ink)]/30"
               }`}
             >
               {tab.label}
               {tab.value === "ต้องตรวจสอบ" && ` (${totalFlagged})`}
+              {tab.value === "ถูกรายงาน" && ` (${reportedCount})`}
             </button>
           ))}
         </div>
@@ -325,7 +415,22 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
 
       <div className="mt-6 px-5 sm:px-8">
         <div className="card overflow-hidden p-0">
-          <div className="hidden lg:grid grid-cols-[1fr_130px_120px_110px_100px_100px] gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface-alt)] px-6 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+          {filter === "ถูกรายงาน" && (
+            <>
+              <p className="border-b border-[var(--color-border)] bg-[var(--color-surface-alt)] px-6 py-3 text-xs text-[var(--color-text-muted)]">
+                TOR ที่ผู้ใช้รายงานว่าข้อมูลไม่ถูกต้อง เรียงจากรายงานล่าสุด — แก้ไขข้อมูลแล้วระบบจะปิดรายงานให้พร้อมกัน
+              </p>
+              {queueError && (
+                <p role="alert" className="px-6 pt-3 text-xs text-[var(--color-danger)]">
+                  {queueError}
+                </p>
+              )}
+              <div className={loadingEditId ? "pointer-events-none opacity-60" : ""}>
+                <ReportedTorQueue reloadKey={reloadKey} onEdit={(id) => void openEditById(id)} />
+              </div>
+            </>
+          )}
+          <div className={`hidden grid-cols-[1fr_130px_120px_110px_100px_100px] gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface-alt)] px-6 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)] ${filter === "ถูกรายงาน" ? "" : "lg:grid"}`}>
             <span>โครงการ</span>
             <span>หน่วยงาน</span>
             <span>งบประมาณ</span>
@@ -334,7 +439,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
             <span className="text-right">จัดการ</span>
           </div>
 
-          {!snapshot && loading ? (
+          {filter === "ถูกรายงาน" ? null : !snapshot && loading ? (
             <div className="p-10 flex items-center justify-center gap-2 text-sm text-[var(--color-text-muted)]">
               <Loader2 size={16} className="animate-spin" />
               กำลังโหลด TOR...
@@ -435,7 +540,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
           </p>
         )}
 
-        {snapshot && totalPages > 1 && (
+        {filter !== "ถูกรายงาน" && snapshot && totalPages > 1 && (
           <nav aria-label="เปลี่ยนหน้า" className="mt-4 flex items-center justify-center gap-3">
             <button
               type="button"
@@ -461,7 +566,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
           </nav>
         )}
 
-        <p className="mt-4 text-xs text-[var(--color-text-muted)]">
+        <p className={`mt-4 text-xs text-[var(--color-text-muted)] ${filter === "ถูกรายงาน" ? "hidden" : ""}`}>
           แสดง {rows.length} จาก {totalCount} รายการ — การซ่อนจะไม่ลบข้อมูลออกจากฐานข้อมูล
           และการแก้ไขอาจถูกเขียนทับหากประกาศต้นฉบับบน e-GP เปลี่ยนแปลงและระบบประมวลผลใหม่
         </p>
@@ -501,6 +606,29 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
             <p className="mt-1 text-xs text-[var(--color-text-faint)]">{draft.projectCode}</p>
 
             {draft.openFlags.length > 0 && <FairnessFlagDetails torId={draft.id} />}
+
+            {draft.reportsError && (
+              <p role="alert" className="mt-4 text-xs text-[var(--color-danger)]">
+                โหลดรายงานจากผู้ใช้ไม่สำเร็จ — การบันทึกจะไม่ปิดรายงานให้
+              </p>
+            )}
+            {draft.reports.length > 0 && (
+              <section className="mt-4 rounded-2xl bg-[var(--color-surface-alt)] p-4" aria-label="รายงานจากผู้ใช้">
+                <p className="text-xs font-semibold text-[var(--color-text)]">
+                  รายงานจากผู้ใช้ที่รอดำเนินการ ({draft.reports.length})
+                </p>
+                <ul className="mt-2 flex max-h-48 flex-col gap-2 overflow-y-auto">
+                  {draft.reports.map((r) => (
+                    <li key={r.id} className="rounded-xl bg-white p-3 text-xs leading-relaxed text-[var(--color-text)]">
+                      “{r.description}”
+                      <span className="mt-1 block text-[11px] text-[var(--color-text-faint)]">
+                        {r.reporter} · {timeAgo(r.createdAt)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             <form
               onSubmit={(e) => {
@@ -607,6 +735,36 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                 </span>
               </label>
 
+              {draft.reports.length > 0 && (
+                <div className="flex flex-col gap-2 rounded-2xl border border-[var(--color-border)] px-3.5 py-3">
+                  <label className="flex items-start gap-2.5 text-sm text-[var(--color-text)]">
+                    <input
+                      type="checkbox"
+                      checked={draft.resolveReports}
+                      onChange={(e) => setDraft({ ...draft, resolveReports: e.target.checked })}
+                      className="mt-0.5 accent-[var(--color-rose-dark)]"
+                    />
+                    <span>
+                      ปิดรายงานจากผู้ใช้ {draft.reports.length} รายการเมื่อบันทึก
+                      <span className="block text-xs text-[var(--color-text-muted)]">
+                        ยกเลิกเครื่องหมายหากยังไม่ได้แก้ไขตามที่รายงาน
+                      </span>
+                    </span>
+                  </label>
+                  {draft.resolveReports && (
+                    <textarea
+                      value={draft.resolutionNote}
+                      onChange={(e) => setDraft({ ...draft, resolutionNote: e.target.value })}
+                      rows={2}
+                      maxLength={1000}
+                      placeholder="บันทึกสิ่งที่แก้ไข (ไม่บังคับ)"
+                      aria-label="บันทึกการแก้ไข"
+                      className="rounded-2xl border border-[var(--color-border)] px-3.5 py-2 text-xs focus:outline-none focus:border-[var(--color-ink)]"
+                    />
+                  )}
+                </div>
+              )}
+
               <div className="mt-2 flex items-center gap-3">
                 <button
                   type="submit"
@@ -614,7 +772,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                   className="btn-pill btn-pill-primary flex-1 py-3 text-sm disabled:opacity-50"
                 >
                   <Save size={15} />
-                  {saving ? "กำลังบันทึก..." : "บันทึกและทำเครื่องหมายว่าตรวจสอบแล้ว"}
+                  {saving ? "กำลังบันทึก..." : draft.reports.length > 0 && draft.resolveReports ? "บันทึกและปิดรายงาน" : "บันทึกและทำเครื่องหมายว่าตรวจสอบแล้ว"}
                 </button>
                 <button
                   type="button"
