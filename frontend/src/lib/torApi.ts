@@ -1,5 +1,5 @@
 import { API_BASE } from "@/lib/api";
-import { type AISummary, type Category, type FairnessField, type FairnessFlag, type TOR, type TorProcurementView } from "@/lib/mockData";
+import { type AISummary, type Category, type ConfidenceLevel, type FairnessField, type FairnessFlag, type TOR, type TorProcurementView } from "@/lib/mockData";
 import { STATUS_FROM_API } from "@/lib/torStatus";
 
 /**
@@ -81,7 +81,7 @@ export function slugToCategory(raw: string): Category | null {
 /** A TOR whose submission deadline is at most this many days away is "ใกล้ปิดรับ". */
 export const CLOSING_SOON_DAYS = 7;
 
-const CONFIDENCE_MAP: Record<string, AISummary["confidence"]> = {
+const CONFIDENCE_MAP: Record<string, ConfidenceLevel> = {
   high: "สูง",
   medium: "ปานกลาง",
   low: "ต่ำ",
@@ -106,6 +106,12 @@ interface ApiFairnessFlag {
   severity?: string;
   message: string;
   detectedAt?: string;
+  confidence?: string;
+}
+
+/** Backend high/medium/low → the Thai level; null when absent or unknown, never a guessed default. */
+export function toConfidenceLevel(raw: string | null | undefined): ConfidenceLevel | null {
+  return raw && Object.hasOwn(CONFIDENCE_MAP, raw) ? CONFIDENCE_MAP[raw] : null;
 }
 
 interface ApiAnnouncement {
@@ -191,6 +197,7 @@ function mapFairnessFlags(raw: ApiFairnessFlag[] | undefined, fallbackDate: stri
     severity: f.severity === "high" || f.severity === "low" ? f.severity : "medium",
     message: f.message,
     detectedAt: f.detectedAt ?? fallbackDate,
+    confidence: toConfidenceLevel(f.confidence),
   }));
 }
 
@@ -203,7 +210,8 @@ function mapSummary(raw: ApiAiSummary | null | undefined, fallbackDate: string):
       weight: c.weight,
     })),
     generatedAt: raw?.generatedAt ?? fallbackDate,
-    confidence: (raw?.confidence && CONFIDENCE_MAP[raw.confidence]) || "ปานกลาง",
+    // Unknown stays unknown: showing "ปานกลาง" would state a confidence the AI never gave.
+    confidence: toConfidenceLevel(raw?.confidence),
   };
 }
 

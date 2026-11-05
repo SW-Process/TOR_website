@@ -7,10 +7,15 @@ import { applyFairnessPrefilter, type FairnessPrefilterThresholds } from "./fair
 
 const strArray = z.preprocess((v) => (v == null ? [] : v), z.array(z.string()));
 
+/** A 0..1 confidence the model may leave out (older responses); a missing one is stored as unknown. */
+const optionalConfidence = z.number().min(0).max(1).nullable().optional();
+
 export const fairnessSignalSchema = z.object({
   field: z.enum(["budget", "deadline", "qualificationRequirements", "other"]),
   severity: z.enum(["low", "medium", "high"]),
   message: z.string().min(1),
+  /** How strongly the source supports this signal (FR-20). */
+  confidence: optionalConfidence,
 });
 
 export type FairnessSignal = z.infer<typeof fairnessSignalSchema>;
@@ -18,7 +23,10 @@ export type FairnessSignal = z.infer<typeof fairnessSignalSchema>;
 export const torExtractionResultSchema = z.object({
   isSoftwareRelated: z.boolean(),
   classificationReason: z.string().min(1),
+  /** Confidence in the software/not-software classification, not in the summary. */
   confidence: z.number().min(0).max(1),
+  /** Confidence that summary, keyPoints and qualifications reflect the document (FR-20). */
+  summaryConfidence: optionalConfidence,
   category: z.string(),
   categoryTags: strArray,
   // Optional: older responses and unclear TORs omit it; unknown values are dropped in applyExtractionToTor.
@@ -133,7 +141,9 @@ export function applyExtractionToTor(
       // model value does not make tor.save() throw a ValidationError.
       ...(c.weight != null ? { weight: Math.max(0, Math.min(100, c.weight)) } : {}),
     })),
-    confidence: bucketConfidence(result.confidence),
+    // The summary's own confidence (FR-20), not the classification's: a scan the model can
+    // classify confidently may still be summarized from only part of the text. Unknown stays unset.
+    ...(result.summaryConfidence != null ? { confidence: bucketConfidence(result.summaryConfidence) } : {}),
     model: opts.extractorId,
     generatedAt: now,
   };
@@ -173,6 +183,7 @@ export function applyExtractionToTor(
     field: s.field,
     severity: s.severity,
     message: s.message,
+    ...(s.confidence != null ? { confidence: bucketConfidence(s.confidence) } : {}),
     detectedAt: now,
     status: "open",
   })) as unknown as typeof tor.fairnessFlags;

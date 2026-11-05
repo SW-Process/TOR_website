@@ -69,6 +69,13 @@ describe("GeminiExtractor", () => {
     expect(generate).toHaveBeenCalledTimes(2);
   });
 
+  it("asks for a summary confidence and a confidence on every fairness signal (FR-20)", () => {
+    expect(RESPONSE_SCHEMA.required).toContain("summaryConfidence");
+    expect(RESPONSE_SCHEMA.properties?.fairnessSignals?.items?.required).toContain("confidence");
+    expect(SYSTEM_INSTRUCTION).toContain('"summaryConfidence"');
+    expect(SYSTEM_INSTRUCTION).toContain('Each signal\'s "confidence"');
+  });
+
   it("RESPONSE_SCHEMA uses the SDK Type enum members, not lowercase strings", () => {
     expect(RESPONSE_SCHEMA.type).toBe(Type.OBJECT);
     expect(RESPONSE_SCHEMA.properties?.isSoftwareRelated?.type).toBe(Type.BOOLEAN);
@@ -79,6 +86,8 @@ describe("GeminiExtractor", () => {
     expect(RESPONSE_SCHEMA.properties?.evaluationCriteria?.items?.type).toBe(Type.OBJECT);
     expect(RESPONSE_SCHEMA.properties?.fairnessSignals?.type).toBe(Type.ARRAY);
     expect(RESPONSE_SCHEMA.properties?.fairnessSignals?.items?.type).toBe(Type.OBJECT);
+    expect(RESPONSE_SCHEMA.properties?.summaryConfidence?.type).toBe(Type.NUMBER);
+    expect(RESPONSE_SCHEMA.properties?.fairnessSignals?.items?.properties?.confidence?.type).toBe(Type.NUMBER);
     const allTypes = [
       RESPONSE_SCHEMA.type,
       ...Object.values(RESPONSE_SCHEMA.properties ?? {}).map((p) => p.type),
