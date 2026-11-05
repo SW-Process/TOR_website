@@ -120,6 +120,8 @@ export interface IFairnessFlag {
   field: FairnessField;
   severity: "low" | "medium" | "high";
   message: string;
+  /** How strongly the source supports this signal (FR-20). Absent on flags written before it existed. */
+  confidence?: Confidence;
   detectedAt: Date;
   status: "open" | "acknowledged" | "dismissed";
 }
@@ -201,6 +203,7 @@ const fairnessFlagSchema = new Schema<IFairnessFlag>(
     },
     severity: { type: String, enum: ["low", "medium", "high"], default: "medium" },
     message: { type: String, required: true },
+    confidence: { type: String, enum: ["high", "medium", "low"] },
     detectedAt: { type: Date, default: Date.now },
     status: { type: String, enum: ["open", "acknowledged", "dismissed"], default: "open" },
   },

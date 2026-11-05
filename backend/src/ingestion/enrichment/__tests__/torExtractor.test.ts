@@ -17,6 +17,7 @@ const ok = (over: Partial<TorExtractionResult> = {}): TorExtractionResult => ({
   isSoftwareRelated: true,
   classificationReason: "จ้างพัฒนาระบบสารสนเทศ",
   confidence: 0.9,
+  summaryConfidence: 0.6,
   category: "information-system",
   categoryTags: ["mis"],
   summary: "โครงการพัฒนาระบบ...",
@@ -62,7 +63,49 @@ describe("bucketConfidence", () => {
   );
 });
 
+describe("torExtractionResultSchema confidences (FR-20)", () => {
+  it("accepts a response without summaryConfidence or a signal confidence", () => {
+    const raw: Record<string, unknown> = { ...ok({ fairnessSignals: [{ field: "budget", severity: "high", message: "x" }] }) };
+    delete raw.summaryConfidence;
+    expect(torExtractionResultSchema.safeParse(raw).success).toBe(true);
+  });
+
+  it("rejects a summaryConfidence or signal confidence outside 0..1", () => {
+    expect(torExtractionResultSchema.safeParse(ok({ summaryConfidence: 1.5 })).success).toBe(false);
+    expect(
+      torExtractionResultSchema.safeParse(
+        ok({ fairnessSignals: [{ field: "budget", severity: "high", message: "x", confidence: 90 }] })
+      ).success
+    ).toBe(false);
+  });
+});
+
 describe("applyExtractionToTor", () => {
+  it("leaves the summary confidence unset when the model gave none, instead of guessing", async () => {
+    const tor = await Tor.create({ title: "จ้างพัฒนาระบบ" });
+    applyExtractionToTor(tor, ok({ summaryConfidence: null }), { extractorId: "g", fallbackText: "x" });
+    expect(tor.aiSummary?.summary).toBe("โครงการพัฒนาระบบ...");
+    expect(tor.aiSummary?.confidence).toBeUndefined();
+  });
+
+  it("stores each fairness signal's confidence as a level, and none when the model gave none", async () => {
+    const tor = await Tor.create({ title: "จ้างพัฒนาระบบ" });
+    applyExtractionToTor(
+      tor,
+      ok({
+        fairnessSignals: [
+          { field: "budget", severity: "high", message: "งบต่างจากราคากลาง", confidence: 0.92 },
+          { field: "qualificationRequirements", severity: "low", message: "สเปกระบุยี่ห้อ", confidence: 0.3 },
+          { field: "other", severity: "medium", message: "ข้อสังเกตอื่น" },
+        ],
+      }),
+      { extractorId: "g", fallbackText: "x" }
+    );
+    await tor.save();
+    const saved = await Tor.findById(tor.id).lean();
+    expect(saved?.fairnessFlags.map((f) => f.confidence)).toEqual(["high", "low", undefined]);
+  });
+
   it("writes all fields and sets pipelineStatus 'enriched' when software-related", async () => {
     const tor = await Tor.create({ title: "จ้างพัฒนาระบบ" });
     applyExtractionToTor(tor, ok(), { extractorId: "gemini-2.5-flash", fallbackText: "จ้างพัฒนาระบบ" });
@@ -72,7 +115,8 @@ describe("applyExtractionToTor", () => {
     expect(tor.aiSummary?.summary).toBe("โครงการพัฒนาระบบ...");
     expect(tor.aiSummary?.keyPoints).toEqual(["จัดทำระบบ", "อบรมผู้ใช้"]);
     expect(tor.aiSummary?.qualifications).toEqual(["ทุนจดทะเบียน 5 ล้าน"]);
-    expect(tor.aiSummary?.confidence).toBe("high");
+    // From summaryConfidence (0.6), not the classification's confidence (0.9).
+    expect(tor.aiSummary?.confidence).toBe("medium");
     expect(tor.aiSummary?.model).toBe("gemini-2.5-flash");
     expect(tor.aiSummary?.evaluationCriteria.map((c) => c.label)).toEqual(["ราคา", "เทคนิค"]);
     expect(tor.technologyStack).toEqual(["React", "PostgreSQL"]);

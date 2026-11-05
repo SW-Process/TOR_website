@@ -394,6 +394,21 @@ describe("GET /api/tors/:id", () => {
     expect((await request(app).get(`/api/tors/${pending!._id}`)).status).toBe(404);
     expect((await request(app).get("/api/tors/not-an-id")).status).toBe(400);
   });
+
+  it("returns the confidence of the AI summary and of each fairness flag (FR-20)", async () => {
+    await seed();
+    const enriched = await Tor.findOne({ pipelineStatus: "enriched" });
+    enriched!.aiSummary = { summary: "สรุป", keyPoints: [], qualifications: [], evaluationCriteria: [], confidence: "medium" };
+    enriched!.fairnessFlags.push(
+      { field: "budget", severity: "high", message: "งบต่างจากราคากลาง", confidence: "high", detectedAt: new Date(), status: "open" },
+      { field: "other", severity: "low", message: "ข้อสังเกตเก่า", detectedAt: new Date(), status: "open" }
+    );
+    await enriched!.save();
+
+    const { body } = await request(app).get(`/api/tors/${enriched!._id}`);
+    expect(body.tor.aiSummary.confidence).toBe("medium");
+    expect(body.tor.fairnessFlags.map((f: { confidence?: string }) => f.confidence ?? null)).toEqual(["high", null]);
+  });
 });
 
 describe("GET /api/tors/price-stats", () => {
