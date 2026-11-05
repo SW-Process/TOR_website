@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import TORCard from "./TORCard";
+import SaveSearchButton from "./SaveSearchButton";
 import { categories, formatBudget } from "@/lib/mockData";
 import {
   CLOSING_SOON_DAYS,
@@ -494,7 +495,7 @@ export default function TORExplorer() {
         )}
 
         <div>
-          <div ref={resultsTop} className="flex items-center justify-between mb-4 scroll-mt-24">
+          <div ref={resultsTop} className="flex flex-wrap items-center justify-between gap-3 mb-4 scroll-mt-24">
             <p className="text-sm text-[var(--color-text-muted)]">
               พบ <span className="font-semibold text-[var(--color-text)]">{result.totalCount}</span> รายการ
               {result.totalCount > PAGE_SIZE && (
@@ -504,17 +505,20 @@ export default function TORExplorer() {
                 </>
               )}
             </p>
-            <select
-              value={filters.sort}
-              onChange={(e) => update({ sort: e.target.value as SortKey })}
-              className="rounded-full border border-[var(--color-border)] px-4 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
-            >
-              <option value="newest">ประกาศล่าสุด</option>
-              <option value="deadline">ใกล้ปิดรับก่อน</option>
-              <option value="hearing">ใกล้สิ้นสุดรับฟังคำวิจารณ์ก่อน</option>
-              <option value="budgetDesc">งบประมาณ: มาก-น้อย</option>
-              <option value="budgetAsc">งบประมาณ: น้อย-มาก</option>
-            </select>
+            <div className="flex flex-wrap items-center gap-2">
+              <SaveSearchButton filters={filters} />
+              <select
+                value={filters.sort}
+                onChange={(e) => update({ sort: e.target.value as SortKey })}
+                className="rounded-full border border-[var(--color-border)] px-4 py-2 text-sm focus:outline-none focus:border-[var(--color-ink)]"
+              >
+                <option value="newest">ประกาศล่าสุด</option>
+                <option value="deadline">ใกล้ปิดรับก่อน</option>
+                <option value="hearing">ใกล้สิ้นสุดรับฟังคำวิจารณ์ก่อน</option>
+                <option value="budgetDesc">งบประมาณ: มาก-น้อย</option>
+                <option value="budgetAsc">งบประมาณ: น้อย-มาก</option>
+              </select>
+            </div>
           </div>
 
           {loading ? (
