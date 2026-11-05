@@ -224,6 +224,39 @@ export function toApiParams(f: TorFilters): URLSearchParams {
   return p;
 }
 
+/** Keys `/api/tors` repeats for multiple values; a saved search keeps them as arrays. */
+const MULTI_VALUE_KEYS = new Set(["status", "category", "agency", "tech", "projectType"]);
+
+/**
+ * Filters → a saved search's `filters` (FR-28): the same fields `toApiParams` sends to
+ * `/api/tors`, minus paging, so the backend can replay it as a search and match new TORs.
+ */
+export function toSavedSearchFilters(f: TorFilters): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {};
+  for (const [key, value] of toApiParams(f)) {
+    if (key === "page" || key === "pageSize") continue;
+    if (MULTI_VALUE_KEYS.has(key)) out[key] = [...((out[key] as string[] | undefined) ?? []), value];
+    else out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * True when the search sends at least one condition besides the sort order, so a saved
+ * copy would narrow anything. An inverted budget or date range isn't sent, so it doesn't count.
+ */
+export function hasSearchCriteria(f: TorFilters): boolean {
+  return Object.keys(toSavedSearchFilters(f)).some((k) => k !== "sort" && k !== "order");
+}
+
+/** A starting name for a saved search, from what the vendor searched for. */
+export function suggestSearchName(f: TorFilters): string {
+  const parts = [f.q.trim(), ...f.categories, ...f.agencies, ...f.tech].filter(Boolean);
+  if (parts.length === 0) return "การค้นหาของฉัน";
+  const name = parts.slice(0, 3).join(", ") + (parts.length > 3 ? ` และอีก ${parts.length - 3}` : "");
+  return name.length > 80 ? `${name.slice(0, 79)}…` : name;
+}
+
 export function activeFilterCount(f: TorFilters): number {
   return (
     f.categories.length +
