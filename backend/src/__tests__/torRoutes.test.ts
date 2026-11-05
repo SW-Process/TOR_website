@@ -409,6 +409,26 @@ describe("GET /api/tors/:id", () => {
     expect(body.tor.aiSummary.confidence).toBe("medium");
     expect(body.tor.fairnessFlags.map((f: { confidence?: string }) => f.confidence ?? null)).toEqual(["high", null]);
   });
+
+  it("never exposes a fairness flag's reasoning or data points publicly (FR-19)", async () => {
+    await seed();
+    const enriched = await Tor.findOne({ pipelineStatus: "enriched" });
+    enriched!.fairnessFlags.push({
+      field: "budget",
+      severity: "high",
+      message: "งบต่างจากราคากลาง",
+      reasoning: "เหตุผลสำหรับผู้ดูแลระบบ",
+      dataPoints: [{ label: "งบประมาณ", value: "1 บาท", source: "system" }],
+      detectedAt: new Date(),
+      status: "open",
+    });
+    await enriched!.save();
+
+    const { body } = await request(app).get(`/api/tors/${enriched!._id}`);
+    expect(body.tor.fairnessFlags[0].message).toBe("งบต่างจากราคากลาง");
+    expect(body.tor.fairnessFlags[0]).not.toHaveProperty("reasoning");
+    expect(body.tor.fairnessFlags[0]).not.toHaveProperty("dataPoints");
+  });
 });
 
 describe("GET /api/tors/price-stats", () => {

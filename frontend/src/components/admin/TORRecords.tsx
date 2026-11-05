@@ -13,8 +13,8 @@ import {
   X,
 } from "lucide-react";
 import AdminPageHeader from "./AdminPageHeader";
+import FairnessFlagDetails from "./FairnessFlagDetails";
 import HideTorDialog from "./HideTorDialog";
-import ConfidenceBadge from "@/components/ConfidenceBadge";
 import StatusBadge from "@/components/StatusBadge";
 import { categories, formatBudget, formatThaiDate, formatThaiMonthYear, type ConfidenceLevel, type TOR, type TORStatus } from "@/lib/mockData";
 import { apiFetch } from "@/lib/api";
@@ -500,22 +500,7 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
             </div>
             <p className="mt-1 text-xs text-[var(--color-text-faint)]">{draft.projectCode}</p>
 
-            {draft.openFlags.length > 0 && (
-              <div className="mt-4 rounded-2xl bg-[var(--color-danger-bg)] p-4">
-                <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-danger)]">
-                  <AlertTriangle size={13} />
-                  สัญญาณที่ควรตรวจสอบ (สร้างโดย AI)
-                </p>
-                <ul className="mt-2 flex flex-col gap-1.5">
-                  {draft.openFlags.map((f, i) => (
-                    <li key={i} className="text-xs text-[var(--color-danger)] leading-relaxed">
-                      <span className="font-semibold">{fieldLabels[f.field]}:</span> {f.message}{" "}
-                      <ConfidenceBadge level={f.confidence} subject="สัญญาณนี้" size="sm" />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {draft.openFlags.length > 0 && <FairnessFlagDetails torId={draft.id} />}
 
             <form
               onSubmit={(e) => {

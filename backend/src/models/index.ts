@@ -33,7 +33,7 @@ export { AdminNotification } from "./AdminNotification";
 export { Setting } from "./Setting";
 
 export type { IUser, UserRole, UserDocument } from "./User";
-export type { ITor, IAiSummary, IFairnessFlag, ISourceDocument, SourceDocumentKind, SourceTextLayer, TorPipelineStatus, IClassification, ProcurementStage, AnnouncementKind, IProcurementAnnouncement, IBidDeadline, BidDeadlinePrecision, DeadlineAttemptOutcome, IDeadlineAttempt, IProcurement, ProcurementSource } from "./Tor";
+export type { ITor, IAiSummary, IFairnessFlag, IFairnessDataPoint, ISourceDocument, SourceDocumentKind, SourceTextLayer, TorPipelineStatus, IClassification, ProcurementStage, AnnouncementKind, IProcurementAnnouncement, IBidDeadline, BidDeadlinePrecision, DeadlineAttemptOutcome, IDeadlineAttempt, IProcurement, ProcurementSource } from "./Tor";
 export type { IVendorProfile, ISavedSearch, IHiddenTor } from "./VendorProfile";
 export type { IBookmark, ApplicationStatus } from "./Bookmark";
 export type { INotification, NotificationType } from "./Notification";

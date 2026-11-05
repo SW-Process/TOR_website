@@ -76,6 +76,18 @@ describe("GeminiExtractor", () => {
     expect(SYSTEM_INSTRUCTION).toContain('Each signal\'s "confidence"');
   });
 
+  it("asks for each signal's reasoning and data points, held to the same neutral wording (FR-19)", () => {
+    const signal = RESPONSE_SCHEMA.properties?.fairnessSignals?.items;
+    expect(signal?.required).toEqual(expect.arrayContaining(["reasoning", "dataPoints"]));
+    expect(signal?.properties?.reasoning?.type).toBe(Type.STRING);
+    expect(signal?.properties?.dataPoints?.type).toBe(Type.ARRAY);
+    expect(signal?.properties?.dataPoints?.items?.type).toBe(Type.OBJECT);
+    expect(signal?.properties?.dataPoints?.items?.required).toEqual(["label", "value"]);
+    expect(SYSTEM_INSTRUCTION).toContain('Each signal\'s "reasoning"');
+    expect(SYSTEM_INSTRUCTION).toContain('Each signal\'s "dataPoints"');
+    expect(SYSTEM_INSTRUCTION).toMatch(/"reasoning" and "dataPoints"[^.]*same neutral/);
+  });
+
   it("RESPONSE_SCHEMA uses the SDK Type enum members, not lowercase strings", () => {
     expect(RESPONSE_SCHEMA.type).toBe(Type.OBJECT);
     expect(RESPONSE_SCHEMA.properties?.isSoftwareRelated?.type).toBe(Type.BOOLEAN);

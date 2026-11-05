@@ -53,6 +53,8 @@ export interface PrefilterFacts {
   referencePrice?: number | null;
   announcementDate?: Date | null;
   bidDeadline?: Date | null;
+  /** "month": `bidDeadline` is only the end of the month the PDF names, so it has no real day. */
+  bidDeadlinePrecision?: "day" | "month";
 }
 
 /**
@@ -74,6 +76,53 @@ export function applyFairnessPrefilter(
     if (s.field === "deadline" && windowDays != null && windowDays >= t.minBidWindowDays) return false;
     return true;
   });
+}
+
+const baht = (n: number) => `${n.toLocaleString("en-US")} บาท`;
+
+const thaiDate = (d: Date, precision: "day" | "month" = "day") =>
+  new Intl.DateTimeFormat("th-TH", {
+    timeZone: "Asia/Bangkok",
+    calendar: "buddhist",
+    ...(precision === "day" ? { day: "numeric" } : {}),
+    month: "long",
+    year: "numeric",
+  })
+    .format(d)
+    .replace(/^พ\.ศ\. /, "");
+
+/**
+ * The TOR's own numbers behind a signal, plus the threshold it was held to (FR-19). Stored on
+ * the flag as they stand now, so they still show what the flag was based on after an admin
+ * corrects the TOR or changes the thresholds. A fact we do not have is left out.
+ */
+export function signalDataPoints(
+  field: FairnessSignal["field"],
+  facts: PrefilterFacts,
+  t?: FairnessPrefilterThresholds
+): { label: string; value: string }[] {
+  const points: { label: string; value: string }[] = [];
+  if (field === "budget") {
+    const { budget, referencePrice } = facts;
+    if (budget != null) points.push({ label: "งบประมาณ", value: baht(budget) });
+    if (referencePrice != null) points.push({ label: "ราคากลาง", value: baht(referencePrice) });
+    const deviation = budgetDeviationPercent(budget, referencePrice);
+    if (deviation != null) {
+      const direction = budget! < referencePrice! ? "ต่ำกว่า" : "สูงกว่า";
+      points.push({ label: "ส่วนต่างจากราคากลาง", value: `${direction} ${deviation.toFixed(1)}%` });
+    }
+    if (t) points.push({ label: "เกณฑ์ที่ใช้ตรวจ", value: `ต่างจากราคากลางตั้งแต่ ${t.budgetDeviationPercent}%` });
+  } else if (field === "deadline") {
+    const { announcementDate, bidDeadline, bidDeadlinePrecision } = facts;
+    if (announcementDate) points.push({ label: "วันที่ประกาศ", value: thaiDate(announcementDate) });
+    if (bidDeadline) {
+      points.push({ label: "กำหนดยื่นข้อเสนอ", value: thaiDate(bidDeadline, bidDeadlinePrecision) });
+    }
+    const days = bidDeadlinePrecision === "month" ? null : bidWindowDays(announcementDate, bidDeadline);
+    if (days != null) points.push({ label: "ระยะเวลายื่นข้อเสนอ", value: `${Math.round(days * 10) / 10} วัน` });
+    if (t) points.push({ label: "เกณฑ์ที่ใช้ตรวจ", value: `น้อยกว่า ${t.minBidWindowDays} วัน` });
+  }
+  return points;
 }
 
 /** Prompt lines that tell the model the Administrator's cut-offs. */

@@ -116,12 +116,25 @@ export type FairnessField =
   | "qualificationRequirements"
   | "other";
 
+/**
+ * One fact behind a fairness flag (FR-19), kept as it stood when the flag was generated.
+ * "system": the TOR's own numbers and the thresholds in force. "ai": what the model read from the document.
+ */
+export interface IFairnessDataPoint {
+  label: string;
+  value: string;
+  source: "system" | "ai";
+}
+
 export interface IFairnessFlag {
   field: FairnessField;
   severity: "low" | "medium" | "high";
   message: string;
   /** How strongly the source supports this signal (FR-20). Absent on flags written before it existed. */
   confidence?: Confidence;
+  /** Admin-only (FR-19), like `dataPoints`. Absent on flags written before it existed. */
+  reasoning?: string;
+  dataPoints?: IFairnessDataPoint[];
   detectedAt: Date;
   status: "open" | "acknowledged" | "dismissed";
 }
@@ -204,6 +217,18 @@ const fairnessFlagSchema = new Schema<IFairnessFlag>(
     severity: { type: String, enum: ["low", "medium", "high"], default: "medium" },
     message: { type: String, required: true },
     confidence: { type: String, enum: ["high", "medium", "low"] },
+    reasoning: { type: String },
+    dataPoints: {
+      type: [
+        {
+          label: { type: String, required: true },
+          value: { type: String, required: true },
+          source: { type: String, enum: ["system", "ai"], required: true },
+          _id: false,
+        },
+      ],
+      default: undefined,
+    },
     detectedAt: { type: Date, default: Date.now },
     status: { type: String, enum: ["open", "acknowledged", "dismissed"], default: "open" },
   },
