@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { API_BASE, SESSION_EXPIRED_EVENT, apiFetch } from "./api";
 import { getReauthHandler, type ReauthMethod } from "./reauth";
 
@@ -72,8 +72,32 @@ let checked = false;
 let inFlight: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
+interface AuthSnapshot {
+  user: AuthUser | null;
+  ready: boolean;
+}
+
+/**
+ * What the server renders, and what the first client render must match: the session
+ * hasn't been checked yet. Hydrating from the live cache instead made a part of the page
+ * that hydrated after the check finished (e.g. behind Suspense) render signed-in content
+ * where the server rendered nothing, a hydration mismatch.
+ */
+const SERVER_SNAPSHOT: AuthSnapshot = { user: null, ready: false };
+let snapshot: AuthSnapshot = SERVER_SNAPSHOT;
+
+/** Publish the cache to every useAuth(). Call after any change to cachedUser or checked. */
 function emit() {
+  snapshot = { user: cachedUser, ready: checked };
   for (const l of listeners) l();
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  void ensureLoaded();
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 async function loadSession(): Promise<void> {
@@ -197,20 +221,11 @@ async function sendPublic(
 }
 
 export function useAuth() {
-  const [user, setUser] = useState<AuthUser | null>(cachedUser);
-  const [ready, setReady] = useState(checked);
-
-  useEffect(() => {
-    const sync = () => {
-      setUser(cachedUser);
-      setReady(checked);
-    };
-    listeners.add(sync);
-    void ensureLoaded().then(sync);
-    return () => {
-      listeners.delete(sync);
-    };
-  }, []);
+  const { user, ready } = useSyncExternalStore(
+    subscribe,
+    () => snapshot,
+    () => SERVER_SNAPSHOT
+  );
 
   const submitCredentials = useCallback(
     async (path: string, email: string, password: string): Promise<AuthResult> => {
