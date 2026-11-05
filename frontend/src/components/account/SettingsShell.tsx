@@ -14,6 +14,7 @@ import {
   LogOut,
   Mail,
   MonitorSmartphone,
+  SearchCheck,
   ShieldCheck,
   Trash2,
   UserRound,
@@ -23,7 +24,7 @@ import { useAuth } from "@/lib/useAuth";
 import { Avatar } from "./ui";
 
 /** Every page reachable from the settings sidebar; `/account/settings?section=<id>` unless noted. */
-export type SettingsPageId = "profile" | "email" | "password" | "mfa" | "sessions" | "shortcuts" | "saved" | "hidden" | "reports" | "delete" | "business";
+export type SettingsPageId = "profile" | "email" | "password" | "mfa" | "sessions" | "shortcuts" | "saved" | "searches" | "hidden" | "reports" | "delete" | "business";
 
 export const SETTINGS_ROOT = "/account/settings";
 
@@ -162,6 +163,12 @@ export default function SettingsShell({
               {isVendor && (
                 <>
                   <NavItem icon={Bookmark} label="รายการที่บันทึก" href={settingsHref("saved")} active={active === "saved"} />
+                  <NavItem
+                    icon={SearchCheck}
+                    label="การค้นหาที่บันทึกไว้"
+                    href={settingsHref("searches")}
+                    active={active === "searches"}
+                  />
                   <NavItem icon={EyeOff} label="TOR ที่ซ่อนไว้" href={settingsHref("hidden")} active={active === "hidden"} />
                 </>
               )}

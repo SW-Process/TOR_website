@@ -11,7 +11,11 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (ready && !isLoggedIn) {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      // Keep the query too (e.g. /account/settings?section=searches) so sign-in returns to the
+      // same view. Read from window here rather than useSearchParams, which would need a
+      // Suspense boundary on every page that uses this guard.
+      const back = `${pathname}${window.location.search}`;
+      router.replace(`/login?next=${encodeURIComponent(back)}`);
     }
   }, [ready, isLoggedIn, router, pathname]);
 

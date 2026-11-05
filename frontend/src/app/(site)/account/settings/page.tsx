@@ -8,6 +8,7 @@ import GoogleIcon from "@/components/GoogleIcon";
 import AccountTorCard, { CardAction } from "@/components/account/AccountTorCard";
 import SettingsShell from "@/components/account/SettingsShell";
 import MfaSection from "@/components/account/MfaSection";
+import SavedSearchesSection from "@/components/account/SavedSearchesSection";
 import { AvatarCard, FieldBlock, SubmitBar, inputClass, useSubmit } from "@/components/account/ui";
 import { formatThaiDate } from "@/lib/mockData";
 import { useAuth } from "@/lib/useAuth";
@@ -20,7 +21,7 @@ import { ShortcutKeys, ShortcutTable } from "@/components/KeyboardShortcuts";
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_NAME_LENGTH = 60;
 
-type SectionId = "profile" | "email" | "password" | "mfa" | "sessions" | "shortcuts" | "saved" | "hidden" | "reports" | "delete";
+type SectionId = "profile" | "email" | "password" | "mfa" | "sessions" | "shortcuts" | "saved" | "searches" | "hidden" | "reports" | "delete";
 
 const SECTION_TITLES: Record<SectionId, string> = {
   profile: "แก้ไขโปรไฟล์",
@@ -30,6 +31,7 @@ const SECTION_TITLES: Record<SectionId, string> = {
   sessions: "อุปกรณ์ที่เข้าสู่ระบบ",
   shortcuts: "ปุ่มลัดบนคีย์บอร์ด",
   saved: "รายการที่บันทึก",
+  searches: "การค้นหาที่บันทึกไว้",
   hidden: "TOR ที่ซ่อนไว้",
   reports: "รายงานที่ฉันส่ง",
   delete: "ลบบัญชี",
@@ -976,6 +978,7 @@ function SettingsContent() {
         {section === "sessions" && <SessionsSection />}
         {section === "shortcuts" && <ShortcutsSection />}
         {section === "saved" && <SavedSection />}
+        {section === "searches" && <SavedSearchesSection />}
         {section === "hidden" && <HiddenSection />}
         {section === "reports" && <ReportsSection />}
         {section === "delete" && <DeleteSection />}

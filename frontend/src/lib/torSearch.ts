@@ -1,5 +1,5 @@
 import { categories, type Category, type TORStatus } from "@/lib/mockData";
-import { categoryToSlug } from "@/lib/torApi";
+import { categoryToSlug, slugToCategory } from "@/lib/torApi";
 
 /**
  * FR-7 (SRS §6.1): every search filter lives in one object, is serialized to
@@ -255,6 +255,49 @@ export function suggestSearchName(f: TorFilters): string {
   if (parts.length === 0) return "การค้นหาของฉัน";
   const name = parts.slice(0, 3).join(", ") + (parts.length > 3 ? ` และอีก ${parts.length - 3}` : "");
   return name.length > 80 ? `${name.slice(0, 79)}…` : name;
+}
+
+/** Backend status value → the page's Thai status label. */
+const STATUS_FROM_API = Object.fromEntries(Object.entries(STATUS_API).map(([label, api]) => [api, label])) as Record<
+  string,
+  TORStatus
+>;
+
+function strings(v: unknown): string[] {
+  if (typeof v === "string") return [v];
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
+/** `2026-10-01T00:00:00+07:00` (or a plain `2026-10-01`) → `2026-10-01`. */
+function isoDay(v: unknown): string | undefined {
+  const s = strings(v)[0];
+  return s && /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : undefined;
+}
+
+/**
+ * A saved search's stored `filters` (the `/api/tors` fields) → the search page's filters,
+ * so it can be shown and reopened (FR-28). The reverse of `toApiParams`; anything the page
+ * doesn't know is dropped by `parseTorFilters`, as it is for a hand-edited URL.
+ */
+export function savedSearchToTorFilters(filters: Record<string, unknown>): TorFilters {
+  const sortEntry = Object.entries(SORT_API).find(
+    ([, v]) => v.sort === strings(filters.sort)[0] && v.order === (strings(filters.order)[0] ?? v.order)
+  );
+  return parseTorFilters({
+    q: strings(filters.q)[0],
+    category: strings(filters.category).map((c) => slugToCategory(c) ?? c),
+    agency: strings(filters.agency),
+    tech: strings(filters.tech),
+    projectType: strings(filters.projectType),
+    status: strings(filters.status).map((s) => STATUS_FROM_API[s] ?? s),
+    budgetMin: strings(filters.budgetMin)[0],
+    budgetMax: strings(filters.budgetMax)[0],
+    publishedFrom: isoDay(filters.publishedFrom),
+    publishedTo: isoDay(filters.publishedTo),
+    deadlineFrom: isoDay(filters.deadlineFrom),
+    deadlineTo: isoDay(filters.deadlineTo),
+    sort: sortEntry?.[0],
+  });
 }
 
 export function activeFilterCount(f: TorFilters): number {
