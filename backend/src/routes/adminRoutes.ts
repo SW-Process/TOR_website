@@ -17,6 +17,7 @@ import {
   adminUpdateFaq,
 } from "../controllers/adminHelpController";
 import { findUsers, revokeAllSessions, revokeUserSessions } from "../controllers/adminSessionController";
+import { getFairnessPrefilterSettings, putFairnessPrefilterSettings } from "../controllers/adminSettingsController";
 import { requireAdminMfa, requireAuth, requireRole } from "../middleware/auth";
 import { auditAdminAction } from "../middleware/auditLog";
 
@@ -42,6 +43,9 @@ router.patch("/chats/:id", updateChat);
 router.get("/chats/:id/messages", getChatMessages);
 router.post("/chats/:id/messages", replyToChat);
 router.post("/chats/:id/read", markChatRead);
+
+router.get("/settings/fairness-prefilter", getFairnessPrefilterSettings);
+router.put("/settings/fairness-prefilter", putFairnessPrefilterSettings);
 
 router.get("/help/announcements", adminListAnnouncements);
 router.post("/help/announcements", adminCreateAnnouncement);
