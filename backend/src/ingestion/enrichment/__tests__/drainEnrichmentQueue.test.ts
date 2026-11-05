@@ -2,7 +2,7 @@
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 import { Readable } from "node:stream";
-import { Tor, EnrichmentJob, IngestionRun, SystemLog } from "../../../models";
+import { Tor, EnrichmentJob, IngestionRun, SystemLog, Setting } from "../../../models";
 import { enqueue } from "../enrichmentJobRepo";
 import { drainEnrichmentQueue } from "../drainEnrichmentQueue";
 import type { TorExtractor, TorExtractionResult } from "../torExtractor";
@@ -12,7 +12,7 @@ let mongod: MongoMemoryServer;
 beforeAll(async () => { mongod = await MongoMemoryServer.create(); await mongoose.connect(mongod.getUri()); await EnrichmentJob.init(); });
 afterAll(async () => { await mongoose.disconnect(); await mongod.stop(); });
 afterEach(async () => {
-  await Promise.all([Tor.deleteMany({}), EnrichmentJob.deleteMany({}), IngestionRun.deleteMany({}), SystemLog.deleteMany({})]);
+  await Promise.all([Tor.deleteMany({}), EnrichmentJob.deleteMany({}), IngestionRun.deleteMany({}), SystemLog.deleteMany({}), Setting.deleteMany({})]);
   setStorageForTest(null);
 });
 
@@ -330,5 +330,51 @@ describe("drainEnrichmentQueue", () => {
     } finally {
       logSpy.mockRestore();
     }
+  });
+  describe("fairness pre-filter (FR-20)", () => {
+    const budgetHigh = { field: "budget" as const, severity: "high" as const, message: "งบประมาณต่างจากราคากลาง" };
+    const qualLow = { field: "qualificationRequirements" as const, severity: "low" as const, message: "สเปกระบุยี่ห้อ" };
+
+    it("drops signals that fail the thresholds before saving the flags", async () => {
+      setStorageForTest(fakeStorage);
+      // Budget 5% above the reference price: below a 30% threshold.
+      const tor = await seedTorWithJob({ budget: 1_050_000, referencePrice: 1_000_000 });
+      await drainEnrichmentQueue({
+        extractor: extractorReturning(result({ fairnessSignals: [budgetHigh, qualLow] })),
+        fairnessThresholds: { budgetDeviationPercent: 30, minBidWindowDays: 7, minSeverity: "medium" },
+      });
+      expect((await Tor.findById(tor.id).lean())?.fairnessFlags).toHaveLength(0);
+    });
+
+    it("uses the thresholds an admin saved", async () => {
+      setStorageForTest(fakeStorage);
+      await Setting.create({
+        key: "fairness-prefilter",
+        value: { budgetDeviationPercent: 3, minBidWindowDays: 7, minSeverity: "low" },
+      });
+      const tor = await seedTorWithJob({ budget: 1_050_000, referencePrice: 1_000_000 });
+      await drainEnrichmentQueue({ extractor: extractorReturning(result({ fairnessSignals: [budgetHigh, qualLow] })) });
+      const flags = (await Tor.findById(tor.id).lean())?.fairnessFlags ?? [];
+      expect(flags.map((f) => f.field).sort()).toEqual(["budget", "qualificationRequirements"]);
+    });
+
+    it("tells the extractor the thresholds", async () => {
+      setStorageForTest(fakeStorage);
+      await seedTorWithJob();
+      const seen: unknown[] = [];
+      const thresholds = { budgetDeviationPercent: 45, minBidWindowDays: 10, minSeverity: "high" as const };
+      await drainEnrichmentQueue({
+        extractor: {
+          id: "spy",
+          extractBidDeadline: async () => ({ date: null, time: null, confidence: 0 }),
+          extract: async (input) => {
+            seen.push(input.fairnessThresholds);
+            return result();
+          },
+        },
+        fairnessThresholds: thresholds,
+      });
+      expect(seen).toEqual([thresholds]);
+    });
   });
 });

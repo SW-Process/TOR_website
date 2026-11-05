@@ -13,6 +13,7 @@
  *   adminnotifications — in-app pipeline alerts for admins
  *   chatconversations — site "chat with admin" threads (one per visitor)
  *   chatmessages   — messages within a chat conversation
+ *   settings       — admin-configurable settings, one document per key
  */
 export { User } from "./User";
 export { VendorProfile } from "./VendorProfile";
@@ -29,6 +30,7 @@ export { Session } from "./Session";
 export { Announcement } from "./Announcement";
 export { Faq } from "./Faq";
 export { AdminNotification } from "./AdminNotification";
+export { Setting } from "./Setting";
 
 export type { IUser, UserRole, UserDocument } from "./User";
 export type { ITor, IAiSummary, IFairnessFlag, ISourceDocument, SourceDocumentKind, SourceTextLayer, TorPipelineStatus, IClassification, ProcurementStage, AnnouncementKind, IProcurementAnnouncement, IBidDeadline, BidDeadlinePrecision, DeadlineAttemptOutcome, IDeadlineAttempt, IProcurement, ProcurementSource } from "./Tor";
@@ -45,3 +47,4 @@ export type { ISession, SessionMethod } from "./Session";
 export type { IAnnouncement, AnnouncementKind as HelpAnnouncementKind, HelpStatus } from "./Announcement";
 export type { IFaq } from "./Faq";
 export type { IAdminNotification, AdminNotificationType } from "./AdminNotification";
+export type { ISetting, SettingKey } from "./Setting";

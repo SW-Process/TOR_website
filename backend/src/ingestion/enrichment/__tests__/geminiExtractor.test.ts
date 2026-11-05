@@ -196,6 +196,16 @@ describe("buildPrompt", () => {
     const p = buildPrompt(input);
     expect(p).toContain("2026-08-01T00:00:00.000Z");
   });
+
+  it("states the fairness thresholds when given and leaves them out otherwise", () => {
+    const withThresholds = buildPrompt({
+      ...input,
+      fairnessThresholds: { budgetDeviationPercent: 45, minBidWindowDays: 10, minSeverity: "medium" },
+    });
+    expect(withThresholds).toContain("Fairness thresholds set by the administrator");
+    expect(withThresholds).toContain("at least 45%");
+    expect(buildPrompt(input)).not.toContain("Fairness thresholds");
+  });
 });
 
 describe("GeminiExtractor.extractBidDeadline", () => {

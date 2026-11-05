@@ -16,6 +16,7 @@ import {
   type TorExtractionResult,
   type TorExtractor,
 } from "./torExtractor";
+import { fairnessPrefilterPrompt } from "./fairnessPrefilter";
 
 export interface GenerateContentFn {
   (args: {
@@ -150,6 +151,7 @@ export function buildPrompt(input: ExtractInput): string {
     `Known goods category: ${m.goodsCategory ?? "(unknown)"}`,
     `Known announcement date: ${m.announcementDate ?? "(unknown)"}`,
     "",
+    ...(input.fairnessThresholds ? [...fairnessPrefilterPrompt(input.fairnessThresholds), ""] : []),
     "The attached PDF is the TOR (may be a scan — read it).",
     "<tor_document>",
     "(see attached PDF)",

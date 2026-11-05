@@ -3,6 +3,7 @@ import type { HydratedDocument } from "mongoose";
 import type { ITor } from "../../models";
 import { TAXONOMY_VERSION, isTaxonomyCategory, fallbackCategory } from "../../config/taxonomy";
 import { PROJECT_TYPES, type ProjectType } from "../../config/projectTypes";
+import { applyFairnessPrefilter, type FairnessPrefilterThresholds } from "./fairnessPrefilter";
 
 const strArray = z.preprocess((v) => (v == null ? [] : v), z.array(z.string()));
 
@@ -47,6 +48,8 @@ export interface ExtractInput {
     goodsCategory?: string;
     announcementDate?: string;
   };
+  /** The Administrator's fairness pre-filter thresholds, told to the model (FR-20). */
+  fairnessThresholds?: FairnessPrefilterThresholds;
 }
 
 export const bidDeadlineResultSchema = z.object({
@@ -101,7 +104,7 @@ function parseDeadline(value: string | null): Date | undefined {
 export function applyExtractionToTor(
   tor: HydratedDocument<ITor>,
   result: TorExtractionResult,
-  opts: { extractorId: string; fallbackText: string }
+  opts: { extractorId: string; fallbackText: string; fairnessThresholds?: FairnessPrefilterThresholds }
 ): void {
   const now = new Date();
   tor.classification = {
@@ -151,7 +154,21 @@ export function applyExtractionToTor(
 
   // An invitation announcement has no scope of work, so the model has nothing to judge fairness on:
   // never publish signals from it. They appear when a later capture upgrades the document to the TOR.
-  const signals = tor.sourceDocument?.kind === "invitation" ? [] : result.fairnessSignals;
+  const raw = tor.sourceDocument?.kind === "invitation" ? [] : result.fairnessSignals;
+  // The pre-filter checks each signal against the TOR's own numbers (FR-20). The invitation's
+  // bid deadline is preferred over the one the model read from the TOR.
+  const signals = opts.fairnessThresholds
+    ? applyFairnessPrefilter(
+        raw,
+        {
+          budget: tor.budget,
+          referencePrice: tor.referencePrice,
+          announcementDate: tor.announcementDate,
+          bidDeadline: tor.procurement?.bidDeadline?.date ?? tor.submissionDeadline,
+        },
+        opts.fairnessThresholds
+      )
+    : raw;
   tor.fairnessFlags = signals.map((s) => ({
     field: s.field,
     severity: s.severity,
