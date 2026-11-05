@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
+import NotificationBell from "@/components/NotificationBell";
 
 // Top navigation, in display order. membersOnly: vendor and admin pages (dashboard,
 // saved list) — the bookmark API accepts both roles.
@@ -70,121 +71,126 @@ export default function Header() {
           ))}
         </nav>
 
-        <div className="hidden lg:flex items-center gap-1.5">
-          <Link
-            href="/tor"
-            aria-label="ค้นหา"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-blush-soft)] transition-colors"
-          >
-            <Search size={16} />
-          </Link>
+        <div className="flex items-center gap-1.5">
+          {/* One bell for every screen size: in-app notifications are vendor-only (FR-30). */}
+          {isVendor && <NotificationBell />}
 
-          {isAdmin && (
+          <div className="hidden lg:flex items-center gap-1.5">
             <Link
-              href="/admin"
-              className="btn-pill border border-[var(--color-border-strong)] mr-1 px-3.5 py-2 text-[13px] font-medium text-[var(--color-text)] hover:border-[var(--color-ink)] transition-colors"
-            >
-              <ShieldCheck size={14} />
-              หน้าแอดมิน
-            </Link>
-          )}
-
-          {hasBusinessFeatures && (
-            <Link
-              href="/bookmarks"
-              aria-label="รายการที่บันทึก"
+              href="/tor"
+              aria-label="ค้นหา"
               className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-blush-soft)] transition-colors"
             >
-              <Bookmark size={16} />
+              <Search size={16} />
             </Link>
-          )}
 
-          {loggedIn ? (
-            <div className="relative ml-1">
-              <button
-                aria-label="เมนูบัญชี"
-                onClick={() => setMenuOpen((v) => !v)}
-                className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[var(--color-ink)] text-xs font-bold text-white"
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="btn-pill border border-[var(--color-border-strong)] mr-1 px-3.5 py-2 text-[13px] font-medium text-[var(--color-text)] hover:border-[var(--color-ink)] transition-colors"
               >
-                {avatarSrc ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  (displayName || "ส").trim().slice(0, 1).toUpperCase()
-                )}
-              </button>
-              {menuOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 top-full z-40 mt-2 w-56 rounded-2xl border border-[var(--color-border)] bg-white p-1.5 shadow-[var(--shadow-lg)]">
-                    <div className="px-3 py-2">
-                      <p className="text-sm font-semibold text-[var(--color-text)] truncate">{displayName}</p>
-                      <p className="text-xs text-[var(--color-text-faint)] truncate">{user?.email}</p>
-                    </div>
-                    <div className="my-1 h-px bg-[var(--color-border)]" />
-                    {isAdmin && (
-                      <Link
-                        href="/admin"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
-                      >
-                        <ShieldCheck size={15} />
-                        หน้าแอดมิน
-                      </Link>
-                    )}
-                    {hasBusinessFeatures && (
-                      <Link
-                        href="/account/profile"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
-                      >
-                        <UserRound size={15} />
-                        โปรไฟล์ธุรกิจ
-                      </Link>
-                    )}
-                    <Link
-                      href="/account/settings"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
-                    >
-                      <Settings size={15} />
-                      ตั้งค่าบัญชี
-                    </Link>
-                    <Link
-                      href="/help"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
-                    >
-                      <CircleHelp size={15} />
-                      ช่วยเหลือ
-                    </Link>
-                    <div className="my-1 h-px bg-[var(--color-border)]" />
-                    <button
-                      onClick={handleLogout}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-rose-dark)] hover:bg-[var(--color-blush-soft)]"
-                    >
-                      <LogOut size={15} />
-                      ออกจากระบบ
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <Link href="/login" className="btn-pill btn-pill-primary ml-1 px-4 py-2.5 text-[13px]">
-              <LogIn size={14} />
-              เข้าสู่ระบบ
-            </Link>
-          )}
-        </div>
+                <ShieldCheck size={14} />
+                หน้าแอดมิน
+              </Link>
+            )}
 
-        <button
-          aria-label="เปิดเมนู"
-          className="lg:hidden rounded-full p-2 text-[var(--color-ink)] hover:bg-[var(--color-blush-soft)]"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? <X size={22} /> : <Menu size={22} />}
-        </button>
+            {hasBusinessFeatures && (
+              <Link
+                href="/bookmarks"
+                aria-label="รายการที่บันทึก"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-blush-soft)] transition-colors"
+              >
+                <Bookmark size={16} />
+              </Link>
+            )}
+
+            {loggedIn ? (
+              <div className="relative ml-1">
+                <button
+                  aria-label="เมนูบัญชี"
+                  onClick={() => setMenuOpen((v) => !v)}
+                  className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[var(--color-ink)] text-xs font-bold text-white"
+                >
+                  {avatarSrc ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    (displayName || "ส").trim().slice(0, 1).toUpperCase()
+                  )}
+                </button>
+                {menuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
+                    <div className="absolute right-0 top-full z-40 mt-2 w-56 rounded-2xl border border-[var(--color-border)] bg-white p-1.5 shadow-[var(--shadow-lg)]">
+                      <div className="px-3 py-2">
+                        <p className="text-sm font-semibold text-[var(--color-text)] truncate">{displayName}</p>
+                        <p className="text-xs text-[var(--color-text-faint)] truncate">{user?.email}</p>
+                      </div>
+                      <div className="my-1 h-px bg-[var(--color-border)]" />
+                      {isAdmin && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                        >
+                          <ShieldCheck size={15} />
+                          หน้าแอดมิน
+                        </Link>
+                      )}
+                      {hasBusinessFeatures && (
+                        <Link
+                          href="/account/profile"
+                          onClick={() => setMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                        >
+                          <UserRound size={15} />
+                          โปรไฟล์ธุรกิจ
+                        </Link>
+                      )}
+                      <Link
+                        href="/account/settings"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                      >
+                        <Settings size={15} />
+                        ตั้งค่าบัญชี
+                      </Link>
+                      <Link
+                        href="/help"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-blush-soft)]"
+                      >
+                        <CircleHelp size={15} />
+                        ช่วยเหลือ
+                      </Link>
+                      <div className="my-1 h-px bg-[var(--color-border)]" />
+                      <button
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--color-rose-dark)] hover:bg-[var(--color-blush-soft)]"
+                      >
+                        <LogOut size={15} />
+                        ออกจากระบบ
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <Link href="/login" className="btn-pill btn-pill-primary ml-1 px-4 py-2.5 text-[13px]">
+                <LogIn size={14} />
+                เข้าสู่ระบบ
+              </Link>
+            )}
+          </div>
+
+          <button
+            aria-label="เปิดเมนู"
+            className="lg:hidden rounded-full p-2 text-[var(--color-ink)] hover:bg-[var(--color-blush-soft)]"
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
       </div>
 
       {open && (
