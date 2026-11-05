@@ -15,6 +15,8 @@ const listQuerySchema = z.object({
   status: z.enum(["open", "resolved", "all"]).default("open"),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
+  /** Only the reports on this TOR (the admin edit form). */
+  torId: z.string().refine((v) => isValidObjectId(v), "Invalid torId").optional(),
 });
 
 const updateSchema = z
@@ -29,7 +31,7 @@ export async function listReports(req: Request, res: Response): Promise<void> {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) throw httpError(400, parsed.error.issues.map((i) => i.message).join("; "));
   const q = parsed.data;
-  const filter = q.status === "all" ? {} : { status: q.status };
+  const filter = { ...(q.status === "all" ? {} : { status: q.status }), ...(q.torId ? { torId: q.torId } : {}) };
 
   const [reports, totalCount, openCount, resolvedCount] = await Promise.all([
     ErrorReport.find(filter)
