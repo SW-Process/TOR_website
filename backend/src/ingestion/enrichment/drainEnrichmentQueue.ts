@@ -7,12 +7,16 @@ import { logIngestionEvent } from "../log";
 import { claimNext, complete, countRunnable, fail, maxCallsPerRun } from "./enrichmentJobRepo";
 import { sweepStaleEnrichmentRuns } from "./sweepStaleRuns";
 import { applyExtractionToTor, type TorExtractor } from "./torExtractor";
+import type { FairnessPrefilterThresholds } from "./fairnessPrefilter";
+import { getFairnessPrefilter } from "../../services/fairnessSettings";
 
 export interface DrainDeps {
   extractor: TorExtractor;
   storage?: BlobStorage;
   maxCalls?: number;
   now?: () => Date;
+  /** Overrides the saved fairness pre-filter thresholds (tests). */
+  fairnessThresholds?: FairnessPrefilterThresholds;
 }
 
 /**
@@ -43,6 +47,9 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
 
   // Sweep enrichment runs left "running" by an interrupted worker.
   await sweepStaleEnrichmentRuns();
+
+  // Read once per drain: a change an Administrator saves applies from the next drain.
+  const fairnessThresholds = deps.fairnessThresholds ?? (await getFairnessPrefilter()).thresholds;
 
   // The IngestionRun row is created lazily — only once there is a job to do —
   // so an empty queue writes no run row.
@@ -124,23 +131,26 @@ export async function drainEnrichmentQueue(deps: DrainDeps): Promise<DrainResult
             goodsCategory: tor.goodsCategory,
             announcementDate: tor.announcementDate?.toISOString(),
           },
+          fairnessThresholds,
         });
 
-        if (result.fairnessSignals.length > 0) {
+        applyExtractionToTor(tor, result, {
+          extractorId: deps.extractor.id,
+          fallbackText: `${tor.title} ${tor.goodsCategory ?? ""}`,
+          fairnessThresholds,
+        });
+
+        if (result.isSoftwareRelated && result.fairnessSignals.length > 0) {
           console.log(
             JSON.stringify({
               component: "drainEnrichmentQueue",
               event: "fairness-flags",
               torId: tor.id,
-              count: result.fairnessSignals.length,
+              count: tor.fairnessFlags.length,
+              dropped: result.fairnessSignals.length - tor.fairnessFlags.length,
             })
           );
         }
-
-        applyExtractionToTor(tor, result, {
-          extractorId: deps.extractor.id,
-          fallbackText: `${tor.title} ${tor.goodsCategory ?? ""}`,
-        });
         await tor.save();
 
         if ((tor.pipelineStatus as string) === "rejected") {
