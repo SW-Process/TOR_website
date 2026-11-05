@@ -22,6 +22,7 @@ import StatusBadge from "@/components/StatusBadge";
 import BookmarkButton from "@/components/BookmarkButton";
 import HideTorButton from "@/components/HideTorButton";
 import TorViewCount from "@/components/TorViewCount";
+import ConfidenceBadge from "@/components/ConfidenceBadge";
 import ReportIssueButton from "@/components/ReportIssueButton";
 import ShareTorButtons from "@/components/ShareTorButtons";
 import TORCard from "@/components/TORCard";
@@ -141,9 +142,12 @@ export default async function TORDetailPage({
 
           <div className="mt-8 card p-6 sm:p-7 bg-gradient-to-br from-white to-[var(--color-blush-soft)]">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="badge bg-white text-[var(--color-rose-dark)] shadow-[var(--shadow-sm)] py-1.5">
-                <Sparkles size={14} />
-                สรุปสาระสำคัญโดย AI · ความเชื่อมั่น{tor.summary.confidence}
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="badge bg-white text-[var(--color-rose-dark)] shadow-[var(--shadow-sm)] py-1.5">
+                  <Sparkles size={14} />
+                  สรุปสาระสำคัญโดย AI
+                </span>
+                <ConfidenceBadge level={tor.summary.confidence} subject="สรุปนี้" />
               </span>
               <span className="text-xs text-[var(--color-text-muted)]">
                 สร้างเมื่อ {formatThaiDate(tor.summary.generatedAt)}
@@ -230,6 +234,7 @@ export default async function TORDetailPage({
                       <span className="rounded-full bg-[var(--color-warning-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-warning)]">
                         {FAIRNESS_SEVERITY_LABELS[flag.severity]}
                       </span>
+                      <ConfidenceBadge level={flag.confidence} subject="สัญญาณนี้" size="sm" />
                     </div>
                     <p className="mt-1.5 text-sm text-[var(--color-text-muted)] leading-relaxed">
                       {flag.message}

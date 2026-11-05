@@ -14,10 +14,11 @@ import {
 } from "lucide-react";
 import AdminPageHeader from "./AdminPageHeader";
 import HideTorDialog from "./HideTorDialog";
+import ConfidenceBadge from "@/components/ConfidenceBadge";
 import StatusBadge from "@/components/StatusBadge";
-import { categories, formatBudget, formatThaiDate, formatThaiMonthYear, type TOR, type TORStatus } from "@/lib/mockData";
+import { categories, formatBudget, formatThaiDate, formatThaiMonthYear, type ConfidenceLevel, type TOR, type TORStatus } from "@/lib/mockData";
 import { apiFetch } from "@/lib/api";
-import { categoryToSlug, fetchAgencies, isUnknownDeadline, mapApiTor, type ApiTor } from "@/lib/torApi";
+import { categoryToSlug, fetchAgencies, isUnknownDeadline, mapApiTor, toConfidenceLevel, type ApiTor } from "@/lib/torApi";
 import { STATUS_API, STATUSES } from "@/lib/torSearch";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
@@ -58,12 +59,17 @@ interface Snapshot {
 const snapshotCache = new Map<string, Snapshot>();
 
 interface ApiAdminTor extends ApiTor {
-  fairnessFlags?: { field: FlagField; message: string; status: "open" | "acknowledged" | "dismissed" }[];
+  fairnessFlags?: {
+    field: FlagField;
+    message: string;
+    status: "open" | "acknowledged" | "dismissed";
+    confidence?: string;
+  }[];
 }
 
 /** A public TOR plus the AI fairness signals still waiting for review. */
 interface AdminTor extends TOR {
-  openFlags: { field: FlagField; message: string }[];
+  openFlags: { field: FlagField; message: string; confidence: ConfidenceLevel | null }[];
 }
 
 interface Draft {
@@ -92,7 +98,9 @@ interface Draft {
 function toAdminTor(raw: ApiAdminTor): AdminTor {
   return {
     ...mapApiTor(raw),
-    openFlags: (raw.fairnessFlags ?? []).filter((f) => f.status === "open"),
+    openFlags: (raw.fairnessFlags ?? [])
+      .filter((f) => f.status === "open")
+      .map((f) => ({ field: f.field, message: f.message, confidence: toConfidenceLevel(f.confidence) })),
   };
 }
 
@@ -501,7 +509,8 @@ export default function TORRecords({ initialQuery = "" }: { initialQuery?: strin
                 <ul className="mt-2 flex flex-col gap-1.5">
                   {draft.openFlags.map((f, i) => (
                     <li key={i} className="text-xs text-[var(--color-danger)] leading-relaxed">
-                      <span className="font-semibold">{fieldLabels[f.field]}:</span> {f.message}
+                      <span className="font-semibold">{fieldLabels[f.field]}:</span> {f.message}{" "}
+                      <ConfidenceBadge level={f.confidence} subject="สัญญาณนี้" size="sm" />
                     </li>
                   ))}
                 </ul>

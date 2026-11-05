@@ -53,12 +53,16 @@ export type Category =
   | "ที่ปรึกษาด้านดิจิทัล"
   | "อื่นๆ";
 
+/** How sure the AI is (FR-20), from the backend's high/medium/low. */
+export type ConfidenceLevel = "สูง" | "ปานกลาง" | "ต่ำ";
+
 export interface AISummary {
   keyPoints: string[];
   qualifications: string[];
   evaluationCriteria: { label: string; weight?: number }[];
   generatedAt: string;
-  confidence: "สูง" | "ปานกลาง" | "ต่ำ";
+  /** null when the AI gave none (summaries written before FR-20). */
+  confidence: ConfidenceLevel | null;
 }
 
 export type FairnessField =
@@ -80,6 +84,8 @@ export interface FairnessFlag {
   severity: "low" | "medium" | "high";
   message: string;
   detectedAt: string;
+  /** How strongly the source supports the signal (FR-20); null when the AI gave none. */
+  confidence: ConfidenceLevel | null;
 }
 
 export interface TOR {
@@ -199,6 +205,7 @@ export const torList: TOR[] = [
         message:
           "งบประมาณโครงการต่ำกว่าค่าเฉลี่ยของโครงการลักษณะใกล้เคียงกันในหมวดหมู่เดียวกันอย่างมีนัยสำคัญ อาจเกิดจากขอบเขตงานที่แคบกว่าปกติ",
         detectedAt: daysFromToday(-5),
+        confidence: "ปานกลาง",
       },
     ],
   },
@@ -320,6 +327,7 @@ export const torList: TOR[] = [
         message:
           "ระยะเวลาที่กำหนดให้ยื่นข้อเสนอสั้นกว่าค่าเฉลี่ยของโครงการลักษณะใกล้เคียงกัน อาจจำกัดจำนวนผู้เสนอราคาที่สามารถเตรียมเอกสารได้ทัน",
         detectedAt: daysFromToday(-8),
+        confidence: "สูง",
       },
     ],
   },
