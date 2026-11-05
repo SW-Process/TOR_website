@@ -35,7 +35,7 @@ unusually short submission window), never accusations of wrongdoing.
 TOR_website/
 ├── frontend/   # Next.js app — public, vendor, and admin pages
 ├── backend/    # Express API, TOR ingestion, AI enrichment jobs
-└── docs/       # Deployment guide and design notes
+└── docs/       # Deployment guide, security docs and design (use case model)
 ```
 
 ## Run with Docker
@@ -140,6 +140,7 @@ Backend checks: `npm test`, `npm run typecheck`. Frontend checks: `npm run lint`
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) — branching, commit messages, and pull requests
 - [docs/deployment/gcp.md](docs/deployment/gcp.md) — deploying to Google Cloud
+- [docs/design/](docs/design/README.md) — use case model: diagram, actors and use case descriptions
 - [docs/security/](docs/security/README.md) — security documentation (OWASP ASVS 5.0): input validation, sign-in defenses, authorization rules, dependency policy
 
 ## Team
