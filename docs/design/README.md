@@ -6,6 +6,8 @@ The TOR Checker use case diagram, drawn from the actual codebase (backend routes
 
 [`use-case-diagram.svg`](use-case-diagram.svg) is the vector version and stays sharp at any zoom level.
 
+See also the [domain model](domain-model.md): the concepts behind these use cases and how they relate.
+
 ## Notation
 
 | Symbol | Meaning |
