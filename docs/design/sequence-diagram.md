@@ -5,6 +5,7 @@ How the parts of TOR Checker talk to each other over time, for the flows that ma
 | # | Diagram | Use cases |
 |---|---|---|
 | 0 | [System overview](#0-system-overview) | the whole system in one picture |
+| 00 | [Whole system in detail](#00-whole-system-in-detail) | every flow in one tall diagram |
 | 1 | [Discover, enrich and notify](#1-discover-enrich-and-notify) | UC-34, UC-35, UC-36, UC-37 |
 | 2 | [Search and view a TOR](#2-search-and-view-a-tor) | UC-01, UC-02, UC-05 to UC-08 |
 | 3 | [Report incorrect data and resolve it](#3-report-incorrect-data-and-resolve-it) | UC-09, UC-26, UC-27, UC-28 |
@@ -43,6 +44,27 @@ The whole system in the order a TOR lives through it. It is deliberately coarse,
 5. **Keep the data right.** Users report wrong data. Admins, signed in with 2FA, review and correct TORs, resolve reports, and start runs by hand or send projects from the Chrome extension. These runs use the same ingestion code as step 1, inside the API.
 
 The file names keep their original numbers (`sequence-diagram-1-…` to `-4-…`, and `-5-` for this overview), but the overview is listed first because it is the best place to start.
+
+## 00. Whole system in detail
+
+![Sequence diagram: whole system in detail](sequence-diagram-6-system-detailed.png)
+
+[`sequence-diagram-6-system-detailed.svg`](sequence-diagram-6-system-detailed.svg) is the vector version. Source: [`6-system-detailed.mmd`](sequence/6-system-detailed.mmd).
+
+Every flow of the system in one diagram, about 220 steps, drawn at full size (4434 × 12817 px). Open the SVG and zoom, because the PNG is too tall to read in one screen. It has 13 parts and these sections, each in its own colored band:
+
+| Section | What it shows |
+|---|---|
+| A1 to A5 | The five scheduled jobs: discovery, enrichment, the refresh and notify step after enrichment, the daily lifecycle refresh, and the stalled-runs check |
+| B | A visitor: browse, search, statistics, TOR details, PDF, help center, report a TOR |
+| C1 to C4 | Sign up and sign in (password, 2FA, Google), forgot and reset password, and settings that need a fresh re-authentication |
+| D | A vendor: profile, matches, hide, bookmarks, saved searches, calendar notes, notifications, chat |
+| E1 to E7 | An admin: the 2FA gate and audit trail, dashboard and alerts, review and correct TORs, error reports, manual runs, capture with the Chrome extension, chat, help content, settings, logs and sessions |
+
+It is drawn from the routes and the code behind them. Two things it leaves out on purpose:
+
+- **Deadline reminders.** The notification type `deadline_reminder` exists in the model and the [use case model](README.md) lists deadline alerts (UC-24), but nothing in the code creates one. Only profile matches and saved-search matches are sent today.
+- **Per-field validation and every error code.** It shows the main failure of each step, not all of them. See the [API reference](api.md) for those.
 
 ## 1. Discover, enrich and notify
 
