@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1380" viewBox="0 0 2000 1380" font-family="Liberation Sans, Arial, Helvetica, sans-serif">
+<rect width="2000" height="1380" fill="#ffffff"/>
+<text x="1000.0" y="95" text-anchor="middle" font-size="46" font-weight="700" fill="#0b3d2e">How TOR Checker is built: the software development cycle</text>
+<text x="1000.0" y="140" text-anchor="middle" font-size="26" fill="#555">Six activities, followed clockwise, and what the team uses for each. The cycle repeats with every feature.</text>
+<path d="M 1022.3 365.7 A 365 365 0 0 1 1304.4 528.5 L 1158.4 625.1 A 190 190 0 0 0 1011.6 540.4 Z" fill="#b0252d"/>
+<text x="1138.8" y="471.7" text-anchor="middle" font-size="48" font-weight="700" fill="#fff">1</text>
+<text x="1138.8" y="503.7" text-anchor="middle" font-size="19" font-weight="700" fill="#fff">PLANNING</text>
+<path d="M 1326.7 567.1 A 365 365 0 0 1 1326.7 892.9 L 1170.0 814.8 A 190 190 0 0 0 1170.0 645.2 Z" fill="#2a3d6b"/>
+<text x="1277.5" y="712.0" text-anchor="middle" font-size="48" font-weight="700" fill="#fff">2</text>
+<text x="1277.5" y="744.0" text-anchor="middle" font-size="19" font-weight="700" fill="#fff">ANALYSIS</text>
+<path d="M 1304.4 931.5 A 365 365 0 0 1 1022.3 1094.3 L 1011.6 919.6 A 190 190 0 0 0 1158.4 834.9 Z" fill="#0a96dc"/>
+<text x="1138.8" y="952.3" text-anchor="middle" font-size="48" font-weight="700" fill="#fff">3</text>
+<text x="1138.8" y="984.3" text-anchor="middle" font-size="19" font-weight="700" fill="#fff">DESIGN</text>
+<path d="M 977.7 1094.3 A 365 365 0 0 1 695.6 931.5 L 841.6 834.9 A 190 190 0 0 0 988.4 919.6 Z" fill="#0e9f8a"/>
+<text x="861.2" y="952.3" text-anchor="middle" font-size="48" font-weight="700" fill="#fff">4</text>
+<text x="861.2" y="984.3" text-anchor="middle" font-size="19" font-weight="700" fill="#fff">IMPLEMENTATION</text>
+<path d="M 673.3 892.9 A 365 365 0 0 1 673.3 567.1 L 830.0 645.2 A 190 190 0 0 0 830.0 814.8 Z" fill="#edb51a"/>
+<text x="722.5" y="712.0" text-anchor="middle" font-size="48" font-weight="700" fill="#fff">5</text>
+<text x="722.5" y="744.0" text-anchor="middle" font-size="19" font-weight="700" fill="#fff">TESTING &amp;</text>
+<text x="722.5" y="766.0" text-anchor="middle" font-size="19" font-weight="700" fill="#fff">INTEGRATION</text>
+<path d="M 695.6 528.5 A 365 365 0 0 1 977.7 365.7 L 988.4 540.4 A 190 190 0 0 0 841.6 625.1 Z" fill="#ee8300"/>
+<text x="861.2" y="471.7" text-anchor="middle" font-size="48" font-weight="700" fill="#fff">6</text>
+<text x="861.2" y="503.7" text-anchor="middle" font-size="19" font-weight="700" fill="#fff">MAINTENANCE</text>
+<circle cx="1000" cy="730" r="168" fill="#fff"/>
+<text x="1000" y="712" text-anchor="middle" font-size="34" font-weight="400" fill="#0b3d2e">TOR CHECKER</text>
+<text x="1000" y="758" text-anchor="middle" font-size="40" font-weight="700" fill="#0b3d2e">DEVELOPMENT</text>
+<text x="1000" y="804" text-anchor="middle" font-size="40" font-weight="700" fill="#0b3d2e">CYCLE</text>
+<rect x="1400" y="210" width="560" height="250" rx="18" fill="#f6f8f9" stroke="#b0252d" stroke-width="4"/>
+<rect x="1400" y="210" width="14" height="250" rx="7" fill="#b0252d"/>
+<text x="1436" y="256" font-size="30" font-weight="700" fill="#b0252d">1. Planning</text>
+<text x="1436" y="298" font-size="23" fill="#222">GitHub issues: problem, solution, context,</text>
+<text x="1436" y="334" font-size="23" fill="#222">and a link to the requirement (FR-xx)</text>
+<text x="1436" y="370" font-size="23" fill="#222">Project board: Backlog, Ready, In Progress, Done</text>
+<text x="1436" y="406" font-size="23" fill="#222">Two-week sprint labels</text>
+<text x="1436" y="442" font-size="23" fill="#222">Spec and plan before larger features</text>
+<path d="M 1185.5 408.7 L 1400.0 335.0" stroke="#b0252d" stroke-width="3" fill="none" stroke-dasharray="8 6"/>
+<circle cx="1185.5" cy="408.7" r="6" fill="#b0252d"/>
+<rect x="1400" y="625" width="560" height="214" rx="18" fill="#f6f8f9" stroke="#2a3d6b" stroke-width="4"/>
+<rect x="1400" y="625" width="14" height="214" rx="7" fill="#2a3d6b"/>
+<text x="1436" y="671" font-size="30" font-weight="700" fill="#2a3d6b">2. Analysis</text>
+<text x="1436" y="713" font-size="23" fill="#222">Software requirements specification:</text>
+<text x="1436" y="749" font-size="23" fill="#222">numbered functional requirements (FR)</text>
+<text x="1436" y="785" font-size="23" fill="#222">and non-functional requirements (NFR)</text>
+<text x="1436" y="821" font-size="23" fill="#222">Domain model of the system&#x27;s concepts</text>
+<path d="M 1371.0 730.0 L 1400.0 732.0" stroke="#2a3d6b" stroke-width="3" fill="none" stroke-dasharray="8 6"/>
+<circle cx="1371.0" cy="730.0" r="6" fill="#2a3d6b"/>
+<rect x="1400" y="1000" width="560" height="214" rx="18" fill="#f6f8f9" stroke="#0a96dc" stroke-width="4"/>
+<rect x="1400" y="1000" width="14" height="214" rx="7" fill="#0a96dc"/>
+<text x="1436" y="1046" font-size="30" font-weight="700" fill="#0a96dc">3. Design</text>
+<text x="1436" y="1088" font-size="23" fill="#222">System design and API reference</text>
+<text x="1436" y="1124" font-size="23" fill="#222">ER diagram and class diagrams</text>
+<text x="1436" y="1160" font-size="23" fill="#222">Sequence diagrams</text>
+<text x="1436" y="1196" font-size="23" fill="#222">Mockups for the frontend pages</text>
+<path d="M 1185.5 1051.3 L 1400.0 1107.0" stroke="#0a96dc" stroke-width="3" fill="none" stroke-dasharray="8 6"/>
+<circle cx="1185.5" cy="1051.3" r="6" fill="#0a96dc"/>
+<rect x="40" y="1000" width="560" height="214" rx="18" fill="#f6f8f9" stroke="#0e9f8a" stroke-width="4"/>
+<rect x="40" y="1000" width="14" height="214" rx="7" fill="#0e9f8a"/>
+<text x="76" y="1046" font-size="30" font-weight="700" fill="#0e9f8a">4. Implementation</text>
+<text x="76" y="1088" font-size="23" fill="#222">One branch per task: type/what-you-do</text>
+<text x="76" y="1124" font-size="23" fill="#222">Conventional Commits, one thing per commit</text>
+<text x="76" y="1160" font-size="23" fill="#222">Express + MongoDB backend, Next.js frontend</text>
+<text x="76" y="1196" font-size="23" fill="#222">Pull request on the org template</text>
+<path d="M 814.5 1051.3 L 600.0 1107.0" stroke="#0e9f8a" stroke-width="3" fill="none" stroke-dasharray="8 6"/>
+<circle cx="814.5" cy="1051.3" r="6" fill="#0e9f8a"/>
+<rect x="40" y="625" width="560" height="214" rx="18" fill="#f6f8f9" stroke="#edb51a" stroke-width="4"/>
+<rect x="40" y="625" width="14" height="214" rx="7" fill="#edb51a"/>
+<text x="76" y="671" font-size="30" font-weight="700" fill="#9a7200">5. Testing &amp; Integration</text>
+<text x="76" y="713" font-size="23" fill="#222">Backend: 1,300+ automated tests</text>
+<text x="76" y="749" font-size="23" fill="#222">CI on every pull request: typecheck,</text>
+<text x="76" y="785" font-size="23" fill="#222">tests and build</text>
+<text x="76" y="821" font-size="23" fill="#222">At least one review before merge</text>
+<path d="M 629.0 730.0 L 600.0 732.0" stroke="#edb51a" stroke-width="3" fill="none" stroke-dasharray="8 6"/>
+<circle cx="629.0" cy="730.0" r="6" fill="#edb51a"/>
+<rect x="40" y="210" width="560" height="214" rx="18" fill="#f6f8f9" stroke="#ee8300" stroke-width="4"/>
+<rect x="40" y="210" width="14" height="214" rx="7" fill="#ee8300"/>
+<text x="76" y="256" font-size="30" font-weight="700" fill="#ee8300">6. Maintenance</text>
+<text x="76" y="298" font-size="23" fill="#222">Daily refresh of procurement status</text>
+<text x="76" y="334" font-size="23" fill="#222">Alerts when a pipeline run stalls</text>
+<text x="76" y="370" font-size="23" fill="#222">Admin logs and user error reports</text>
+<text x="76" y="406" font-size="23" fill="#222">Docs kept up to date</text>
+<path d="M 814.5 408.7 L 600.0 317.0" stroke="#ee8300" stroke-width="3" fill="none" stroke-dasharray="8 6"/>
+<circle cx="814.5" cy="408.7" r="6" fill="#ee8300"/>
+<text x="1000.0" y="1345" text-anchor="middle" font-size="22" fill="#777">Details and the gaps we know about: docs/development-process.md</text>
+</svg>

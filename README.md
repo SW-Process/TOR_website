@@ -147,6 +147,7 @@ Backend checks: `npm test`, `npm run typecheck`. Frontend checks: `npm run lint`
 - [docs/design/domain-model.md](docs/design/domain-model.md) — domain model: concepts, attributes and associations
 - [docs/security/](docs/security/README.md) — security documentation (OWASP ASVS 5.0): input validation, sign-in defenses, authorization rules, dependency policy
 - [docs/design/api.md](docs/design/api.md) — API reference: every backend endpoint, its access, parameters and responses
+- [docs/development-process.md](docs/development-process.md) — how the project is built, by software development cycle activity, with the gaps we know about
 
 ## Team
 
