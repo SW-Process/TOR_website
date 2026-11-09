@@ -26,7 +26,9 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  offset = 0;
+  // Start each test early in a TOTP step. Only the current step is accepted, so a code made just
+  // before the clock crosses a 30-second boundary would be refused (a slow CI run did exactly that).
+  offset = (2_000 - (realNow() % 30_000) + 30_000) % 30_000;
   jest.spyOn(Date, "now").mockImplementation(() => realNow() + offset);
   process.env.ADMIN_MFA_REQUIRED = "false";
 });

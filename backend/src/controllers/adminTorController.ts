@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { isValidObjectId } from "mongoose";
 import type { QueryFilter } from "mongoose";
 import { z } from "zod";
-import { Tor } from "../models";
+import { ErrorReport, Tor } from "../models";
 import type { ITor } from "../models";
 import { TAXONOMY } from "../config/taxonomy";
 import { httpError } from "../utils/httpError";
@@ -63,6 +63,14 @@ export async function listAdminTors(req: Request, res: Response): Promise<void> 
   });
 }
 
+/** GET /api/admin/tors/:id — one public TOR in the same shape as a list row, for the edit form. */
+export async function getAdminTor(req: Request, res: Response): Promise<void> {
+  const id = torIdParam(req);
+  const tor = await Tor.findOne({ _id: id, pipelineStatus: "enriched" }).select(ADMIN_PROJECT_STAGE).lean();
+  if (!tor) throw httpError(404, "TOR not found");
+  res.status(200).json({ tor: withDisplayStatus(tor) });
+}
+
 /**
  * GET /api/admin/tors/:id/fairness-flags — each flag with the reasoning and data points behind
  * it (FR-19). The public TOR API leaves these two out. Flags written before they existed have
@@ -98,8 +106,15 @@ const updateSchema = z
     bidDeadline: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "bidDeadline must be YYYY-MM-DD").nullable().optional(),
     /** Mark every open fairness flag as acknowledged (reviewed). */
     resolveFlags: z.boolean().optional(),
+    /** Mark every open error report on this TOR resolved (FR-40/FR-41), with the note below. */
+    resolveReports: z.boolean().optional(),
+    resolutionNote: z.string().trim().max(1000).optional(),
   })
-  .strict();
+  .strict()
+  .refine((v) => v.resolutionNote === undefined || v.resolveReports, {
+    message: "resolutionNote needs resolveReports",
+    path: ["resolutionNote"],
+  });
 
 function torIdParam(req: Request): string {
   const id = String(req.params.id);
@@ -130,7 +145,7 @@ export async function updateAdminTor(req: Request, res: Response): Promise<void>
   const id = torIdParam(req);
   const parsed = updateSchema.safeParse(req.body ?? {});
   if (!parsed.success) throw httpError(400, parsed.error.issues.map((i) => i.message).join("; "));
-  const { resolveFlags, budget, submissionDeadline, bidDeadline, ...fields } = parsed.data;
+  const { resolveFlags, resolveReports, resolutionNote, budget, submissionDeadline, bidDeadline, ...fields } = parsed.data;
 
   const tor = await Tor.findOne({ _id: id, pipelineStatus: "enriched" });
   if (!tor) throw httpError(404, "TOR not found");
@@ -194,6 +209,23 @@ export async function updateAdminTor(req: Request, res: Response): Promise<void>
       message: `TOR ${id} edited by admin ${req.user!.id}: ${Object.keys(changes).join(", ")}`,
       context: { torId: id, editedBy: req.user!.id, changes },
     });
+  }
+
+  if (resolveReports) {
+    const resolved = await ErrorReport.updateMany(
+      { torId: id, status: "open" },
+      { $set: { status: "resolved", resolvedBy: req.user!.id, resolvedAt: new Date(), resolutionNote: resolutionNote || undefined } }
+    );
+    if (resolved.modifiedCount > 0) {
+      changes["reports.open"] = { from: resolved.modifiedCount, to: 0 };
+      await logIngestionEvent({
+        source: "application",
+        component: "admin.tor-edit",
+        severity: "info",
+        message: `TOR ${id}: ${resolved.modifiedCount} error report(s) resolved by admin ${req.user!.id}`,
+        context: { torId: id, editedBy: req.user!.id, changes: { "reports.open": changes["reports.open"] } },
+      });
+    }
   }
 
   const saved = await Tor.findById(id).select(ADMIN_PROJECT_STAGE).lean();
