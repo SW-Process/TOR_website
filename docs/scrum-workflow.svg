@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1320" viewBox="0 0 2000 1320" font-family="Liberation Sans, Arial, Helvetica, sans-serif">
 <rect width="2000" height="1320" fill="#fff"/>
 <text x="1000.0" y="80" text-anchor="middle" font-size="46" font-weight="700" fill="#12263f">How our team works: Scrum, adapted to a team of three</text>
-<text x="1000.0" y="124" text-anchor="middle" font-size="26" fill="#5b6b80">Two-week sprints on a GitHub board. We hold sprint planning, a daily stand-up and a sprint review.</text>
+<text x="1000.0" y="124" text-anchor="middle" font-size="26" fill="#5b6b80">Two-week sprints on a GitHub board. We hold sprint planning, a stand-up every Monday, Wednesday and Friday, and a sprint review.</text>
 <text x="120" y="215" text-anchor="start" font-size="30" font-weight="700" fill="#0b4f8f">Roles</text>
 <circle cx="330" cy="300" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
 <circle cx="330" cy="286.0" r="15.0" fill="none" stroke="#0b4f8f" stroke-width="5"/>
@@ -54,8 +54,8 @@
 <text x="1385" y="744" text-anchor="middle" font-size="44" font-weight="700" fill="#12263f">2 weeks</text>
 <path d="M 1490 500 C 1550 410 1650 395 1722 438" fill="none" stroke="#0b2a52" stroke-width="30"/>
 <polygon points="1706,402 1768,462 1690,480" fill="#0b2a52"/>
-<text x="1610" y="355" text-anchor="middle" font-size="28" font-weight="700" fill="#12263f">Daily stand-up</text>
-<text x="1610" y="385" text-anchor="middle" font-size="24" font-weight="400" fill="#5b6b80">every day</text>
+<text x="1610" y="355" text-anchor="middle" font-size="28" font-weight="700" fill="#12263f">Stand-up</text>
+<text x="1610" y="385" text-anchor="middle" font-size="24" font-weight="400" fill="#5b6b80">Mon, Wed, Fri</text>
 <circle cx="1830" cy="490" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
 <rect x="1794" y="462" width="72" height="48" rx="6" fill="none" stroke="#0b4f8f" stroke-width="5"/>
 <line x1="1830" y1="510" x2="1830" y2="524" stroke="#0b4f8f" stroke-width="5"/>

@@ -24,7 +24,7 @@ One person holds two roles, so there is no second view on priorities. Reviews of
 | Sprint planning meeting | The team picks issues for the sprint, adds the sprint label and moves them to the Ready column | The `sprint: ...` label on an issue and the Ready (Sprint backlog) column |
 | Sprint backlog | The issues in the Ready column | The project board |
 | Sprint | Two weeks. The labelled sprints ran 10 Sep to 24 Sep and 25 Sep to 9 Oct | The two `sprint:` labels |
-| Daily stand-up | A short check-in every day on what is done, what is next and what blocks | Held by the team, no trace in the repository |
+| Stand-up | A short check-in on what is done, what is next and what blocks, every Monday, Wednesday and Friday | Held by the team, no trace in the repository |
 | Sprint review | At the end of the sprint the team shows the finished work | Held by the team, no trace in the repository |
 | Finished work | Pull requests merged into `main`, with the card in the Done column | Merged pull requests and the Done column |
 
@@ -47,5 +47,6 @@ The strip at the bottom of the diagram is what happens inside a sprint for each 
 - **No sprint retrospective.** The team does not hold one, so there is no regular moment to change how we work. This is the biggest gap against Scrum.
 - **One person is Product Owner and Scrum Master.** See the roles above.
 - **Sprint labels stop after 9 October.** Later issues have none, so the board does not show which sprint they belong to. If the sprints went on, the labels should too.
+- **The stand-up is three times a week, not daily.** Scrum asks for a daily one. On the days without a stand-up, someone who is blocked has to wait or ask in the chat.
 - **The two-week length is a team choice.** Scrum allows one to four weeks.
 - **Reviews are a team rule, not enforced.** GitHub does not block a merge without approval, because `main` has no branch protection.
