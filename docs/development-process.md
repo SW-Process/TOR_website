@@ -16,8 +16,8 @@ The cycle is not run once. The project started on 9 August 2026 and has since ha
 | 2 | Analysis | A requirements specification with numbered functional and non-functional requirements | The SRS, and the [domain model](design/domain-model.md) |
 | 3 | Design | System, data, class and sequence diagrams, an API reference, a design spec for larger features | [`docs/design/`](design/README.md) and [`docs/superpowers/`](superpowers) |
 | 4 | Implementation | A branch per task, Conventional Commits, pull requests with a template | [`CONTRIBUTING.md`](../CONTRIBUTING.md) and the code |
-| 5 | Testing and integration | Backend tests, CI on every pull request, a review before merge, a security checklist | [`.github/workflows/`](../.github/workflows), [`docs/security/`](security/README.md) |
-| 6 | Maintenance | Scheduled refresh jobs, alerts, logs, user error reports, dependency fixes | [`docs/deployment/gcp.md`](deployment/gcp.md), the admin panel |
+| 5 | Testing and integration | Backend tests, CI on every pull request, a review before merge | [`.github/workflows/`](../.github/workflows) and the backend tests |
+| 6 | Maintenance | Scheduled refresh jobs, alerts, logs, user error reports | [`docs/deployment/gcp.md`](deployment/gcp.md), the admin panel |
 
 ## 1. Planning
 
@@ -63,9 +63,8 @@ The backend is Express 5 with MongoDB, the frontend is Next.js, and both are Typ
 **What we do.**
 
 - **Tests.** The backend has 104 test files with more than 1,300 tests, running against an in-memory MongoDB so no database service is needed.
-- **Continuous integration.** [`ci.yml`](../.github/workflows/ci.yml) runs on every pull request into `main` and on every push to `main`. The backend job runs type checking, the tests and the build. Both jobs audit production dependencies (high and critical findings fail the run) and keep a software bill of materials.
+- **Continuous integration.** [`ci.yml`](../.github/workflows/ci.yml) runs on every pull request into `main` and on every push to `main`. The backend job runs type checking, the tests and the build, and the frontend job runs the build.
 - **Review.** 87 of the 89 pull requests have at least one review, as `CONTRIBUTING.md` requires. Pull request #173 below, for example, was approved and merged by a teammate, not by its author.
-- **Security.** The project is checked against OWASP ASVS 5.0 at Level 2, with a [checklist](security/asvs-checklist.md) that links each requirement to code and test evidence.
 
 **Missing.**
 
@@ -79,8 +78,7 @@ The backend is Express 5 with MongoDB, the frontend is Next.js, and both are Typ
 
 - A daily lifecycle job re-checks open TORs on e-GP and updates their stage and bid deadline.
 - A stalled-runs job marks pipeline runs that stopped making progress as failed and alerts every admin in the admin panel and by email.
-- Admins read the system and audit logs, and users can report wrong data on a TOR. Admins correct it and close the report from a queue.
-- Dependency advisories are fixed as they appear (for example the pull request that upgraded the vulnerable packages), under the [third-party component policy](security/dependency-management.md).
+- Admins read the system logs, and users can report wrong data on a TOR. Admins correct it and close the report from a queue.
 - Deployment steps and schedules are in [`docs/deployment/gcp.md`](deployment/gcp.md).
 
 **Missing.** There is no automated deployment: the guide uses `gcloud` commands, so releasing is a manual step. Vendors get match alerts, but nothing in the code sends deadline reminders yet, although the notification type exists.

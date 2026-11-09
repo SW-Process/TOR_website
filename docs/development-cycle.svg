@@ -62,15 +62,14 @@
 <text x="76" y="1196" font-size="23" fill="#222">Pull request on the org template</text>
 <path d="M 814.5 1051.3 L 600.0 1107.0" stroke="#0e9f8a" stroke-width="3" fill="none" stroke-dasharray="8 6"/>
 <circle cx="814.5" cy="1051.3" r="6" fill="#0e9f8a"/>
-<rect x="40" y="625" width="560" height="250" rx="18" fill="#f6f8f9" stroke="#edb51a" stroke-width="4"/>
-<rect x="40" y="625" width="14" height="250" rx="7" fill="#edb51a"/>
+<rect x="40" y="625" width="560" height="214" rx="18" fill="#f6f8f9" stroke="#edb51a" stroke-width="4"/>
+<rect x="40" y="625" width="14" height="214" rx="7" fill="#edb51a"/>
 <text x="76" y="671" font-size="30" font-weight="700" fill="#9a7200">5. Testing &amp; Integration</text>
 <text x="76" y="713" font-size="23" fill="#222">Backend: 1,300+ automated tests</text>
-<text x="76" y="749" font-size="23" fill="#222">CI on every pull request: typecheck, tests,</text>
-<text x="76" y="785" font-size="23" fill="#222">build, dependency audit, SBOM</text>
+<text x="76" y="749" font-size="23" fill="#222">CI on every pull request: typecheck,</text>
+<text x="76" y="785" font-size="23" fill="#222">tests and build</text>
 <text x="76" y="821" font-size="23" fill="#222">At least one review before merge</text>
-<text x="76" y="857" font-size="23" fill="#222">Security checklist: OWASP ASVS Level 2</text>
-<path d="M 629.0 730.0 L 600.0 750.0" stroke="#edb51a" stroke-width="3" fill="none" stroke-dasharray="8 6"/>
+<path d="M 629.0 730.0 L 600.0 732.0" stroke="#edb51a" stroke-width="3" fill="none" stroke-dasharray="8 6"/>
 <circle cx="629.0" cy="730.0" r="6" fill="#edb51a"/>
 <rect x="40" y="210" width="560" height="214" rx="18" fill="#f6f8f9" stroke="#ee8300" stroke-width="4"/>
 <rect x="40" y="210" width="14" height="214" rx="7" fill="#ee8300"/>
@@ -78,7 +77,7 @@
 <text x="76" y="298" font-size="23" fill="#222">Daily refresh of procurement status</text>
 <text x="76" y="334" font-size="23" fill="#222">Alerts when a pipeline run stalls</text>
 <text x="76" y="370" font-size="23" fill="#222">Admin logs and user error reports</text>
-<text x="76" y="406" font-size="23" fill="#222">Dependency fixes, docs kept up to date</text>
+<text x="76" y="406" font-size="23" fill="#222">Docs kept up to date</text>
 <path d="M 814.5 408.7 L 600.0 317.0" stroke="#ee8300" stroke-width="3" fill="none" stroke-dasharray="8 6"/>
 <circle cx="814.5" cy="408.7" r="6" fill="#ee8300"/>
 <text x="1000.0" y="1345" text-anchor="middle" font-size="22" fill="#777">Details and the gaps we know about: docs/development-process.md</text>
