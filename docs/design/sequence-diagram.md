@@ -4,6 +4,7 @@ How the parts of TOR Checker talk to each other over time, for the flows that ma
 
 | # | Diagram | Use cases |
 |---|---|---|
+| 0 | [System overview](#0-system-overview) | the whole system in one picture |
 | 1 | [Discover, enrich and notify](#1-discover-enrich-and-notify) | UC-34, UC-35, UC-36, UC-37 |
 | 2 | [Search and view a TOR](#2-search-and-view-a-tor) | UC-01, UC-02, UC-05 to UC-08 |
 | 3 | [Report incorrect data and resolve it](#3-report-incorrect-data-and-resolve-it) | UC-09, UC-26, UC-27, UC-28 |
@@ -26,6 +27,22 @@ Each diagram's text source is in [`sequence/`](sequence). The pictures are rende
 mmdc -i sequence/1-pipeline.mmd -o sequence-diagram-1-pipeline.svg -b white
 mmdc -i sequence/1-pipeline.mmd -o sequence-diagram-1-pipeline.png -b white -w 1500 -s 2
 ```
+
+## 0. System overview
+
+![Sequence diagram: system overview](sequence-diagram-5-system-overview.png)
+
+[`sequence-diagram-5-system-overview.svg`](sequence-diagram-5-system-overview.svg) is the vector version. Source: [`5-system-overview.mmd`](sequence/5-system-overview.mmd).
+
+The whole system in the order a TOR lives through it. It is deliberately coarse, so read the four diagrams below for the detail of each part.
+
+1. **Bring TORs in.** A scheduled job finds software projects on e-GP, saves them, stores the PDFs and queues them for AI.
+2. **Understand them with AI.** A second job sends each queued TOR to Gemini and publishes the software ones with a summary and fairness signals.
+3. **Refresh and tell vendors.** The same job reads each TOR's procurement stage and deadline, then emails vendors about matches.
+4. **People use the site.** Visitors and vendors search and read TORs through the frontend and the API, which only ever serve published TORs. Signed-in vendors also keep a profile, bookmarks and saved searches.
+5. **Keep the data right.** Users report wrong data. Admins, signed in with 2FA, review and correct TORs, resolve reports, and start runs by hand or send projects from the Chrome extension. These runs use the same ingestion code as step 1, inside the API.
+
+The file names keep their original numbers (`sequence-diagram-1-…` to `-4-…`, and `-5-` for this overview), but the overview is listed first because it is the best place to start.
 
 ## 1. Discover, enrich and notify
 
