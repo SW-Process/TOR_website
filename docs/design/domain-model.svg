@@ -1,0 +1,311 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="25 -30 2120 1518" width="2120" height="1518" font-family="Arial, Liberation Sans, Helvetica, sans-serif" xmlns:c2pa="http://c2pa.org/manifest"><metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTo5ODQ3YzdjNC00NGJjLTQzMTAtOGZiZi02MDlkOWM3MDU0ZWQAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaDV9Ht6G5hmefXEPsUckIcwAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDo5NjE5MGRiMi0yZmFmLTQ5YTYtOWRiMS02NGFmMDFlZmQ0OWJscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoT5k5l0J7McuHlhy4y2uw5QAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgg8lWAtsuZiM8sW30shgtZIU6a0IxHgf7gzpFAExo4d26kZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaCBAVfuv+HZ5AU6w3pcVz2gAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRNAAAAAAAAAAAAAAAAAGRoYXNoWCAodiKrRDU0XuLsyVmTvQewxYMnokC3tM6zcQxqdxgIAmRuYW1lbmp1bWJmIG1hbmlmZXN0amV4Y2x1c2lvbnOBomVzdGFydBjZZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOjk4NDdjN2M0LTQ0YmMtNDMxMC04ZmJmLTYwOWQ5YzcwNTRlZC9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOjFjMjJkMWIzLThiZjItNDRkNS1hNDhlLWYxZTU1MTUyNDRkZXJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCDyVYC2y5mIzyxbfSyGC1khTprQjEeB/uDOkUATGjh3bqJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFggp1Yuvg7CPBEUEzSsuRRjC5qifO8v7zPB076Ajf8v9xiiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFggLj/5iHmnXl5DxNgvqaw5TGCgoWB/fhVi81wYS3vdwBp0Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQDAgoFY2uO9bE0QsPZk3JAWdn3FwZV3uH3NPMRTPenbMGie5xtkfChflutan8coXLlt/SBqc9lMEh4lNId5V6nc=</c2pa:manifest></metadata>
+<rect x="25" y="-30" width="2120" height="1518" fill="#ffffff"/>
+<text x="55" y="4" font-size="20" font-weight="bold" fill="#111111">TOR Checker — Domain Model</text>
+<line x1="471.7" y1="295.8" x2="929.3" y2="125.1" stroke="#222222" stroke-width="1.2"/>
+<polygon points="929.3,125.1 919.0,137.5 913.4,122.5" fill="#ffffff" stroke="#222222" stroke-width="1.2"/>
+<line x1="1662.9" y1="412.0" x2="1088.3" y2="133.0" stroke="#222222" stroke-width="1.2"/>
+<polygon points="1088.3,133.0 1104.4,131.9 1097.4,146.3" fill="#ffffff" stroke="#222222" stroke-width="1.2"/>
+<line x1="1090.7" y1="90.1" x2="1353.0" y2="74.1" stroke="#222222" stroke-width="1.2"/>
+<line x1="1420.0" y1="100.5" x2="1420.0" y2="184.5" stroke="#222222" stroke-width="1.2"/>
+<polygon points="1420.0,100.5 1414.0,109.5 1420.0,118.5 1426.0,109.5" fill="#222222"/>
+<line x1="1365.0" y1="198.9" x2="1090.7" y2="118.6" stroke="#222222" stroke-width="1.2"/>
+<line x1="1038.4" y1="133.0" x2="1250.4" y2="417.0" stroke="#222222" stroke-width="1.2"/>
+<line x1="1645.0" y1="435.4" x2="1359.4" y2="463.2" stroke="#222222" stroke-width="1.2"/>
+<line x1="1242.0" y1="523.0" x2="1080.0" y2="701.7" stroke="#222222" stroke-width="1.2"/>
+<line x1="471.7" y1="357.0" x2="643.6" y2="407.5" stroke="#222222" stroke-width="1.2"/>
+<line x1="749.6" y1="468.0" x2="920.0" y2="687.1" stroke="#222222" stroke-width="1.2"/>
+<line x1="471.7" y1="398.0" x2="920.0" y2="730.6" stroke="#222222" stroke-width="1.2"/>
+<line x1="308.7" y1="435.5" x2="165.8" y2="647.0" stroke="#222222" stroke-width="1.2"/>
+<polygon points="308.7,435.5 298.7,439.6 298.6,450.4 308.6,446.3" fill="#222222"/>
+<line x1="288.3" y1="340.2" x2="165.0" y2="353.9" stroke="#222222" stroke-width="1.2"/>
+<polygon points="288.3,340.2 278.7,335.2 270.4,342.2 280.0,347.1" fill="#222222"/>
+<line x1="389.0" y1="435.5" x2="416.1" y2="754.5" stroke="#222222" stroke-width="1.2"/>
+<line x1="475.0" y1="799.1" x2="920.0" y2="791.4" stroke="#222222" stroke-width="1.2"/>
+<line x1="365.0" y1="781.0" x2="203.7" y2="725.4" stroke="#222222" stroke-width="1.2"/>
+<line x1="375.3" y1="1107.0" x2="920.0" y2="830.6" stroke="#222222" stroke-width="1.2"/>
+<line x1="920.0" y1="879.2" x2="690.8" y2="1134.5" stroke="#222222" stroke-width="1.2"/>
+<line x1="994.9" y1="903.0" x2="981.7" y2="1192.0" stroke="#222222" stroke-width="1.2"/>
+<polygon points="994.9,903.0 988.5,911.7 994.0,921.0 1000.4,912.3" fill="#222222"/>
+<line x1="1080.0" y1="872.4" x2="1278.6" y2="1077.0" stroke="#222222" stroke-width="1.2"/>
+<polygon points="1080.0,872.4 1082.0,883.1 1092.6,885.4 1090.6,874.7" fill="#222222"/>
+<line x1="1330.0" y1="1183.0" x2="1330.0" y2="1389.5" stroke="#222222" stroke-width="1.2"/>
+<polygon points="1330.0,1183.0 1324.0,1192.0 1330.0,1201.0 1336.0,1192.0" fill="#222222"/>
+<line x1="1080.0" y1="828.9" x2="1640.3" y2="1101.0" stroke="#222222" stroke-width="1.2"/>
+<polygon points="1080.0,828.9 1085.5,838.2 1096.2,836.7 1090.7,827.4" fill="#222222"/>
+<line x1="1700.0" y1="1198.0" x2="1700.0" y2="1382.0" stroke="#222222" stroke-width="1.2"/>
+<polygon points="1700.0,1198.0 1694.0,1207.0 1700.0,1216.0 1706.0,1207.0" fill="#222222"/>
+<line x1="1944.6" y1="1092.9" x2="1759.7" y2="1121.0" stroke="#222222" stroke-width="1.2"/>
+<line x1="1709.1" y1="448.0" x2="2010.7" y2="1042.0" stroke="#222222" stroke-width="1.2"/>
+<line x1="1688.0" y1="448.0" x2="1515.3" y2="707.0" stroke="#222222" stroke-width="1.2"/>
+<line x1="1419.0" y1="763.8" x2="1080.0" y2="785.0" stroke="#222222" stroke-width="1.2"/>
+<line x1="1541.0" y1="729.5" x2="1665.0" y2="667.5" stroke="#222222" stroke-width="1.2"/>
+<line x1="1701.7" y1="448.0" x2="1717.1" y2="609.5" stroke="#222222" stroke-width="1.2"/>
+<line x1="1730.0" y1="412.0" x2="1941.0" y2="285.4" stroke="#222222" stroke-width="1.2"/>
+<line x1="1755.0" y1="446.0" x2="1937.7" y2="499.0" stroke="#222222" stroke-width="1.2"/>
+<text x="1107.3" y="104.1" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="1337.7" y="90.0" font-size="11" text-anchor="middle" fill="#111111">0..1</text>
+<rect x="1204.5" y="86.1" width="36.0" height="15.0" fill="#ffffff"/>
+<text x="1222.5" y="97.1" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">opens</text>
+<text x="1409.0" y="134.5" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="1409.0" y="172.5" font-size="11" text-anchor="middle" fill="#111111">1..*</text>
+<text x="1352.7" y="187.9" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<text x="1122.6" y="120.5" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<rect x="1210.2" y="141.2" width="41.5" height="15.0" fill="#ffffff"/>
+<text x="1230.9" y="152.2" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">sent by</text>
+<text x="1039.1" y="156.4" font-size="11" text-anchor="middle" fill="#111111">0..1</text>
+<text x="1249.7" y="401.6" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="1115.5" y="274.6" width="40.2" height="15.0" fill="#ffffff"/>
+<text x="1135.6" y="285.6" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">reports</text>
+<text x="1628.0" y="430.0" font-size="11" text-anchor="middle" fill="#111111">0..1</text>
+<text x="1374.2" y="454.7" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="1477.6" y="431.4" width="47.0" height="15.0" fill="#ffffff"/>
+<text x="1501.1" y="442.4" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">resolves</text>
+<text x="1239.4" y="546.2" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<text x="1098.9" y="701.2" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<rect x="1136.1" y="598.0" width="33.6" height="15.0" fill="#ffffff"/>
+<text x="1152.8" y="609.0" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">about</text>
+<text x="483.9" y="376.0" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="625.2" y="417.6" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="536.9" y="385.8" width="35.4" height="15.0" fill="#ffffff"/>
+<text x="554.6" y="396.8" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">keeps</text>
+<text x="750.7" y="491.4" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<text x="901.5" y="685.2" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<rect x="808.4" y="577.3" width="35.3" height="15.0" fill="#ffffff"/>
+<text x="826.1" y="588.3" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">tracks</text>
+<text x="478.0" y="420.4" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<text x="900.6" y="733.9" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="673.1" y="566.2" width="32.3" height="15.0" fill="#ffffff"/>
+<text x="689.3" y="577.2" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">hides</text>
+<text x="282.8" y="458.2" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="165.7" y="631.6" font-size="11" text-anchor="middle" fill="#111111">0..50</text>
+<text x="257.3" y="336.6" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="193.6" y="343.6" font-size="11" text-anchor="middle" fill="#111111">0..1000</text>
+<text x="379.4" y="456.4" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="403.8" y="743.5" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="368.1" y="588.9" width="47.0" height="15.0" fill="#ffffff"/>
+<text x="391.6" y="599.9" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">receives</text>
+<text x="491.2" y="813.8" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<text x="904.2" y="806.7" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<rect x="680.9" y="799.2" width="33.6" height="15.0" fill="#ffffff"/>
+<text x="697.7" y="810.2" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">about</text>
+<text x="353.5" y="769.4" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<text x="222.4" y="724.2" font-size="11" text-anchor="middle" fill="#111111">0..1</text>
+<rect x="263.8" y="735.8" width="48.2" height="15.0" fill="#ffffff"/>
+<text x="287.9" y="746.8" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">matched</text>
+<text x="394.6" y="1113.6" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="910.7" y="851.7" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="622.7" y="971.6" width="59.9" height="15.0" fill="#ffffff"/>
+<text x="652.6" y="982.6" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">announces</text>
+<text x="901.1" y="887.7" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="693.3" y="1119.2" font-size="11" text-anchor="middle" fill="#111111">0..1</text>
+<rect x="785.3" y="992.5" width="23.8" height="15.0" fill="#ffffff"/>
+<text x="797.2" y="1003.5" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">has</text>
+<text x="982.5" y="936.5" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="971.5" y="1179.5" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<text x="1093.0" y="905.6" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="1275.3" y="1061.9" font-size="11" text-anchor="middle" fill="#111111">0..1</text>
+<text x="1319.0" y="1217.0" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="1319.0" y="1377.5" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<text x="1102.2" y="855.9" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="1621.1" y="1107.9" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<text x="1689.0" y="1232.0" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="1689.0" y="1370.0" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<text x="1927.2" y="1088.5" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="1773.9" y="1111.7" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="1834.4" y="1089.1" width="32.3" height="15.0" fill="#ffffff"/>
+<text x="1850.5" y="1100.1" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">filters</text>
+<text x="1706.6" y="471.2" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<text x="1993.7" y="1036.7" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<rect x="1821.7" y="743.0" width="56.8" height="15.0" fill="#ffffff"/>
+<text x="1850.1" y="754.0" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">configures</text>
+<text x="1670.0" y="459.2" font-size="11" text-anchor="middle" fill="#111111">0..1</text>
+<text x="1515.1" y="691.6" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="1576.1" y="564.4" width="32.9" height="15.0" fill="#ffffff"/>
+<text x="1592.5" y="575.4" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">starts</text>
+<text x="1402.3" y="757.8" font-size="11" text-anchor="middle" fill="#111111">0..1</text>
+<text x="1095.3" y="777.0" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="1222.6" y="756.4" width="52.5" height="15.0" fill="#ffffff"/>
+<text x="1248.8" y="767.4" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">discovers</text>
+<text x="1560.2" y="736.2" font-size="11" text-anchor="middle" fill="#111111">0..1</text>
+<text x="1655.6" y="688.5" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="1590.2" y="701.3" width="35.3" height="15.0" fill="#ffffff"/>
+<text x="1607.9" y="712.3" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">raises</text>
+<text x="1692.3" y="469.0" font-size="11" text-anchor="middle" fill="#111111">1</text>
+<text x="1704.6" y="598.6" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="1675.0" y="522.8" width="47.0" height="15.0" fill="#ffffff"/>
+<text x="1698.5" y="533.8" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">receives</text>
+<text x="1738.1" y="398.3" font-size="11" text-anchor="middle" fill="#111111">0..1</text>
+<text x="1932.9" y="307.1" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="1823.8" y="351.1" width="34.7" height="15.0" fill="#ffffff"/>
+<text x="1841.2" y="362.1" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">writes</text>
+<text x="1767.3" y="465.0" font-size="11" text-anchor="middle" fill="#111111">0..1</text>
+<text x="1919.3" y="509.1" font-size="11" text-anchor="middle" fill="#111111">*</text>
+<rect x="1825.9" y="476.1" width="34.7" height="15.0" fill="#ffffff"/>
+<text x="1843.3" y="487.1" font-size="11" font-style="italic" text-anchor="middle" fill="#333333">writes</text>
+<rect x="929.3" y="57.0" width="161.4" height="76.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1010.0" y="73.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">User</text>
+<line x1="929.3" y1="79.0" x2="1090.7" y2="79.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="937.3" y="92.0" font-size="12" fill="#111111">-email : String</text>
+<text x="937.3" y="107.0" font-size="12" fill="#111111">-displayName : String</text>
+<text x="937.3" y="122.0" font-size="12" fill="#111111">-twoStepEnabled : Boolean</text>
+<rect x="288.3" y="224.5" width="183.4" height="211.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="380.0" y="240.5" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">Vendor</text>
+<line x1="288.3" y1="246.5" x2="471.7" y2="246.5" stroke="#1d4e74" stroke-width="1"/>
+<text x="296.3" y="259.5" font-size="12" fill="#111111">-companyName : String</text>
+<text x="296.3" y="274.5" font-size="12" fill="#111111">-businessType : String</text>
+<text x="296.3" y="289.5" font-size="12" fill="#111111">-registeredCapital : double</text>
+<text x="296.3" y="304.5" font-size="12" fill="#111111">-yearsExperience : int</text>
+<text x="296.3" y="319.5" font-size="12" fill="#111111">-teamSize : int</text>
+<text x="296.3" y="334.5" font-size="12" fill="#111111">-certifications : String[*]</text>
+<text x="296.3" y="349.5" font-size="12" fill="#111111">-technologies : String[*]</text>
+<text x="296.3" y="364.5" font-size="12" fill="#111111">-interestedCategories : String[*]</text>
+<text x="296.3" y="379.5" font-size="12" fill="#111111">-minBudget : double</text>
+<text x="296.3" y="394.5" font-size="12" fill="#111111">-maxBudget : double</text>
+<text x="296.3" y="409.5" font-size="12" fill="#111111">-serviceArea : String</text>
+<text x="296.3" y="424.5" font-size="12" fill="#111111">-emailAlertsEnabled : Boolean</text>
+<rect x="1645.0" y="412.0" width="110.0" height="36.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1700.0" y="428.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">Administrator</text>
+<line x1="1645.0" y1="434.0" x2="1755.0" y2="434.0" stroke="#1d4e74" stroke-width="1"/>
+<rect x="1353.0" y="39.5" width="134.0" height="61.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1420.0" y="55.5" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">Conversation</text>
+<line x1="1353.0" y1="61.5" x2="1487.0" y2="61.5" stroke="#1d4e74" stroke-width="1"/>
+<text x="1361.0" y="74.5" font-size="12" fill="#111111">-status : String</text>
+<text x="1361.0" y="89.5" font-size="12" fill="#111111">-lastMessageAt : Date</text>
+<rect x="1365.0" y="184.5" width="110.0" height="61.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1420.0" y="200.5" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">ChatMessage</text>
+<line x1="1365.0" y1="206.5" x2="1475.0" y2="206.5" stroke="#1d4e74" stroke-width="1"/>
+<text x="1373.0" y="219.5" font-size="12" fill="#111111">-text : String</text>
+<text x="1373.0" y="234.5" font-size="12" fill="#111111">-sentAt : Date</text>
+<rect x="275.0" y="1107.0" width="110.0" height="46.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="330.0" y="1123.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">Agency</text>
+<line x1="275.0" y1="1129.0" x2="385.0" y2="1129.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="283.0" y="1142.0" font-size="12" fill="#111111">-name : String</text>
+<rect x="920.0" y="677.0" width="160.0" height="226.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1000.0" y="693.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">TOR</text>
+<line x1="920.0" y1="699.0" x2="1080.0" y2="699.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="928.0" y="712.0" font-size="12" fill="#111111">-projectCode : String</text>
+<text x="928.0" y="727.0" font-size="12" fill="#111111">-title : String</text>
+<text x="928.0" y="742.0" font-size="12" fill="#111111">-department : String</text>
+<text x="928.0" y="757.0" font-size="12" fill="#111111">-budget : double</text>
+<text x="928.0" y="772.0" font-size="12" fill="#111111">-referencePrice : double</text>
+<text x="928.0" y="787.0" font-size="12" fill="#111111">-announcementDate : Date</text>
+<text x="928.0" y="802.0" font-size="12" fill="#111111">-bidDeadline : Date</text>
+<text x="928.0" y="817.0" font-size="12" fill="#111111">-status : String</text>
+<text x="928.0" y="832.0" font-size="12" fill="#111111">-procurementStage : String</text>
+<text x="928.0" y="847.0" font-size="12" fill="#111111">-category : String</text>
+<text x="928.0" y="862.0" font-size="12" fill="#111111">-projectType : String</text>
+<text x="928.0" y="877.0" font-size="12" fill="#111111">-technologies : String[*]</text>
+<text x="928.0" y="892.0" font-size="12" fill="#111111">-viewCount : int</text>
+<rect x="594.7" y="1134.5" width="110.7" height="91.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="650.0" y="1150.5" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">TORDocument</text>
+<line x1="594.7" y1="1156.5" x2="705.3" y2="1156.5" stroke="#1d4e74" stroke-width="1"/>
+<text x="602.7" y="1169.5" font-size="12" fill="#111111">-fileName : String</text>
+<text x="602.7" y="1184.5" font-size="12" fill="#111111">-kind : String</text>
+<text x="602.7" y="1199.5" font-size="12" fill="#111111">-pageCount : int</text>
+<text x="602.7" y="1214.5" font-size="12" fill="#111111">-textLayer : String</text>
+<rect x="884.6" y="1192.0" width="190.8" height="76.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="980.0" y="1208.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">ProcurementAnnouncement</text>
+<line x1="884.6" y1="1214.0" x2="1075.4" y2="1214.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="892.6" y="1227.0" font-size="12" fill="#111111">-announcementId : String</text>
+<text x="892.6" y="1242.0" font-size="12" fill="#111111">-kind : String</text>
+<text x="892.6" y="1257.0" font-size="12" fill="#111111">-publishedAt : Date</text>
+<rect x="1259.0" y="1077.0" width="142.0" height="106.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1330.0" y="1093.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">AISummary</text>
+<line x1="1259.0" y1="1099.0" x2="1401.0" y2="1099.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="1267.0" y="1112.0" font-size="12" fill="#111111">-summary : String</text>
+<text x="1267.0" y="1127.0" font-size="12" fill="#111111">-keyPoints : String[*]</text>
+<text x="1267.0" y="1142.0" font-size="12" fill="#111111">-qualifications : String[*]</text>
+<text x="1267.0" y="1157.0" font-size="12" fill="#111111">-confidence : String</text>
+<text x="1267.0" y="1172.0" font-size="12" fill="#111111">-generatedAt : Date</text>
+<rect x="1262.0" y="1389.5" width="135.9" height="61.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1330.0" y="1405.5" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">EvaluationCriterion</text>
+<line x1="1262.0" y1="1411.5" x2="1398.0" y2="1411.5" stroke="#1d4e74" stroke-width="1"/>
+<text x="1270.0" y="1424.5" font-size="12" fill="#111111">-label : String</text>
+<text x="1270.0" y="1439.5" font-size="12" fill="#111111">-weight : int</text>
+<rect x="1640.3" y="1062.0" width="119.4" height="136.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1700.0" y="1078.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">FairnessSignal</text>
+<line x1="1640.3" y1="1084.0" x2="1759.7" y2="1084.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="1648.3" y="1097.0" font-size="12" fill="#111111">-field : String</text>
+<text x="1648.3" y="1112.0" font-size="12" fill="#111111">-severity : String</text>
+<text x="1648.3" y="1127.0" font-size="12" fill="#111111">-message : String</text>
+<text x="1648.3" y="1142.0" font-size="12" fill="#111111">-confidence : String</text>
+<text x="1648.3" y="1157.0" font-size="12" fill="#111111">-reasoning : String</text>
+<text x="1648.3" y="1172.0" font-size="12" fill="#111111">-status : String</text>
+<text x="1648.3" y="1187.0" font-size="12" fill="#111111">-detectedAt : Date</text>
+<rect x="1645.0" y="1382.0" width="110.0" height="76.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1700.0" y="1398.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">DataPoint</text>
+<line x1="1645.0" y1="1404.0" x2="1755.0" y2="1404.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="1653.0" y="1417.0" font-size="12" fill="#111111">-label : String</text>
+<text x="1653.0" y="1432.0" font-size="12" fill="#111111">-value : String</text>
+<text x="1653.0" y="1447.0" font-size="12" fill="#111111">-source : String</text>
+<rect x="1944.6" y="1042.0" width="170.7" height="76.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="2030.0" y="1058.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">FairnessThresholds</text>
+<line x1="1944.6" y1="1064.0" x2="2115.4" y2="1064.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="1952.6" y="1077.0" font-size="12" fill="#111111">-budgetDeviationPercent : int</text>
+<text x="1952.6" y="1092.0" font-size="12" fill="#111111">-minBidWindowDays : int</text>
+<text x="1952.6" y="1107.0" font-size="12" fill="#111111">-minSeverity : String</text>
+<rect x="643.6" y="392.0" width="152.7" height="76.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="720.0" y="408.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">Bookmark</text>
+<line x1="643.6" y1="414.0" x2="796.4" y2="414.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="651.6" y="427.0" font-size="12" fill="#111111">-applicationStatus : String</text>
+<text x="651.6" y="442.0" font-size="12" fill="#111111">-note : String</text>
+<text x="651.6" y="457.0" font-size="12" fill="#111111">-bookmarkedAt : Date</text>
+<rect x="56.3" y="647.0" width="147.4" height="106.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="130.0" y="663.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">SavedSearch</text>
+<line x1="56.3" y1="669.0" x2="203.7" y2="669.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="64.3" y="682.0" font-size="12" fill="#111111">-name : String</text>
+<text x="64.3" y="697.0" font-size="12" fill="#111111">-keyword : String</text>
+<text x="64.3" y="712.0" font-size="12" fill="#111111">-filters : SearchFilters</text>
+<text x="64.3" y="727.0" font-size="12" fill="#111111">-alertsEnabled : Boolean</text>
+<text x="64.3" y="742.0" font-size="12" fill="#111111">-createdAt : Date</text>
+<rect x="365.0" y="754.5" width="110.0" height="91.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="420.0" y="770.5" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">Notification</text>
+<line x1="365.0" y1="776.5" x2="475.0" y2="776.5" stroke="#1d4e74" stroke-width="1"/>
+<text x="373.0" y="789.5" font-size="12" fill="#111111">-type : String</text>
+<text x="373.0" y="804.5" font-size="12" fill="#111111">-message : String</text>
+<text x="373.0" y="819.5" font-size="12" fill="#111111">-read : Boolean</text>
+<text x="373.0" y="834.5" font-size="12" fill="#111111">-createdAt : Date</text>
+<rect x="55.0" y="329.5" width="110.0" height="61.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="110.0" y="345.5" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">DayNote</text>
+<line x1="55.0" y1="351.5" x2="165.0" y2="351.5" stroke="#1d4e74" stroke-width="1"/>
+<text x="63.0" y="364.5" font-size="12" fill="#111111">-date : Date</text>
+<text x="63.0" y="379.5" font-size="12" fill="#111111">-text : String</text>
+<rect x="1220.6" y="417.0" width="138.7" height="106.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1290.0" y="433.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">ErrorReport</text>
+<line x1="1220.6" y1="439.0" x2="1359.4" y2="439.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="1228.6" y="452.0" font-size="12" fill="#111111">-description : String</text>
+<text x="1228.6" y="467.0" font-size="12" fill="#111111">-reporterEmail : String</text>
+<text x="1228.6" y="482.0" font-size="12" fill="#111111">-status : String</text>
+<text x="1228.6" y="497.0" font-size="12" fill="#111111">-resolutionNote : String</text>
+<text x="1228.6" y="512.0" font-size="12" fill="#111111">-resolvedAt : Date</text>
+<rect x="1419.0" y="707.0" width="122.0" height="106.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1480.0" y="723.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">IngestionRun</text>
+<line x1="1419.0" y1="729.0" x2="1541.0" y2="729.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="1427.0" y="742.0" font-size="12" fill="#111111">-trigger : String</text>
+<text x="1427.0" y="757.0" font-size="12" fill="#111111">-phase : String</text>
+<text x="1427.0" y="772.0" font-size="12" fill="#111111">-status : String</text>
+<text x="1427.0" y="787.0" font-size="12" fill="#111111">-startedAt : Date</text>
+<text x="1427.0" y="802.0" font-size="12" fill="#111111">-completedAt : Date</text>
+<rect x="1665.0" y="609.5" width="110.0" height="61.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="1720.0" y="625.5" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">PipelineAlert</text>
+<line x1="1665.0" y1="631.5" x2="1775.0" y2="631.5" stroke="#1d4e74" stroke-width="1"/>
+<text x="1673.0" y="644.5" font-size="12" fill="#111111">-message : String</text>
+<text x="1673.0" y="659.5" font-size="12" fill="#111111">-read : Boolean</text>
+<rect x="1941.0" y="197.0" width="118.0" height="106.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="2000.0" y="213.0" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">FAQ</text>
+<line x1="1941.0" y1="219.0" x2="2059.0" y2="219.0" stroke="#1d4e74" stroke-width="1"/>
+<text x="1949.0" y="232.0" font-size="12" fill="#111111">-question : String</text>
+<text x="1949.0" y="247.0" font-size="12" fill="#111111">-answer : String</text>
+<text x="1949.0" y="262.0" font-size="12" fill="#111111">-category : String</text>
+<text x="1949.0" y="277.0" font-size="12" fill="#111111">-featured : Boolean</text>
+<text x="1949.0" y="292.0" font-size="12" fill="#111111">-status : String</text>
+<rect x="1937.7" y="459.5" width="144.6" height="121.0" fill="#86cdef" stroke="#1d4e74" stroke-width="1"/>
+<text x="2010.0" y="475.5" font-size="13" font-weight="bold" text-anchor="middle" fill="#111111">NewsAnnouncement</text>
+<line x1="1937.7" y1="481.5" x2="2082.3" y2="481.5" stroke="#1d4e74" stroke-width="1"/>
+<text x="1945.7" y="494.5" font-size="12" fill="#111111">-title : String</text>
+<text x="1945.7" y="509.5" font-size="12" fill="#111111">-body : String</text>
+<text x="1945.7" y="524.5" font-size="12" fill="#111111">-kind : String</text>
+<text x="1945.7" y="539.5" font-size="12" fill="#111111">-pinned : Boolean</text>
+<text x="1945.7" y="554.5" font-size="12" fill="#111111">-status : String</text>
+<text x="1945.7" y="569.5" font-size="12" fill="#111111">-publishedAt : Date</text>
+</svg>
