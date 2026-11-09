@@ -1,0 +1,44 @@
+sequenceDiagram
+    autonumber
+    actor U as User or visitor
+    actor AD as Admin
+    participant A as Express API
+    participant M as MongoDB
+
+    rect rgb(240, 246, 252)
+    Note over U,M: Report incorrect data (UC-09)
+    U->>A: POST /api/tors/:id/report (description, optional email)
+    A->>M: check the TOR exists
+    A->>M: create ErrorReport (status open, reportedBy or reporterEmail)
+    A-->>U: 201
+    end
+
+    rect rgb(245, 240, 252)
+    Note over AD,M: Review the queue (UC-26, UC-28)
+    AD->>A: GET /api/admin/tors/reported
+    A->>A: requireAuth, role admin, 2FA verified
+    A->>M: group open ErrorReports by TOR, newest first
+    A-->>AD: one row per TOR with open count and latest report
+    AD->>A: GET /api/admin/tors/:id
+    AD->>A: GET /api/admin/reports?status=open&torId=:id
+    A-->>AD: the TOR and its open reports
+    opt open the AI flag details (FR-19)
+        AD->>A: GET /api/admin/tors/:id/fairness-flags
+        A->>M: read flags with reasoning and data points
+        A-->>AD: flags
+    end
+    end
+
+    rect rgb(240, 250, 244)
+    Note over AD,M: Correct the TOR and resolve the reports (UC-27, FR-40)
+    AD->>A: PATCH /api/admin/tors/:id (fields, resolveFlags, resolveReports, resolutionNote)
+    A->>A: validate with zod
+    A->>M: update the TOR fields
+    opt resolveReports
+        A->>M: mark every open report on the TOR resolved (admin, time, note)
+    end
+    A->>M: write SystemLog (what changed) and the admin audit entry
+    A-->>AD: 200 with the updated TOR
+    end
+
+    Note over U,A: The reporter later sees the resolution in GET /api/auth/reports

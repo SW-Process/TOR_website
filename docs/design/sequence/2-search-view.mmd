@@ -1,0 +1,46 @@
+sequenceDiagram
+    autonumber
+    actor U as Visitor
+    participant F as Next.js frontend
+    participant A as Express API
+    participant M as MongoDB
+    participant B as Cloud Storage
+
+    rect rgb(240, 246, 252)
+    Note over U,M: Search TORs (UC-01, UC-02)
+    U->>F: open the search page and type a keyword, set filters
+    F->>A: GET /api/tors?q=...&agency=...&budget=...
+    A->>A: read session if any (optionalAuth)
+    A->>M: aggregate Tor where pipelineStatus = enriched
+    Note right of A: a signed-in vendor's hidden TORs are left out
+    M-->>A: page of TORs
+    A-->>F: list with totalCount and hasNextPage
+    F-->>U: result cards with status badges
+    end
+
+    rect rgb(245, 240, 252)
+    Note over U,M: View TOR details (UC-05, UC-06, UC-07)
+    U->>F: open /tor/:id
+    F->>A: GET /api/tors/:id (server-side)
+    A->>M: find Tor where pipelineStatus = enriched
+    alt not found or not published
+        A-->>F: 404
+        F-->>U: not-found page
+    else found
+        M-->>A: Tor with aiSummary and fairnessFlags
+        Note right of A: internal fields and admin-only flag details are removed
+        A-->>F: tor
+        F-->>U: page with AI summary, fairness signals and confidence
+        U->>A: POST /api/tors/:id/view (rate limited)
+        A->>M: increment viewCount
+    end
+    end
+
+    rect rgb(240, 250, 244)
+    Note over U,B: Download the original PDF (UC-08)
+    U->>A: GET /api/tors/:id/document
+    A->>M: find Tor where pipelineStatus = enriched, read sourceDocument.storageKey
+    A->>B: open stream
+    B-->>A: PDF bytes
+    A-->>U: PDF
+    end
