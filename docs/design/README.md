@@ -99,3 +99,5 @@ The TOR Checker use case diagram, drawn from the actual codebase (backend routes
 - **Registered User is an abstract actor.** Vendor and Admin inherit from Registered User, which inherits from Guest.
 - **Cloud Scheduler is a timer actor** that triggers the `tor-discovery`, `tor-enrichment`, and `tor-lifecycle` jobs. An admin can also start an ingestion run through UC-32.
 - The admin statistics dashboard and the Terms and Privacy Policy pages only display information, so they are not counted as use cases.
+
+The backend endpoints behind these use cases are listed in the [API reference](api.md).

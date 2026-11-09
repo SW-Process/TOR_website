@@ -142,6 +142,7 @@ Backend checks: `npm test`, `npm run typecheck`. Frontend checks: `npm run lint`
 - [docs/deployment/gcp.md](docs/deployment/gcp.md) — deploying to Google Cloud
 - [docs/design/](docs/design/README.md) — use case model: diagram, actors and use case descriptions
 - [docs/security/](docs/security/README.md) — security documentation (OWASP ASVS 5.0): input validation, sign-in defenses, authorization rules, dependency policy
+- [docs/design/api.md](docs/design/api.md) — API reference: every backend endpoint, its access, parameters and responses
 
 ## Team
 
