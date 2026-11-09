@@ -138,6 +138,7 @@ Backend checks: `npm test`, `npm run typecheck`. Frontend checks: `npm run lint`
 
 ## Documentation
 
+- [docs/design/class-diagram.md](docs/design/class-diagram.md) — class diagrams: backend classes, interfaces and modules
 - [CONTRIBUTING.md](CONTRIBUTING.md) — branching, commit messages, and pull requests
 - [docs/deployment/gcp.md](docs/deployment/gcp.md) — deploying to Google Cloud
 - [docs/design/](docs/design/README.md) — use case model: diagram, actors and use case descriptions

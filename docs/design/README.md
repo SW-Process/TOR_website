@@ -15,6 +15,8 @@ The TOR Checker use case diagram, drawn from the actual codebase (backend routes
 | Dashed arrow «include» | The use case at the arrowhead always runs as part of the base use case |
 | Dashed arrow «extend» | The use case at the tail optionally adds behavior to the base use case under a condition |
 
+The code that implements these use cases is shown in the [class diagram](class-diagram.md).
+
 ## Actors
 
 | Actor | Type | Role |
