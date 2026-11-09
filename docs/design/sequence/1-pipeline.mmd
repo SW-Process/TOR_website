@@ -1,0 +1,60 @@
+sequenceDiagram
+    autonumber
+    participant S as Cloud Scheduler
+    participant D as Discovery job
+    participant G as e-GP
+    participant B as Cloud Storage
+    participant M as MongoDB
+    participant E as Enrichment job
+    participant AI as Gemini
+    participant X as Email service
+
+    rect rgb(240, 246, 252)
+    Note over S,M: Discover new TORs (UC-34), hourly
+    S->>D: start
+    D->>M: mark stale runs failed, create IngestionRun (running)
+    D->>G: search "ซอฟต์แวร์" and fetch project details
+    loop each project
+        D->>M: upsert Tor by projectCode, compare sourceContentHash
+        alt created, changed, or no stored PDF
+            D->>G: download TOR PDF
+            D->>B: store PDF (never in Mongo)
+        end
+        alt unchanged
+            Note right of D: nothing to queue
+        else keyword gate fails
+            D->>M: pipelineStatus = rejected
+        else software-related title
+            D->>M: enqueue EnrichmentJob (torId, hash)
+        end
+    end
+    D->>M: close IngestionRun with counts, write SystemLog
+    end
+
+    rect rgb(245, 240, 252)
+    Note over S,AI: Enrich with AI (UC-35), every 15 minutes
+    S->>E: start
+    E->>M: read the fairness thresholds
+    loop until maxCalls or queue empty
+        E->>M: claim next job under a lease (first claim creates the IngestionRun)
+        E->>B: read the TOR PDF
+        E->>AI: one multimodal call (PDF, metadata, thresholds)
+        AI-->>E: classification, summary, category, fairness signals
+        E->>E: pre-filter signals against the TOR's own numbers, add data points
+        alt software-related
+            E->>M: save aiSummary and fairnessFlags, pipelineStatus = enriched
+        else not software
+            E->>M: pipelineStatus = rejected
+        end
+        Note right of E: on error the job retries with backoff, then is marked failed
+    end
+    end
+
+    rect rgb(240, 250, 244)
+    Note over E,X: Refresh and notify (UC-37, UC-36)
+    E->>G: read procurement stage of the TORs just enriched
+    E->>AI: read the bid deadline from the invitation PDF, if there is one (small call)
+    E->>M: write procurement stage and deadline
+    E->>M: match vendor profiles and saved searches, create notifications
+    E->>X: send match digest emails
+    end

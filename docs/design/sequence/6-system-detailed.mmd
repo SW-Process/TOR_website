@@ -1,0 +1,380 @@
+sequenceDiagram
+    autonumber
+    actor V as Visitor / Vendor
+    actor AD as Admin
+    participant EXT as Chrome extension
+    participant F as Next.js frontend
+    participant A as Express API
+    participant M as MongoDB
+    participant B as Cloud Storage
+    participant SCH as Cloud Scheduler
+    participant J as Cloud Run jobs
+    participant G as e-GP
+    participant AI as Gemini
+    participant GO as Google OAuth
+    participant X as Email (SendGrid)
+
+    Note over F,A: Every API request first gets a request id, security headers, an origin check (CSRF) and JSON and cookie parsing. Then the route's rate limit, session and role checks run.
+
+    rect rgb(240, 246, 252)
+    Note over SCH,G: A1. Discovery job (hourly)
+    SCH->>J: start discovery
+    J->>M: mark stale discovery runs failed
+    J->>M: create IngestionRun (running)
+    J->>G: search software projects page by page, fetch details (polite, rate limited)
+    loop each project
+        alt agency is not on the allowlist
+            J->>M: count as skipped
+        else allowed
+            J->>M: upsert Tor by projectCode, compare sourceContentHash
+            opt created, changed, or no stored document yet
+                J->>G: download the TOR PDF
+                J->>J: inspect the PDF (digital, scanned, unreadable, missing)
+                J->>B: store the PDF (binaries never go in Mongo)
+            end
+            alt hash unchanged
+                Note right of J: nothing to queue
+            else title fails the software keyword gate
+                J->>M: pipelineStatus = rejected
+            else looks software-related
+                J->>M: queue an EnrichmentJob (torId, hash)
+            end
+        end
+        Note right of J: one failing project is logged and does not stop the run
+    end
+    J->>M: close the run (success, partial or failed) with counts, write SystemLog
+    end
+
+    rect rgb(245, 240, 252)
+    Note over SCH,AI: A2. Enrichment job (every 15 minutes)
+    SCH->>J: start enrichment
+    J->>M: read the fairness pre-filter thresholds (or the defaults)
+    loop until the call limit is reached or the queue is empty
+        J->>M: claim the next job under a lease (first claim creates the run)
+        J->>B: read the TOR PDF
+        J->>AI: one multimodal call (PDF, metadata, thresholds)
+        AI-->>J: JSON result
+        J->>J: validate the result against the schema
+        alt not software-related
+            J->>M: pipelineStatus = rejected, job done
+        else software-related
+            J->>J: pick category and project type, fix Buddhist-era dates
+            J->>J: drop fairness signals below the thresholds, attach data points and confidence
+            Note right of J: a TOR that only has an invitation PDF gets no fairness flags
+            J->>M: save aiSummary, fairnessFlags, scalar fields, pipelineStatus = enriched
+        end
+        opt the call or validation fails
+            J->>M: retry later with backoff, mark failed after the last attempt
+        end
+    end
+    J->>M: close the enrichment run
+    end
+
+    rect rgb(240, 250, 244)
+    Note over J,V: A3. After enrichment: refresh the TORs just enriched, then notify vendors
+    J->>G: read procurement stage (national e-GP first, BMA portal second)
+    opt the TOR has an invitation with a file
+        J->>G: download the invitation PDF
+        J->>AI: small call: read the bid deadline
+    end
+    J->>M: write stage and deadline (checks lastCheckedAt first)
+    J->>M: score each vendor profile against the new TORs, notify at 70 or more
+    J->>M: replay every saved search that has alerts on
+    J->>M: create Notification rows (profile match, saved search match), never twice
+    J->>X: one digest email per vendor, unless the vendor turned email alerts off
+    X-->>V: digest email
+    end
+
+    rect rgb(240, 250, 244)
+    Note over SCH,G: A4. Lifecycle job (daily at 02:30 Bangkok time)
+    SCH->>J: start lifecycle
+    J->>M: pick enriched, unfinished TORs, oldest checked first
+    J->>G: re-read stage and contract status
+    J->>AI: read deadline only for a new invitation or a changed file
+    J->>M: write procurement fields only, never the AI queue
+    end
+
+    rect rgb(252, 244, 240)
+    Note over SCH,X: A5. Stalled-runs job (short interval)
+    SCH->>J: start stalled-runs check
+    J->>M: mark runs with no progress as failed (all four phases)
+    J->>M: create an AdminNotification for every admin
+    J->>X: email the ADMIN_ALERT_EMAILS addresses
+    end
+
+    rect rgb(255, 248, 235)
+    Note over V,B: B. Visitor: browse, read, download, report (no account needed)
+    V->>F: open the home or search page
+    F->>A: GET /api/tors (keyword, agency, category, budget, deadline, status, sort)
+    A->>M: aggregate published TORs only (pipelineStatus = enriched)
+    Note right of A: a signed-in vendor's hidden TORs are left out
+    A-->>F: page of TORs
+    F-->>V: result cards
+    V->>A: GET /api/tors/agencies and /technologies (filter choices)
+    V->>A: GET /api/tors/price-stats
+    A->>M: group by category or agency, percentiles of reference price
+    A-->>V: statistics
+    V->>F: open /tor/:id
+    F->>A: GET /api/tors/:id
+    A->>M: find the published TOR
+    alt not published or unknown
+        A-->>F: 404
+        F-->>V: not-found page
+    else published
+        A-->>F: TOR without internal fields or admin-only flag details
+        F->>A: GET /api/tors (similar TORs)
+        F-->>V: AI summary, fairness signals with confidence, status, similar TORs
+        V->>A: POST /api/tors/:id/view
+        A->>M: increment viewCount
+    end
+    V->>A: GET /api/tors/:id/document
+    A->>M: read sourceDocument.storageKey
+    A->>B: open a stream
+    alt stream fails
+        A-->>V: 404 or 502 as JSON
+    else
+        B-->>V: PDF shown in the browser
+    end
+    V->>A: GET /api/help/faqs and /announcements
+    A->>M: read help content
+    A-->>V: FAQs and announcements
+    V->>A: POST /api/tors/:id/report (rate limited, optional email if anonymous)
+    A->>M: create ErrorReport (open)
+    A-->>V: 201
+    end
+
+    rect rgb(240, 246, 252)
+    Note over V,X: C1. Sign up and sign in with a password
+    V->>A: POST /api/auth/register (rate limited)
+    A->>M: create User (role vendor, password hashed)
+    A->>M: create Session
+    A-->>V: 201 and an HttpOnly session cookie
+    V->>A: POST /api/auth/login (limited per IP and per account)
+    A->>M: find the user and compare the hash
+    alt unknown email or wrong password
+        A-->>V: 401 (the same message for both)
+    else correct and 2FA is off
+        A->>M: create Session
+        A-->>V: 200 and the session cookie
+    else correct and 2FA is on
+        A->>M: store a one-time pending id on the user
+        A-->>V: 200 mfaRequired and a short-lived pending cookie
+        V->>A: POST /api/auth/mfa/verify (6-digit code or a recovery code)
+        A->>M: check pending cookie, current 30 s step, step not used before
+        alt wrong code or the pending step expired
+            A-->>V: 401 bad_code or mfa_expired
+        else accepted
+            A->>M: create Session with mfa = true
+            A-->>V: 200 and the session cookie
+        end
+    end
+    end
+
+    rect rgb(240, 246, 252)
+    Note over V,GO: C2. Sign in with Google
+    V->>A: GET /api/auth/google
+    A-->>V: redirect to Google (state, PKCE challenge and nonce kept in a cookie)
+    V->>GO: choose an account and consent
+    GO-->>V: redirect to /api/auth/google/callback with code and state
+    V->>A: GET /api/auth/google/callback
+    A->>GO: exchange the code and verify the identity
+    alt state mismatch, exchange failed, or email not verified
+        A-->>V: redirect to /login with an error
+    else verified
+        A->>M: find the user by Google id, else by email (link), else create a vendor
+        alt 2FA is on
+            A-->>V: redirect to /login/verify with the pending cookie
+        else
+            A->>M: create Session
+            A-->>V: redirect to the dashboard (new users go to profile onboarding)
+        end
+    end
+    end
+
+    rect rgb(240, 246, 252)
+    Note over V,X: C3. Forgot and reset password
+    V->>A: POST /api/auth/forgot-password (limited per IP and per account)
+    A->>M: find the user
+    opt user exists and is not on cooldown
+        A->>M: store the hash of a random token with an expiry
+        A->>X: send the reset link (token in the URL fragment)
+    end
+    A-->>V: 200 (the same answer whether or not the email exists)
+    V->>A: POST /api/auth/reset-password (token, new password)
+    A->>M: check the token hash (constant time), expiry and password rules
+    alt invalid or expired link, or weak password
+        A-->>V: 400
+    else
+        A->>M: set the password, bump tokenVersion, delete every session
+        A-->>V: 200 (no sign-in, the user must sign in again)
+    end
+    end
+
+    rect rgb(240, 246, 252)
+    Note over V,M: C4. Account settings that need a recent re-authentication
+    V->>A: PUT /api/auth/password, PUT /api/auth/email, DELETE /api/auth/me, 2FA setup or off, logout-others, revoke a session
+    alt not re-authenticated recently
+        A-->>V: 401 reauth_required (with the accepted methods)
+        V->>A: POST /api/auth/reauth (password, plus a code if 2FA is on)
+        A->>M: mark the session as re-authenticated
+        V->>A: repeat the request
+    end
+    A->>M: apply the change
+    A-->>V: 200
+    V->>A: POST /api/auth/mfa/setup, then /api/auth/mfa/enable with a code
+    A-->>V: seed and QR code, then recovery codes
+    V->>A: GET /api/auth/sessions, PATCH /api/auth/me, POST /api/auth/avatar
+    A->>M: read sessions, update the profile
+    A->>B: store the avatar image
+    V->>A: GET /api/auth/reports (my own reports and their resolution)
+    V->>A: POST /api/auth/logout
+    A->>M: delete this device's session
+    A-->>V: cookie cleared
+    end
+
+    rect rgb(255, 248, 235)
+    Note over V,M: D. Vendor workspace (needs a vendor session)
+    V->>A: PUT /api/vendor/profile (company, expertise, technologies)
+    A->>M: upsert VendorProfile
+    V->>A: GET /api/vendor/matches
+    A->>M: read the profile and open TORs, skipping hidden ones
+    A->>A: compute the match score for each TOR and sort
+    A-->>V: ranked matches
+    V->>A: PUT or DELETE /api/vendor/hidden-tors/:torId
+    A->>M: add or remove the TOR in the hidden list
+    V->>A: PUT /api/vendor/bookmarks/:torId (status, note)
+    A->>M: upsert the bookmark (capped), status interested, preparing, submitted or missed
+    V->>A: GET, PATCH or DELETE /api/vendor/bookmarks
+    A->>M: read, update or remove
+    V->>A: POST, PATCH or DELETE /api/vendor/profile/saved-searches
+    A->>M: store the filters and the alerts on or off switch
+    V->>A: GET or PUT /api/vendor/day-notes/:date
+    A->>M: read or save the calendar note
+    loop the bell asks every 60 seconds
+        V->>A: GET /api/vendor/notifications
+        A->>M: read the notifications and the unread count
+        A-->>V: list
+    end
+    V->>A: PATCH /api/vendor/notifications/:id/read
+    A->>M: mark read
+    V->>A: POST /api/chat/messages (rate limited)
+    A->>M: start or continue the chat thread, append the message
+    loop the chat widget polls
+        V->>A: GET /api/chat/conversation?after=last
+        A->>M: read new messages
+        A-->>V: admin replies
+    end
+    V->>A: POST /api/chat/read
+    A->>M: clear the unread count
+    end
+
+    rect rgb(252, 244, 240)
+    Note over AD,M: E1. Admin sign-in and the 2FA gate
+    AD->>A: sign in (password or Google, then the 2FA code)
+    A->>M: create Session with mfa = true
+    AD->>A: any /api/admin/... or /api/ingestion/... request
+    alt the session has not passed 2FA
+        A-->>AD: 403 mfa_required
+    else the role is not admin
+        A-->>AD: 403
+    else
+        A->>M: do the work
+        A->>M: write an audit entry for every change (who, route, outcome, field names)
+        A-->>AD: the response
+    end
+    end
+
+    rect rgb(252, 244, 240)
+    Note over AD,M: E2. Dashboard and alerts
+    AD->>A: GET /api/admin/stats
+    A->>M: count TORs today, open flags, latest runs, 30-day run history
+    A-->>AD: numbers for the overview
+    loop the top bar asks on a timer
+        AD->>A: GET /api/admin/notifications
+        A->>M: read this admin's pipeline alerts
+        A-->>AD: alerts and unread count
+    end
+    AD->>A: PATCH /api/admin/notifications/:id/read
+    A->>M: mark read
+    end
+
+    rect rgb(252, 244, 240)
+    Note over AD,M: E3. Review and correct TORs
+    AD->>A: GET /api/admin/tors (filters, flagged only)
+    A->>M: aggregate published TORs with their flags and the flagged count
+    AD->>A: GET /api/admin/tors/reported
+    A->>M: group open reports by TOR
+    AD->>A: GET /api/admin/tors/:id and /fairness-flags
+    A->>M: read the TOR, reasoning and data points
+    AD->>A: PATCH /api/admin/tors/:id (fields, bid deadline, resolveFlags, resolveReports, note)
+    A->>M: update the TOR, acknowledge flags, resolve its open reports
+    A->>M: write SystemLog with what changed
+    A-->>AD: updated TOR
+    AD->>A: DELETE /api/admin/tors/:id (hide from the site)
+    A->>M: pipelineStatus = rejected
+    A-->>AD: 204
+    end
+
+    rect rgb(252, 244, 240)
+    Note over AD,M: E4. Error reports inbox
+    AD->>A: GET /api/admin/reports?status=open
+    A->>M: read reports with reporter and TOR
+    AD->>A: PATCH /api/admin/reports/:id (resolve with a note, or reopen)
+    A->>M: update status, resolver and time
+    end
+
+    rect rgb(252, 244, 240)
+    Note over AD,G: E5. Run the pipeline by hand
+    AD->>A: POST /api/ingestion/runs
+    A->>M: create IngestionRun (running)
+    A-->>AD: 202 (409 if one is already running)
+    A->>G: crawl in the background, same code as A1
+    A->>B: store PDFs
+    A->>M: save TORs, queue AI jobs, close the run
+    AD->>A: POST /api/ingestion/enrichment/runs (maxCalls)
+    A->>AI: same enrichment as A2, then A3
+    AD->>A: POST /api/ingestion/lifecycle/runs (maxTors, onlyOpen)
+    A->>G: same refresh as A4
+    loop the ingestion page asks while a run is going
+        AD->>A: GET /api/ingestion/runs, /runs/:id, /enrichment/pending, /lifecycle/pending
+        A->>M: read progress and counts
+        A-->>AD: progress
+    end
+    end
+
+    rect rgb(252, 244, 240)
+    Note over AD,G: E6. Capture projects with the Chrome extension
+    AD->>EXT: pick projects on the national e-GP search page
+    EXT->>A: POST /api/ingestion/capture (at most 100 projects)
+    alt the national source is disabled
+        A-->>EXT: 503
+    else a capture is already running
+        A-->>EXT: 409
+    else
+        A->>M: create IngestionRun (phase capture)
+        A-->>EXT: 202
+        loop each project in the background
+            A->>G: read the project and its document bundle
+            A->>B: store the TOR PDF (the invitation PDF if there is no TOR yet)
+            A->>M: upsert Tor, queue AI jobs (the keyword gate runs on the title)
+        end
+        A->>M: close the run with counts
+    end
+    AD->>A: GET /api/ingestion/capture/pending
+    A-->>AD: how many captured TORs have no stored document
+    end
+
+    rect rgb(252, 244, 240)
+    Note over AD,M: E7. Chat, help content, settings, logs and sessions
+    AD->>A: GET /api/admin/chats, its messages, POST a reply, mark read, PATCH the status
+    A->>M: read and write the thread
+    A-->>V: the vendor sees the reply on the next poll
+    AD->>A: POST, PATCH or DELETE /api/admin/help/faqs and /announcements
+    A->>M: save the help content
+    AD->>A: GET or PUT /api/admin/settings/fairness-prefilter
+    A->>M: store the thresholds (used from the next enrichment run)
+    AD->>A: GET /api/admin/logs (source, severity, run, text, dates)
+    A->>M: read SystemLog
+    AD->>A: GET /api/admin/users, POST revoke a user's sessions or everyone's
+    A->>M: delete the sessions
+    end

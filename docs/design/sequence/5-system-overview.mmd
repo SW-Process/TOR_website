@@ -1,0 +1,66 @@
+sequenceDiagram
+    autonumber
+    actor V as Visitor / Vendor
+    actor AD as Admin
+    participant F as Next.js frontend
+    participant A as Express API
+    participant M as MongoDB
+    participant B as Cloud Storage
+    participant J as Scheduled jobs
+    participant G as e-GP
+    participant AI as Gemini
+    participant X as Email service
+
+    rect rgb(240, 246, 252)
+    Note over J,B: 1. Bring TORs in (hourly)
+    J->>G: search software projects, fetch details
+    J->>M: save new or changed TORs
+    J->>B: store each TOR PDF
+    J->>M: queue the software-related ones for AI
+    end
+
+    rect rgb(245, 240, 252)
+    Note over J,AI: 2. Understand them with AI (every 15 minutes)
+    J->>B: read the PDF
+    J->>AI: one call: classify, summarize, find fairness signals
+    AI-->>J: result
+    J->>M: publish software TORs with summary and flags
+    end
+
+    rect rgb(240, 250, 244)
+    Note over J,V: 3. Refresh and tell vendors
+    J->>G: read procurement stage and bid deadline
+    J->>M: save stage, create match notifications
+    J->>X: send digest emails
+    X-->>V: email about matching TORs
+    end
+
+    rect rgb(255, 248, 235)
+    Note over V,B: 4. People use the site
+    V->>F: search, open a TOR
+    F->>A: GET /api/tors
+    A->>M: read published TORs only
+    A-->>F: TORs
+    F-->>V: list, AI summary, fairness signals
+    V->>A: GET /api/tors/:id/document
+    A->>B: stream the PDF
+    B-->>V: PDF
+    opt signed-in vendor
+        V->>A: profile, bookmarks, saved searches, hide a TOR
+        A->>M: save
+        V->>A: read notifications and matches
+    end
+    end
+
+    rect rgb(252, 244, 240)
+    Note over V,M: 5. Keep the data right
+    V->>A: report incorrect data
+    A->>M: save the report
+    AD->>F: sign in with 2FA, open the admin panel
+    F->>A: review queue, flagged TORs, logs
+    A->>M: read
+    AD->>A: correct the TOR, resolve reports, hide a TOR
+    A->>M: save and write the audit trail
+    AD->>A: start a run now, or send projects from the Chrome extension
+    A->>G: same ingestion code as step 1
+    end

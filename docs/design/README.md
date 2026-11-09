@@ -10,6 +10,8 @@ How these parts are deployed and connected is shown in the [system design](syste
 
 See also the [domain model](domain-model.md): the concepts behind these use cases and how they relate.
 
+The order of calls inside the main use cases is shown in the [sequence diagrams](sequence-diagram.md).
+
 ## Notation
 
 | Symbol | Meaning |

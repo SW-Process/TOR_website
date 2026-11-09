@@ -1,0 +1,46 @@
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant F as Next.js frontend
+    participant A as Express API
+    participant M as MongoDB
+
+    U->>F: enter email and password
+    F->>A: POST /api/auth/login
+    A->>M: find user by email
+    A->>A: compare password hash
+    alt unknown email or wrong password
+        A-->>F: 401 same message for both
+    else correct, 2FA is off
+        A->>M: create Session
+        A-->>F: 200 user, HttpOnly session cookie
+    else correct, 2FA is on
+        A->>M: store a one-time pending id on the user
+        A-->>F: 200 mfaRequired, short-lived pending cookie (no session yet)
+        F-->>U: ask for the authenticator code
+        U->>F: enter the 6-digit code or a recovery code
+        F->>A: POST /api/auth/mfa/verify
+        A->>A: check the pending cookie is valid and unused
+        A->>M: check the code matches the current 30 s step and was not used before
+        alt code wrong
+            A-->>F: 401 bad_code
+        else pending step expired
+            A-->>F: 401 mfa_expired, start again
+        else code accepted
+            A->>M: create Session with mfa = true
+            A-->>F: 200 user, session cookie, pending cookie cleared
+        end
+    end
+
+    Note over U,A: Google sign-in joins the same 2FA step after Google confirms the identity (UC-11)
+
+    rect rgb(252, 244, 240)
+    Note over F,A: Admin routes (UC-12)
+    F->>A: any /api/admin/... request
+    A->>A: requireAuth, role admin, session has mfa
+    alt session has no 2FA
+        A-->>F: 403 mfa_required
+    else
+        A-->>F: the response
+    end
+    end
