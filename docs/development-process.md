@@ -13,7 +13,7 @@ The cycle is not run once. The project started on 9 August 2026 and has since ha
 | # | Activity | What we do | Where to find it |
 |---|---|---|---|
 | 1 | Planning | Issues in a fixed format, a project board, two-week sprints | GitHub issues and the SW-Process project board |
-| 2 | Analysis | A requirements specification with numbered functional requirements and use cases | The SRS, and the [use case model](design/README.md) and [domain model](design/domain-model.md) |
+| 2 | Analysis | A requirements specification with numbered functional and non-functional requirements | The SRS, and the [domain model](design/domain-model.md) |
 | 3 | Design | System, data, class and sequence diagrams, an API reference, a design spec for larger features | [`docs/design/`](design/README.md) and [`docs/superpowers/`](superpowers) |
 | 4 | Implementation | A branch per task, Conventional Commits, pull requests with a template | [`CONTRIBUTING.md`](../CONTRIBUTING.md) and the code |
 | 5 | Testing and integration | Backend tests, CI on every pull request, a review before merge, a security checklist | [`.github/workflows/`](../.github/workflows), [`docs/security/`](security/README.md) |
@@ -29,7 +29,7 @@ Before a larger feature, the team writes a design spec and then an implementatio
 
 ## 2. Analysis
 
-**What we do.** The requirements are in a software requirements specification (SRS) with numbered functional requirements (FR-01 and up), use cases (UC) and non-functional requirements (NFR). Code comments and issues refer to these numbers, for example `FR-40` on the admin queue of reported TORs. The [use case model](design/README.md) lists 37 use cases with their actors, and the [domain model](design/domain-model.md) shows the concepts and how they relate.
+**What we do.** The requirements are in a software requirements specification (SRS) with numbered functional requirements (FR-01 and up) and non-functional requirements (NFR). Code comments and issues refer to these numbers, for example `FR-40` on the admin queue of reported TORs. The [domain model](design/domain-model.md) shows the concepts of the system and how they relate.
 
 **Missing.** The SRS is not in the repository. [`CLAUDE.md`](../CLAUDE.md) calls `docs/SRS.md` the source of truth, but that file does not exist, so a new contributor cannot read the requirements the code points to. Committing it (or linking to where it lives) is the most useful fix on this page.
 
@@ -83,7 +83,7 @@ The backend is Express 5 with MongoDB, the frontend is Next.js, and both are Typ
 - Dependency advisories are fixed as they appear (for example the pull request that upgraded the vulnerable packages), under the [third-party component policy](security/dependency-management.md).
 - Deployment steps and schedules are in [`docs/deployment/gcp.md`](deployment/gcp.md).
 
-**Missing.** There is no automated deployment: the guide uses `gcloud` commands, so releasing is a manual step. Deadline reminders for vendors are listed as a use case (UC-24), but nothing in the code sends them yet, so only match alerts are sent.
+**Missing.** There is no automated deployment: the guide uses `gcloud` commands, so releasing is a manual step. Vendors get match alerts, but nothing in the code sends deadline reminders yet, although the notification type exists.
 
 ## One feature through the cycle
 
@@ -107,4 +107,4 @@ In order of effect:
 3. Add the frontend lint step to CI and fix the outdated note about it.
 4. Add tests for the frontend, and a few end-to-end checks of the main flows (search, sign in, admin correction).
 5. Label every issue with its sprint again, and close issue #51.
-6. Either build the deadline reminder or remove UC-24 from the use case model.
+6. Either build the deadline reminder or remove its notification type.

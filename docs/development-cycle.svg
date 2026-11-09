@@ -39,9 +39,9 @@
 <rect x="1400" y="625" width="14" height="214" rx="7" fill="#2a3d6b"/>
 <text x="1436" y="671" font-size="30" font-weight="700" fill="#2a3d6b">2. Analysis</text>
 <text x="1436" y="713" font-size="23" fill="#222">Software requirements specification:</text>
-<text x="1436" y="749" font-size="23" fill="#222">functional requirements (FR), use cases (UC),</text>
-<text x="1436" y="785" font-size="23" fill="#222">non-functional requirements (NFR)</text>
-<text x="1436" y="821" font-size="23" fill="#222">Use case model and domain model</text>
+<text x="1436" y="749" font-size="23" fill="#222">numbered functional requirements (FR)</text>
+<text x="1436" y="785" font-size="23" fill="#222">and non-functional requirements (NFR)</text>
+<text x="1436" y="821" font-size="23" fill="#222">Domain model of the system&#x27;s concepts</text>
 <path d="M 1371.0 730.0 L 1400.0 732.0" stroke="#2a3d6b" stroke-width="3" fill="none" stroke-dasharray="8 6"/>
 <circle cx="1371.0" cy="730.0" r="6" fill="#2a3d6b"/>
 <rect x="1400" y="1000" width="560" height="214" rx="18" fill="#f6f8f9" stroke="#0a96dc" stroke-width="4"/>
