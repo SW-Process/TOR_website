@@ -97,6 +97,8 @@ See also the [domain model](domain-model.md): the concepts behind these use case
 | UC-36 | Match & Notify Vendors | Email Service | UC-35 «include» | Match new TORs against vendor profiles and saved searches, then send notifications and digest emails |
 | UC-37 | Refresh Procurement Lifecycle | Cloud Scheduler, e-GP System | — | Update the procurement stage and deadlines of TORs that are still open |
 
+How the data behind these use cases is stored is shown in the [ER diagram](er-diagram.md).
+
 ## Modeling notes
 
 - **Login is a precondition** for every Vendor and Admin use case, so the diagram does not draw an «include» to Log In from each one.

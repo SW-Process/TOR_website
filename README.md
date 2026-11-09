@@ -139,6 +139,7 @@ Backend checks: `npm test`, `npm run typecheck`. Frontend checks: `npm run lint`
 ## Documentation
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) — branching, commit messages, and pull requests
+- [docs/design/er-diagram.md](docs/design/er-diagram.md) — ER diagram: MongoDB collections, fields, keys and references
 - [docs/deployment/gcp.md](docs/deployment/gcp.md) — deploying to Google Cloud
 - [docs/design/system-design.md](docs/design/system-design.md) — system design: architecture, components, connections and main flows
 - [docs/design/](docs/design/README.md) — use case model: diagram, actors and use case descriptions
