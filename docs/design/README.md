@@ -2,6 +2,8 @@
 
 The TOR Checker use case diagram, drawn from the actual codebase (backend routes, frontend pages, the Chrome extension, and the Cloud Run jobs).
 
+How these parts are deployed and connected is shown in the [system design](system-design.md).
+
 ![TOR Checker use case diagram](use-case-diagram.png)
 
 [`use-case-diagram.svg`](use-case-diagram.svg) is the vector version and stays sharp at any zoom level.
