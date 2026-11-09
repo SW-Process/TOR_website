@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1320" viewBox="0 0 2000 1320" font-family="Liberation Sans, Arial, Helvetica, sans-serif">
+<rect width="2000" height="1320" fill="#fff"/>
+<text x="1000.0" y="80" text-anchor="middle" font-size="46" font-weight="700" fill="#12263f">How our team works: Scrum, adapted to a team of three</text>
+<text x="1000.0" y="124" text-anchor="middle" font-size="26" fill="#5b6b80">Two-week sprints on a GitHub board. We hold sprint planning, a stand-up every Monday, Wednesday and Friday, and a sprint review.</text>
+<text x="120" y="215" text-anchor="start" font-size="30" font-weight="700" fill="#0b4f8f">Roles</text>
+<circle cx="330" cy="300" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
+<circle cx="330" cy="286.0" r="15.0" fill="none" stroke="#0b4f8f" stroke-width="5"/>
+<path d="M 300.0 330.0 Q 300.0 304.0 330 304.0 Q 360.0 304.0 360.0 330.0 Z" fill="none" stroke="#0b4f8f" stroke-width="5" stroke-linejoin="round"/>
+<text x="330" y="405" text-anchor="middle" font-size="26" font-weight="700" fill="#12263f">Product Owner</text>
+<text x="330" y="436" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Paranyu</text>
+<circle cx="640" cy="300" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
+<circle cx="614" cy="294.2" r="10.5" fill="none" stroke="#0b4f8f" stroke-width="5"/>
+<path d="M 593.0 325.0 Q 593.0 306.8 614 306.8 Q 635.0 306.8 635.0 325.0 Z" fill="none" stroke="#0b4f8f" stroke-width="5" stroke-linejoin="round"/>
+<circle cx="666" cy="294.2" r="10.5" fill="none" stroke="#0b4f8f" stroke-width="5"/>
+<path d="M 645.0 325.0 Q 645.0 306.8 666 306.8 Q 687.0 306.8 687.0 325.0 Z" fill="none" stroke="#0b4f8f" stroke-width="5" stroke-linejoin="round"/>
+<circle cx="640" cy="282.1" r="12.75" fill="none" stroke="#0b4f8f" stroke-width="5"/>
+<path d="M 614.5 319.5 Q 614.5 297.4 640 297.4 Q 665.5 297.4 665.5 319.5 Z" fill="none" stroke="#0b4f8f" stroke-width="5" stroke-linejoin="round"/>
+<text x="640" y="405" text-anchor="middle" font-size="26" font-weight="700" fill="#12263f">Dev team</text>
+<text x="640" y="436" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Paranyu, Pakorn,</text>
+<text x="640" y="464" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Karnpon</text>
+<circle cx="950" cy="300" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
+<circle cx="950" cy="286.0" r="15.0" fill="none" stroke="#0b4f8f" stroke-width="5"/>
+<path d="M 920.0 330.0 Q 920.0 304.0 950 304.0 Q 980.0 304.0 980.0 330.0 Z" fill="none" stroke="#0b4f8f" stroke-width="5" stroke-linejoin="round"/>
+<text x="950" y="405" text-anchor="middle" font-size="26" font-weight="700" fill="#12263f">Scrum Master</text>
+<text x="950" y="436" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Paranyu</text>
+<rect x="330" y="670" width="660" height="60" fill="#0b4f8f"/>
+<polygon points="990,638 1085,700 990,762" fill="#0b4f8f"/>
+<circle cx="330" cy="700" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
+<rect x="306" y="668" width="48" height="64" rx="6" fill="none" stroke="#0b4f8f" stroke-width="5"/>
+<line x1="318" y1="686" x2="342" y2="686" stroke="#0b4f8f" stroke-width="4"/>
+<line x1="318" y1="700" x2="342" y2="700" stroke="#0b4f8f" stroke-width="4"/>
+<line x1="318" y1="714" x2="342" y2="714" stroke="#0b4f8f" stroke-width="4"/>
+<text x="330" y="812" text-anchor="middle" font-size="26" font-weight="700" fill="#12263f">Product Backlog</text>
+<text x="330" y="842" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">GitHub issues in the</text>
+<text x="330" y="870" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Backlog column</text>
+<circle cx="640" cy="700" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
+<path d="M 606 674 h 68 a 8 8 0 0 1 8 8 v 30 a 8 8 0 0 1 -8 8 h -40 l -16 14 v -14 h -12 a 8 8 0 0 1 -8 -8 v -30 a 8 8 0 0 1 8 -8 z" fill="none" stroke="#0b4f8f" stroke-width="5" stroke-linejoin="round"/>
+<line x1="620" y1="690" x2="660" y2="690" stroke="#0b4f8f" stroke-width="4"/>
+<line x1="620" y1="704" x2="660" y2="704" stroke="#0b4f8f" stroke-width="4"/>
+<text x="640" y="812" text-anchor="middle" font-size="26" font-weight="700" fill="#12263f">Sprint Planning</text>
+<text x="640" y="842" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Pick issues, add the</text>
+<text x="640" y="870" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">sprint label</text>
+<circle cx="950" cy="700" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
+<rect x="926" y="668" width="48" height="64" rx="6" fill="none" stroke="#0b4f8f" stroke-width="5"/>
+<line x1="938" y1="686" x2="962" y2="686" stroke="#0b4f8f" stroke-width="4"/>
+<line x1="938" y1="700" x2="962" y2="700" stroke="#0b4f8f" stroke-width="4"/>
+<line x1="938" y1="714" x2="962" y2="714" stroke="#0b4f8f" stroke-width="4"/>
+<text x="950" y="812" text-anchor="middle" font-size="26" font-weight="700" fill="#12263f">Sprint Backlog</text>
+<text x="950" y="842" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">The Ready column</text>
+<text x="950" y="870" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">of the board</text>
+<path d="M 1520.9 763.4 A 150 150 0 1 1 1460.0 570.1" fill="none" stroke="#b7c9e2" stroke-width="84"/>
+<polygon points="1491.0,516.4 1513.7,601.1 1429.0,623.8" fill="#b7c9e2"/>
+<text x="1385" y="692" text-anchor="middle" font-size="44" font-weight="700" fill="#12263f">Sprint</text>
+<text x="1385" y="744" text-anchor="middle" font-size="44" font-weight="700" fill="#12263f">2 weeks</text>
+<path d="M 1490 500 C 1550 410 1650 395 1722 438" fill="none" stroke="#0b2a52" stroke-width="30"/>
+<polygon points="1706,402 1768,462 1690,480" fill="#0b2a52"/>
+<text x="1610" y="355" text-anchor="middle" font-size="28" font-weight="700" fill="#12263f">Stand-up</text>
+<text x="1610" y="385" text-anchor="middle" font-size="24" font-weight="400" fill="#5b6b80">Mon, Wed, Fri</text>
+<circle cx="1830" cy="490" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
+<rect x="1794" y="462" width="72" height="48" rx="6" fill="none" stroke="#0b4f8f" stroke-width="5"/>
+<line x1="1830" y1="510" x2="1830" y2="524" stroke="#0b4f8f" stroke-width="5"/>
+<line x1="1812" y1="524" x2="1848" y2="524" stroke="#0b4f8f" stroke-width="5"/>
+<polyline points="1814,486 1826,498 1848,476" fill="none" stroke="#0b4f8f" stroke-width="5"/>
+<text x="1830" y="600" text-anchor="middle" font-size="26" font-weight="700" fill="#12263f">Sprint Review</text>
+<text x="1830" y="630" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Show the finished</text>
+<text x="1830" y="658" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">work to the team</text>
+<polygon points="1620,810 1700,810 1700,782 1772,838 1700,894 1700,866 1620,866" fill="#0b2a52"/>
+<circle cx="1830" cy="850" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
+<polyline points="1808,852 1824,868 1854,832" fill="none" stroke="#0b4f8f" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1830" y="960" text-anchor="middle" font-size="26" font-weight="700" fill="#12263f">Finished work</text>
+<text x="1830" y="990" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Merged pull requests,</text>
+<text x="1830" y="1018" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Done column</text>
+<text x="120" y="1050" text-anchor="start" font-size="30" font-weight="700" fill="#0b4f8f">Inside the sprint: how one issue is finished</text>
+<rect x="60" y="1090" width="232" height="170" rx="16" fill="#f3f6fa" stroke="#0b4f8f" stroke-width="4"/>
+<circle cx="94" cy="1124" r="20" fill="#0b4f8f"/>
+<text x="94" y="1132" text-anchor="middle" font-size="24" font-weight="700" fill="#fff">1</text>
+<text x="176.0" y="1174" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">Take an issue</text>
+<text x="176.0" y="1204" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">from Ready, move</text>
+<text x="176.0" y="1234" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">it to In Progress</text>
+<polygon points="298,1158 328,1175 298,1192" fill="#0b4f8f"/>
+<rect x="334" y="1090" width="232" height="170" rx="16" fill="#f3f6fa" stroke="#0b4f8f" stroke-width="4"/>
+<circle cx="368" cy="1124" r="20" fill="#0b4f8f"/>
+<text x="368" y="1132" text-anchor="middle" font-size="24" font-weight="700" fill="#fff">2</text>
+<text x="450.0" y="1174" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">Branch from main</text>
+<text x="450.0" y="1204" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">type/what-you-do</text>
+<polygon points="572,1158 602,1175 572,1192" fill="#0b4f8f"/>
+<rect x="608" y="1090" width="232" height="170" rx="16" fill="#f3f6fa" stroke="#0b4f8f" stroke-width="4"/>
+<circle cx="642" cy="1124" r="20" fill="#0b4f8f"/>
+<text x="642" y="1132" text-anchor="middle" font-size="24" font-weight="700" fill="#fff">3</text>
+<text x="724.0" y="1174" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">Commit in small</text>
+<text x="724.0" y="1204" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">steps, Conventional</text>
+<text x="724.0" y="1234" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">Commits</text>
+<polygon points="846,1158 876,1175 846,1192" fill="#0b4f8f"/>
+<rect x="882" y="1090" width="232" height="170" rx="16" fill="#f3f6fa" stroke="#0b4f8f" stroke-width="4"/>
+<circle cx="916" cy="1124" r="20" fill="#0b4f8f"/>
+<text x="916" y="1132" text-anchor="middle" font-size="24" font-weight="700" fill="#fff">4</text>
+<text x="998.0" y="1174" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">Open a pull request</text>
+<text x="998.0" y="1204" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">on the template,</text>
+<text x="998.0" y="1234" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">link the issue</text>
+<polygon points="1120,1158 1150,1175 1120,1192" fill="#0b4f8f"/>
+<rect x="1156" y="1090" width="232" height="170" rx="16" fill="#f3f6fa" stroke="#0b4f8f" stroke-width="4"/>
+<circle cx="1190" cy="1124" r="20" fill="#0b4f8f"/>
+<text x="1190" y="1132" text-anchor="middle" font-size="24" font-weight="700" fill="#fff">5</text>
+<text x="1272.0" y="1174" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">CI runs</text>
+<text x="1272.0" y="1204" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">typecheck, tests,</text>
+<text x="1272.0" y="1234" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">build</text>
+<polygon points="1394,1158 1424,1175 1394,1192" fill="#0b4f8f"/>
+<rect x="1430" y="1090" width="232" height="170" rx="16" fill="#f3f6fa" stroke="#0b4f8f" stroke-width="4"/>
+<circle cx="1464" cy="1124" r="20" fill="#0b4f8f"/>
+<text x="1464" y="1132" text-anchor="middle" font-size="24" font-weight="700" fill="#fff">6</text>
+<text x="1546.0" y="1174" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">A teammate</text>
+<text x="1546.0" y="1204" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">reviews and</text>
+<text x="1546.0" y="1234" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">approves</text>
+<polygon points="1668,1158 1698,1175 1668,1192" fill="#0b4f8f"/>
+<rect x="1704" y="1090" width="232" height="170" rx="16" fill="#f3f6fa" stroke="#0b4f8f" stroke-width="4"/>
+<circle cx="1738" cy="1124" r="20" fill="#0b4f8f"/>
+<text x="1738" y="1132" text-anchor="middle" font-size="24" font-weight="700" fill="#fff">7</text>
+<text x="1820.0" y="1174" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">Merge into main,</text>
+<text x="1820.0" y="1204" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">the card moves</text>
+<text x="1820.0" y="1234" text-anchor="middle" font-size="22" font-weight="400" fill="#12263f">to Done</text>
+</svg>
