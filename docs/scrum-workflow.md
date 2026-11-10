@@ -26,9 +26,10 @@ One person holds two roles, so there is no second view on priorities. Reviews of
 | Sprint | 15 days. Six sprints, from 11 August to 8 November | The Sprint field of the board |
 | Stand-up | A short check-in on what is done, what is next and what blocks, every Monday, Wednesday and Friday | Held by the team, no trace in the repository |
 | Sprint review | At the end of the sprint the team shows the finished work | Held by the team, no trace in the repository |
+| Sprint retrospective | The team talks about what went well and what to change. Action items are written down and checked in the next sprint | [`docs/process/retrospectives.md`](process/retrospectives.md) |
 | Finished work | Pull requests merged into `main`, with the card in the Done column | Merged pull requests and the Done column |
 
-The planning, stand-up and review meetings were confirmed by the team. They leave no record in the repository, so this page cannot show their dates or notes.
+The planning, stand-up and review meetings were confirmed by the team. They leave no record in the repository, so this page cannot show their dates or notes. The retrospective is the exception: its notes and action items are in the retrospectives document.
 
 ## One issue, from start to finish
 

@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1320" viewBox="0 0 2000 1320" font-family="Liberation Sans, Arial, Helvetica, sans-serif">
 <rect width="2000" height="1320" fill="#fff"/>
 <text x="1000.0" y="80" text-anchor="middle" font-size="46" font-weight="700" fill="#12263f">How our team works: Scrum, adapted to a team of three</text>
-<text x="1000.0" y="124" text-anchor="middle" font-size="26" fill="#5b6b80">15-day sprints on a GitHub board. We hold sprint planning, a stand-up every Monday, Wednesday and Friday, and a sprint review.</text>
+<text x="1000.0" y="124" text-anchor="middle" font-size="26" fill="#5b6b80">15-day sprints on a GitHub board. We hold sprint planning, a stand-up every Monday, Wednesday and Friday, and a sprint review with a retrospective.</text>
 <text x="120" y="215" text-anchor="start" font-size="30" font-weight="700" fill="#0b4f8f">Roles</text>
 <circle cx="330" cy="300" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
 <circle cx="330" cy="286.0" r="15.0" fill="none" stroke="#0b4f8f" stroke-width="5"/>
@@ -62,8 +62,10 @@
 <line x1="1812" y1="524" x2="1848" y2="524" stroke="#0b4f8f" stroke-width="5"/>
 <polyline points="1814,486 1826,498 1848,476" fill="none" stroke="#0b4f8f" stroke-width="5"/>
 <text x="1830" y="600" text-anchor="middle" font-size="26" font-weight="700" fill="#12263f">Sprint Review</text>
-<text x="1830" y="630" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Show the finished</text>
-<text x="1830" y="658" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">work to the team</text>
+<text x="1830" y="630" text-anchor="middle" font-size="26" font-weight="700" fill="#12263f">+ Retrospective</text>
+<text x="1830" y="662" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Show the finished work,</text>
+<text x="1830" y="690" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">then talk about how</text>
+<text x="1830" y="718" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">we worked</text>
 <polygon points="1620,810 1700,810 1700,782 1772,838 1700,894 1700,866 1620,866" fill="#0b2a52"/>
 <circle cx="1830" cy="850" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
 <polyline points="1808,852 1824,868 1854,832" fill="none" stroke="#0b4f8f" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
