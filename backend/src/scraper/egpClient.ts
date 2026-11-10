@@ -54,7 +54,7 @@ export function listingUrl(projectId: string, env: NodeJS.ProcessEnv = process.e
   return `${base}/${projectId}`;
 }
 
-/** Polite read-only client over the Bangkok e-GP public API (see munyin.py). */
+/** Polite read-only client over the Bangkok e-GP public API. */
 export class EgpClient implements EgpClientLike {
   private readonly cfg: EgpClientConfig;
   private readonly sleep: (ms: number) => Promise<void>;

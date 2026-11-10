@@ -7,8 +7,8 @@
 ## 1. Context & Goal
 
 The backend (now TypeScript, `origin/main`) has auth and the 8 Mongoose models but
-no data ingestion. `munyin.py` was a throwaway prototype that proved out the Bangkok
-e-GP public API and produced `data/manifest.jsonl`. This phase builds the real
+no data ingestion. An earlier throwaway prototype proved out the Bangkok
+e-GP public API. This phase builds the real
 ingestion path **in the TS backend**: pull software-procurement TORs from e-GP,
 upsert them into the `tors` collection, and fetch + store each TOR's source PDF so
 later stages (OCR, AI summary, fairness) have the bytes to work with.
@@ -20,7 +20,7 @@ run-history side of FR-34.
 
 **In scope**
 
-- TS port of the e-GP client (`munyin.py`'s `Client`)
+- TS client for the e-GP public API
 - Manual, admin-triggered ingestion run that upserts `Tor` documents
 - Download the `ร่างขอบเขตของงาน (TOR)` PDF for each project into a swappable blob store
 - Inspect each PDF's text layer (`digital` / `scanned` / `unreadable` / `missing`)
@@ -38,7 +38,7 @@ that vanish from e-GP, any frontend work, the frontend's separate Mongoose model
 
 Store our own copy of the TOR PDF (keep the e-GP URLs too):
 
-1. The product's core features need the file bytes. `munyin.py` measured ~93% of
+1. The product's core features need the file bytes. The earlier prototype measured ~93% of
    TOR PDFs as scans with no text layer, so OCR — which needs the bytes — is the
    main extraction path, not a fallback.
 2. e-GP has no official public API contract; file URLs can rot or change. A dead
@@ -84,7 +84,7 @@ per-project work is factored so a future Pub/Sub consumer can call it unchanged.
 - `backend/.gitignore` — add `/storage`
 - `package.json` — add `pdf-parse` (+ `@types/pdf-parse` dev)
 
-## 5. e-GP API surface (ported from `munyin.py`)
+## 5. e-GP API surface
 
 Base URLs and the TOR announcement-type id move to env / a constants module.
 
@@ -224,7 +224,7 @@ pageCount: null, byteSize: null, sha256: null, fetchedAt: now }`, `save()`. The
 ## 8. `pdfInspect`
 
 ```ts
-const TEXT_LAYER_MIN_CHARS_PER_PAGE = 200; // same threshold as munyin.py
+const TEXT_LAYER_MIN_CHARS_PER_PAGE = 200;
 
 async function pdfInspect(buf: Buffer): Promise<{
   pageCount: number | null;
@@ -359,7 +359,7 @@ Add: `pdf-parse`; dev `@types/pdf-parse`. All test tooling
 
 ## 16. Assumptions
 
-1. The e-GP endpoints, params, and `TOR_TYPE_ID` in `munyin.py` are current and can
+1. The e-GP endpoints, params, and `TOR_TYPE_ID` in the earlier prototype are current and can
    be ported as-is.
 2. This work branches off `main` (which has the TS backend + auth + Jest).
 3. Only the `ร่างขอบเขตของงาน (TOR)` announcement is stored; other announcement

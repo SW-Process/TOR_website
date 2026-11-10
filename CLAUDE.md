@@ -12,13 +12,12 @@ BKK Software TOR Aggregator & Fairness Checker — aggregates software-procureme
 
 ## Repo layout
 
-Monorepo with three independently-run parts:
+Monorepo with two independently-run parts:
 
 | Part | Stack | Run |
 |---|---|---|
 | `frontend/` | Next.js 16 (App Router), React 19, Tailwind v4, TypeScript | `npm run dev` (port 3000) |
 | `backend/` | Express 5, Mongoose 9, **TypeScript** | `npm run dev` (tsx watch, port 8000) |
-| `munyin.py` | standalone Python e-GP ingestion client | `python munyin.py ...` |
 
 ### Commands
 
@@ -60,18 +59,14 @@ The frontend has no database connection and no Next.js API route handlers: every
 ### Frontend data
 Pages read and write through the Express API (`frontend/src/lib/api.ts` and the `use*` hooks). `frontend/src/lib/mockData.ts` and `adminMockData.ts` now hold mostly types, labels and formatting helpers (plus sample rows that are no longer shown). Domain types and enum values are **in Thai** (e.g. status `"เปิดรับ"`, categories). Route groups: `(site)/` for public+vendor pages, `admin/` for the admin panel. All frontend work is implementation from existing mockups — not UI design.
 
-**Auth** is `useAuth` (`frontend/src/lib/useAuth.ts`) calls the Express backend (`/api/auth/*` via `frontend/src/lib/api.ts`, `NEXT_PUBLIC_API_BASE_URL`) with `credentials: "include"` — email/password + Google OAuth, HttpOnly cookie. The other `use*` hooks (`useProfile`, `useBookmarks`, `useHiddenTors`, …) call the API too; `localStorage` is only read once by `useDayNotes` to upload notes an older version kept there.
+**Auth** goes through `useAuth` (`frontend/src/lib/useAuth.ts`), which calls the Express backend (`/api/auth/*` via `frontend/src/lib/api.ts`, `NEXT_PUBLIC_API_BASE_URL`) with `credentials: "include"` — email/password + Google OAuth, HttpOnly cookie. The other `use*` hooks (`useProfile`, `useBookmarks`, `useHiddenTors`, …) call the API too; `localStorage` is only read once by `useDayNotes` to upload notes an older version kept there.
 
 Next 16 note: `searchParams` in page components is a `Promise` and must be `await`ed.
-
-### `munyin.py` — e-GP ingestion (not yet wired into the backend)
-Polite public-API client for `egp2.bangkok.go.th` (no auth). `python munyin.py discover --search ซอฟต์แวร์ --max-projects 200 --download` writes `data/manifest.jsonl` + `data/pdfs/<projectNumber>/`; `python munyin.py stats` summarizes it. Resumable (skips project ids already in the manifest). Most structured fields come pre-structured from the API; ~93% of the PDFs are scans with no text layer, so OCR is the main extraction path. Requires `pip install requests` (and `pypdf` for `--download` text-layer detection).
 
 ### Planned AI pipeline (cost-control funnel)
 Cheap→expensive stages so not every TOR hits the LLM: scrape → parse/keyword-classify → embeddings + budget/timeline stats + brand-name regex (filters out most normal TORs) → Gemini review queue only for flagged candidates → results store. Each stage is its own queue/worker; jobs idempotent keyed by TOR id + content hash; dead-letter queue for unparseable PDFs.
 
 ### TOR ingestion (`backend/src/scraper/` + `backend/src/ingestion/`)
-`munyin.py` was a throwaway prototype; the real ingestion path is in the TS backend.
 `POST /api/ingestion/runs` (admin) creates an `IngestionRun` and kicks off
 `runIngestion` in-process — it pages the e-GP API (`scraper/egpClient.ts`), upserts
 `Tor` docs keyed by `projectCode` with change detection via `sourceContentHash`, and
