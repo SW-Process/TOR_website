@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1320" viewBox="0 0 2000 1320" font-family="Liberation Sans, Arial, Helvetica, sans-serif">
 <rect width="2000" height="1320" fill="#fff"/>
 <text x="1000.0" y="80" text-anchor="middle" font-size="46" font-weight="700" fill="#12263f">How our team works: Scrum, adapted to a team of three</text>
-<text x="1000.0" y="124" text-anchor="middle" font-size="26" fill="#5b6b80">Two-week sprints on a GitHub board. We hold sprint planning, a stand-up every Monday, Wednesday and Friday, and a sprint review.</text>
+<text x="1000.0" y="124" text-anchor="middle" font-size="26" fill="#5b6b80">15-day sprints on a GitHub board. We hold sprint planning, a stand-up every Monday, Wednesday and Friday, and a sprint review.</text>
 <text x="120" y="215" text-anchor="start" font-size="30" font-weight="700" fill="#0b4f8f">Roles</text>
 <circle cx="330" cy="300" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
 <circle cx="330" cy="286.0" r="15.0" fill="none" stroke="#0b4f8f" stroke-width="5"/>
@@ -38,8 +38,8 @@
 <line x1="620" y1="690" x2="660" y2="690" stroke="#0b4f8f" stroke-width="4"/>
 <line x1="620" y1="704" x2="660" y2="704" stroke="#0b4f8f" stroke-width="4"/>
 <text x="640" y="812" text-anchor="middle" font-size="26" font-weight="700" fill="#12263f">Sprint Planning</text>
-<text x="640" y="842" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Pick issues, add the</text>
-<text x="640" y="870" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">sprint label</text>
+<text x="640" y="842" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Pick issues, set the</text>
+<text x="640" y="870" text-anchor="middle" font-size="23" font-weight="400" fill="#5b6b80">Sprint field</text>
 <circle cx="950" cy="700" r="70" fill="#fff" stroke="#0b4f8f" stroke-width="6"/>
 <rect x="926" y="668" width="48" height="64" rx="6" fill="none" stroke="#0b4f8f" stroke-width="5"/>
 <line x1="938" y1="686" x2="962" y2="686" stroke="#0b4f8f" stroke-width="4"/>
@@ -51,7 +51,7 @@
 <path d="M 1520.9 763.4 A 150 150 0 1 1 1460.0 570.1" fill="none" stroke="#b7c9e2" stroke-width="84"/>
 <polygon points="1491.0,516.4 1513.7,601.1 1429.0,623.8" fill="#b7c9e2"/>
 <text x="1385" y="692" text-anchor="middle" font-size="44" font-weight="700" fill="#12263f">Sprint</text>
-<text x="1385" y="744" text-anchor="middle" font-size="44" font-weight="700" fill="#12263f">2 weeks</text>
+<text x="1385" y="744" text-anchor="middle" font-size="44" font-weight="700" fill="#12263f">15 days</text>
 <path d="M 1490 500 C 1550 410 1650 395 1722 438" fill="none" stroke="#0b2a52" stroke-width="30"/>
 <polygon points="1706,402 1768,462 1690,480" fill="#0b2a52"/>
 <text x="1610" y="355" text-anchor="middle" font-size="28" font-weight="700" fill="#12263f">Stand-up</text>

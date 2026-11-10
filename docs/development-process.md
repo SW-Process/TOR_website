@@ -12,7 +12,7 @@ The cycle is not run once. The project started on 9 August 2026 and has since ha
 
 | # | Activity | What we do | Where to find it |
 |---|---|---|---|
-| 1 | Planning | Issues in a fixed format, a project board, two-week sprints | GitHub issues and the SW-Process project board |
+| 1 | Planning | Issues in a fixed format, a project board, 15-day sprints | GitHub issues and the SW-Process project board |
 | 2 | Analysis | A requirements specification with numbered functional and non-functional requirements | The SRS, and the [domain model](design/domain-model.md) |
 | 3 | Design | System, data, class and sequence diagrams, an API reference, a design spec for larger features | [`docs/design/`](design/README.md) and [`docs/superpowers/`](superpowers) |
 | 4 | Implementation | A branch per task, Conventional Commits, pull requests with a template | [`CONTRIBUTING.md`](../CONTRIBUTING.md) and the code |
@@ -21,11 +21,11 @@ The cycle is not run once. The project started on 9 August 2026 and has since ha
 
 ## 1. Planning
 
-**What we do.** Work starts as a GitHub issue with four fixed parts: the problem, the proposed solution, extra context, and traceability. Traceability names the requirement the issue implements (for example FR-19) and carries the matching `FR-xx` label, so every feature can be followed back to the specification. There are 40 or more different requirement labels in use. Issues sit on the SW-Process project board (Backlog, Ready, In Progress, Done) and the work was planned in two-week sprints, labelled `sprint: 10 Sep-24 Sep` and `sprint: 25 Sep - 9 Oct`.
+**What we do.** Work starts as a GitHub issue with four fixed parts: the problem, the proposed solution, extra context, and traceability. Traceability names the requirement the issue implements (for example FR-19) and carries the matching `FR-xx` label, so every feature can be followed back to the specification. There are 40 or more different requirement labels in use. Issues sit on the SW-Process project board (Backlog, Ready, In Progress, Done) and the work was planned in six sprints of 15 days (11 August to 8 November), set in the board's Sprint field. Each sprint is reviewed in [`docs/process/retrospectives.md`](process/retrospectives.md).
 
 Before a larger feature, the team writes a design spec and then an implementation plan. There are six specs and nine plans so far, for example the [fairness flag detection spec](superpowers/specs/2026-09-08-fairness-flag-detection-design.md) and its [plan](superpowers/plans/2026-09-08-fairness-flag-detection.md).
 
-**Missing.** Only 25 issues carry a sprint label, and none after the second sprint, so the board no longer shows which sprint a task belongs to. Issue [#51](https://github.com/SW-Process/TOR_website/issues/51) ("Test issue") is still open and looks like a leftover that should be closed.
+**Missing.** 17 of the 98 items on the board have no sprint set. Issue [#51](https://github.com/SW-Process/TOR_website/issues/51) ("Test issue") is still open and looks like a leftover that should be closed.
 
 ## 2. Analysis
 
@@ -104,5 +104,5 @@ In order of effect:
 2. Turn on branch protection for `main` with the two CI checks and one required review.
 3. Add the frontend lint step to CI and fix the outdated note about it.
 4. Add tests for the frontend, and a few end-to-end checks of the main flows (search, sign in, admin correction).
-5. Label every issue with its sprint again, and close issue #51.
+5. Set a sprint on every board item, and close issue #51.
 6. Either build the deadline reminder or remove its notification type.
