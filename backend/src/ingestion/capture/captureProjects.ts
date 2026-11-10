@@ -5,7 +5,7 @@ import type { ITor } from "../../models/Tor";
 import type { GprocCaptureClientLike, GprocMoney } from "../../scraper/gprocClient.types";
 import type { BlobStorage } from "../../storage/storage.types";
 import { enqueue } from "../enrichment/enrichmentJobRepo";
-import { gprocProjectUrl } from "../gprocUrl";
+import { gprocHtmlAnnouncementUrl, gprocProjectUrl, HTML_ANNOUNCEMENT_METHOD_ID } from "../gprocUrl";
 import { logIngestionEvent } from "../log";
 import type { PdfParseFn } from "../pdfInspect";
 import { looksSoftwareRelated } from "../softwareKeywordGate";
@@ -39,8 +39,10 @@ type Outcome = { kind: "created" | "known" | "skipped" | "failed"; note?: string
 /**
  * Capture admin-selected process5 projects: create the missing TORs from process5 data, store the TOR PDF
  * found in the document bundle (or the signed invitation PDF when there is no TOR yet) and queue enrichment.
- * A TOR with no stored source document is never queued; one summarised from its invitation is upgraded
- * when a later capture finds the TOR file.
+ * A TOR with no stored source document is never queued, except a project published as ประกาศเชิญชวนทั่วไป
+ * (process5 method 20): e-GP has no PDF for it at all, only an HTML announcement on the old e-GP, so it gets
+ * that page's link and is queued to be summarised from the project details. One summarised from its
+ * invitation is upgraded when a later capture finds the TOR file.
  * Serial; per-project errors never escape; 3 consecutive process5 errors pause process5 for the run.
  * The `title`/`agency` hints from the client can only SKIP a project, never create or change data.
  */
@@ -103,6 +105,18 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
     return false;
   }
 
+  /**
+   * A method-20 project with no PDF: store the old e-GP HTML announcement link and queue it to be summarised
+   * from the project details (no document). Returns false for any other method.
+   */
+  async function useHtmlAnnouncement(tor: HydratedDocument<ITor>, code: string, methodId: string | null | undefined): Promise<boolean> {
+    if (methodId !== HTML_ANNOUNCEMENT_METHOD_ID) return false;
+    tor.sourceAnnouncementHtmlUrl = gprocHtmlAnnouncementUrl(code);
+    await tor.save();
+    await enqueueEnrichment(tor._id as Types.ObjectId, tor.sourceContentHash ?? "");
+    return true;
+  }
+
   /** Budget and reference price; a miss only costs those two fields, so an error is logged and swallowed. */
   async function fetchMoney(code: string): Promise<GprocMoney | null> {
     try {
@@ -134,7 +148,18 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
       // (a) never judged: no document yet -> retry, then queue; a stored document but (maybe) no job (a failed
       // enqueue earlier) -> just queue it (idempotent when the job exists with the same hash).
       if (existing.pipelineStatus === "pending" && !doc?.storageKey) {
-        if (!(await attachSourceFile(existing, code))) return { kind: "known", note: "no source document found yet" };
+        if (!(await attachSourceFile(existing, code))) {
+          let methodId: string | null | undefined;
+          try {
+            methodId = (await deps.gproc.projectDetail(code))?.methodId;
+          } catch (err) {
+            return { kind: "failed", note: `process5: ${(err as Error).message}`, gproc: "error" };
+          }
+          if (await useHtmlAnnouncement(existing, code, methodId)) {
+            return { kind: "known", note: "no PDF on e-GP (HTML announcement only), queued for enrichment from the project details", gproc: "ok" };
+          }
+          return { kind: "known", note: "no source document found yet" };
+        }
         await enqueueEnrichment(existing._id as Types.ObjectId, existing.sourceContentHash ?? "");
         return { kind: "known", note: "source document attached, queued for enrichment" };
       }
@@ -213,6 +238,9 @@ export async function captureProjects(runId: Types.ObjectId, projects: CapturePr
       throw err;
     }
     const kind = await attachSourceFile(tor, code);
+    if (!kind && (await useHtmlAnnouncement(tor, code, detail.methodId))) {
+      return { kind: "created", note: "no PDF on e-GP (HTML announcement only), queued for enrichment from the project details", gproc: "ok" };
+    }
     if (!kind) {
       await log("warning", `capture ${code}: no TOR file or invitation PDF found; created without a source document and not queued for enrichment`);
       return { kind: "created", note: "created, but no TOR file or invitation found yet; not queued for enrichment", gproc: "ok" };
