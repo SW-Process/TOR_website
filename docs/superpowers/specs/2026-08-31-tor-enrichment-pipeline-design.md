@@ -10,7 +10,7 @@
 first half of TOR ingestion in the TS backend:
 
 - `scraper/egpClient.ts` — polite read-only client over the Bangkok e-GP public API
-  (`egp2.bangkok.go.th`), ported from `munyin.py`
+  (`egp2.bangkok.go.th`)
 - `ingestion/mapProject.ts` — pure e-GP → `Tor` payload mapper with a
   `sourceContentHash` idempotency key
 - `ingestion/runIngestion.ts` — admin-triggered orchestrator: search → per-project

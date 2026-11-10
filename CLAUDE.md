@@ -12,13 +12,12 @@ BKK Software TOR Aggregator & Fairness Checker — aggregates software-procureme
 
 ## Repo layout
 
-Monorepo with three independently-run parts:
+Monorepo with two independently-run parts:
 
 | Part | Stack | Run |
 |---|---|---|
 | `frontend/` | Next.js 16 (App Router), React 19, Tailwind v4, TypeScript | `npm run dev` (port 3000) |
 | `backend/` | Express 5, Mongoose 9, **TypeScript** | `npm run dev` (tsx watch, port 8000) |
-| `munyin.py` | standalone Python e-GP ingestion client | `python munyin.py ...` |
 
 ### Commands
 
@@ -53,25 +52,21 @@ CI runs on PRs into `main` (`.github/workflows/ci.yml`): backend typecheck + tes
 The frontend has no database connection and no Next.js API route handlers: every read and write goes through the Express API, which enforces authentication and authorization. Do not add Mongoose (or any DB credential) to the frontend.
 
 ### Backend data model (`backend/src/models/`, index in `models/index.ts`)
-8 collections: `users`, `vendorprofiles` (1:1 with vendor user), `tors` (central entity), `bookmarks` (vendor↔TOR join + application status), `notifications`, `errorreports` (public-submitted TOR corrections), `ingestionruns`, `systemlogs`.
+16 collections, drawn in full in `docs/design/er-diagram.md`. The main ones: `users`, `vendorprofiles` (1:1 with vendor user), `tors` (central entity), `bookmarks` (vendor↔TOR join + application status), `notifications`, `errorreports` (public-submitted TOR corrections), `ingestionruns`, `systemlogs`. The rest: `sessions`, `chatconversations`, `chatmessages`, `faqs`, `announcements`, `enrichmentjobs`, `adminnotifications`, `settings`.
 
 `Tor` embeds `aiSummary` and `fairnessFlags` (fetched with the TOR, never queried alone). The AI-written description lives at `aiSummary.summary` — never presented as the agency's own text, since it's a model-generated summary of a government document, not an official field. PDF binaries live in GCS, not Mongo — `sourceDocumentUrl` is a reference. `similarTORs` is a precomputed array of ObjectIds. There is a text index on `title`/`agency` (search actually uses a regex on `title`, not `$text` — see the RULING in `torController.ts`).
 
-### Frontend runs on mock data
-Pages currently render from `frontend/src/lib/mockData.ts` and `frontend/src/lib/adminMockData.ts`. Domain types and enum values are **in Thai** (e.g. status `"เปิดรับ"`, categories). Route groups: `(site)/` for public+vendor pages, `admin/` for the admin panel. All frontend work is implementation from existing mockups — not UI design.
+### Frontend data
+Pages read and write through the Express API (`frontend/src/lib/api.ts` and the `use*` hooks). `frontend/src/lib/mockData.ts` and `adminMockData.ts` now hold mostly types, labels and formatting helpers (plus sample rows that are no longer shown). Domain types and enum values are **in Thai** (e.g. status `"เปิดรับ"`, categories). Route groups: `(site)/` for public+vendor pages, `admin/` for the admin panel. All frontend work is implementation from existing mockups — not UI design.
 
-**Auth is real**, though: `useAuth` (`frontend/src/lib/useAuth.ts`) calls the Express backend (`/api/auth/*` via `frontend/src/lib/api.ts`, `NEXT_PUBLIC_API_BASE_URL`) with `credentials: "include"` — email/password + Google OAuth, HttpOnly cookie. The other `use*` hooks (`useProfile`, `useBookmarks`, …) are still localStorage mocks.
+**Auth** goes through `useAuth` (`frontend/src/lib/useAuth.ts`), which calls the Express backend (`/api/auth/*` via `frontend/src/lib/api.ts`, `NEXT_PUBLIC_API_BASE_URL`) with `credentials: "include"` — email/password + Google OAuth, HttpOnly cookie. The other `use*` hooks (`useProfile`, `useBookmarks`, `useHiddenTors`, …) call the API too; `localStorage` is only read once by `useDayNotes` to upload notes an older version kept there.
 
 Next 16 note: `searchParams` in page components is a `Promise` and must be `await`ed.
-
-### `munyin.py` — e-GP ingestion (not yet wired into the backend)
-Polite public-API client for `egp2.bangkok.go.th` (no auth). `python munyin.py discover --search ซอฟต์แวร์ --max-projects 200 --download` writes `data/manifest.jsonl` + `data/pdfs/<projectNumber>/`; `python munyin.py stats` summarizes it. Resumable (skips project ids already in the manifest). Most structured fields come pre-structured from the API; ~93% of the PDFs are scans with no text layer, so OCR is the main extraction path. Requires `pip install requests` (and `pypdf` for `--download` text-layer detection).
 
 ### Planned AI pipeline (cost-control funnel)
 Cheap→expensive stages so not every TOR hits the LLM: scrape → parse/keyword-classify → embeddings + budget/timeline stats + brand-name regex (filters out most normal TORs) → Gemini review queue only for flagged candidates → results store. Each stage is its own queue/worker; jobs idempotent keyed by TOR id + content hash; dead-letter queue for unparseable PDFs.
 
 ### TOR ingestion (`backend/src/scraper/` + `backend/src/ingestion/`)
-`munyin.py` was a throwaway prototype; the real ingestion path is in the TS backend.
 `POST /api/ingestion/runs` (admin) creates an `IngestionRun` and kicks off
 `runIngestion` in-process — it pages the e-GP API (`scraper/egpClient.ts`), upserts
 `Tor` docs keyed by `projectCode` with change detection via `sourceContentHash`, and

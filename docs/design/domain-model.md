@@ -47,7 +47,7 @@ The concepts of the TOR Checker problem domain, their attributes, and how they r
 |---|---|
 | Bookmark | A TOR the vendor follows. `applicationStatus` is interested, preparing, submitted or missed. |
 | SavedSearch | A keyword and filters kept for reuse, with alerts on or off. |
-| Notification | An in-app alert about one TOR: a profile match, a saved-search match or a deadline reminder. |
+| Notification | An in-app alert about one TOR: a profile match or a saved-search match. A deadline reminder is allowed by the data model, but nothing creates one yet. |
 | DayNote | A vendor's note on one day of the deadline calendar. |
 
 ### Support and operations

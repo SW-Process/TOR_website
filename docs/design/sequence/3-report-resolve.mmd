@@ -37,7 +37,8 @@ sequenceDiagram
     opt resolveReports
         A->>M: mark every open report on the TOR resolved (admin, time, note)
     end
-    A->>M: write SystemLog (what changed) and the admin audit entry
+    A->>M: write SystemLog (what changed)
+    A->>A: log the admin action (who, route, outcome) to the application log
     A-->>AD: 200 with the updated TOR
     end
 

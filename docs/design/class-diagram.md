@@ -65,7 +65,7 @@ Every outside system is reached through an interface. The pipeline depends only 
 | `notifications` | Creates profile and saved-search match notifications, then e-mails the digests |
 | `storage`, `email` | Factories that return the configured `BlobStorage` or `EmailSender` |
 
-Every function takes its outside dependencies in an optional `deps` argument (`RunIngestionDeps`, `DrainDeps`, `RefreshLifecycleDeps`, `CaptureDeps`), defaulting to the real implementation. That is how the 1,250+ backend tests run the whole pipeline without the network.
+Every function takes its outside dependencies in an optional `deps` argument (`RunIngestionDeps`, `DrainDeps`, `RefreshLifecycleDeps`, `CaptureDeps`), defaulting to the real implementation. That is how the 1,300+ backend tests run the whole pipeline without the network.
 
 ## 2. API request handling
 

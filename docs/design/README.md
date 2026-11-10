@@ -62,7 +62,7 @@ The code that implements these use cases is shown in the [class diagram](class-d
 | UC-12 | Verify 2FA Code | — | «extend» UC-10 | Enter an authenticator-app code when 2FA is on; required for every admin sign-in |
 | UC-13 | Sign Up | Guest | — | Register as a vendor |
 | UC-14 | Reset Forgotten Password | Guest, Email Service | — | Request a password reset; the system emails a reset link |
-| UC-15 | Manage Account & Security | Registered User | — | Change email or password, set up 2FA, view and revoke sessions, delete the account; each action requires re-authentication |
+| UC-15 | Manage Account & Security | Registered User | — | Change email or password, set up 2FA, view and revoke sessions, delete the account; the sensitive changes (not just viewing) require a recent re-authentication |
 
 ### Vendor Workspace
 
@@ -76,7 +76,7 @@ The code that implements these use cases is shown in the [class diagram](class-d
 | UC-21 | Save Search Criteria | Vendor | — | Save a search; the system notifies the vendor when a new TOR matches it |
 | UC-22 | View Deadline Calendar | Vendor | — | See submission deadlines of followed TORs on a calendar |
 | UC-23 | Add Day Notes | — | «extend» UC-22 | Write a note on a calendar day |
-| UC-24 | Receive Match & Deadline Alerts | Vendor | — | Receive three kinds of notifications: profile match, saved-search match, and deadline reminder |
+| UC-24 | Receive Match & Deadline Alerts | Vendor | — | Receive notifications about matching TORs: a profile match or a saved-search match. A deadline reminder is planned (the type exists) but nothing sends it yet |
 | UC-25 | Chat with Admin | Vendor | — | Send questions to the admin team |
 
 ### Administration
@@ -88,7 +88,7 @@ The code that implements these use cases is shown in the [class diagram](class-d
 | UC-28 | Handle Error Reports | Admin | — | Review and resolve incorrect-data reports from users |
 | UC-29 | Reply to User Chats | Admin | — | Answer vendor messages |
 | UC-30 | Manage Help Content | Admin | — | Create, edit, and delete FAQs and announcements |
-| UC-31 | Monitor Logs & User Sessions | Admin | — | View system and audit logs; revoke a user's sessions |
+| UC-31 | Monitor Logs & User Sessions | Admin | — | View system logs (including the edits admins make to TORs); revoke a user's sessions. The audit trail of every admin change is also written to the application log in Cloud Logging, not shown in the admin panel |
 | UC-32 | Run Ingestion Manually | Admin | UC-34 «include» | Start an ingestion run without waiting for the schedule |
 | UC-33 | Capture Projects via Browser Extension | Admin, e-GP System | — | Collect project numbers from the e-GP search page with the Chrome extension and send them to the system, up to 100 per send |
 

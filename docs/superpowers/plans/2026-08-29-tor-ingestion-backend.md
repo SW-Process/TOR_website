@@ -21,7 +21,7 @@
 - Models: `import { Tor, IngestionRun, SystemLog } from "../models"`. Model file pattern: `export const X = model<IX>(...)` + `export default X` + `interface IX`.
 - e-GP politeness (NFR-07): sequential requests only, honest User-Agent, request delay, retry with backoff, per-request timeout. All configurable via env with the defaults below.
 - e-GP constants: `EGP_API_BASE=https://egp2.bangkok.go.th/appapi/api`, `EGP_FILE_BASE=https://egp2.bangkok.go.th/api/file`, `EGP_LISTING_BASE=https://egp2.bangkok.go.th/project-detail`, `TOR_TYPE_ID=24995aa2-d875-4d3d-9dec-d5e22d222aa4`.
-- Text-layer threshold: `TEXT_LAYER_MIN_CHARS_PER_PAGE = 200` (verbatim from `munyin.py`).
+- Text-layer threshold: `TEXT_LAYER_MIN_CHARS_PER_PAGE = 200`.
 - Blob key scheme: `tor-pdfs/<projectNumber>/<announcementId>.pdf`.
 - Commits: Conventional Commits, imperative, no trailing period, scope `ingestion`. End every commit message body with:
   `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
@@ -730,7 +730,7 @@ export interface PdfInspectResult {
 
 export type PdfParseFn = (buf: Buffer) => Promise<{ numpages: number; text: string }>;
 
-/** A page averaging fewer than this many characters needs OCR. Verbatim from munyin.py. */
+/** A page averaging fewer than this many characters needs OCR. */
 export const TEXT_LAYER_MIN_CHARS_PER_PAGE = 200;
 
 const defaultParse: PdfParseFn = async (buf) => {
@@ -1019,7 +1019,7 @@ export function listingUrl(projectId: string, env: NodeJS.ProcessEnv = process.e
   return `${base}/${projectId}`;
 }
 
-/** Polite read-only client over the Bangkok e-GP public API (see munyin.py). */
+/** Polite read-only client over the Bangkok e-GP public API. */
 export class EgpClient implements EgpClientLike {
   private readonly cfg: EgpClientConfig;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -2638,7 +2638,6 @@ In `CLAUDE.md`, under "Architecture notes that span files", add a subsection:
 
 ```markdown
 ### TOR ingestion (`backend/src/scraper/` + `backend/src/ingestion/`)
-`munyin.py` was a throwaway prototype; the real ingestion path is in the TS backend.
 `POST /api/ingestion/runs` (admin) creates an `IngestionRun` and kicks off
 `runIngestion` in-process — it pages the e-GP API (`scraper/egpClient.ts`), upserts
 `Tor` docs keyed by `projectCode` with change detection via `sourceContentHash`, and

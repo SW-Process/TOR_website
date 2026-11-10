@@ -9,7 +9,7 @@ export interface PdfInspectResult {
 
 export type PdfParseFn = (buf: Buffer) => Promise<{ numpages: number; text: string }>;
 
-/** A page averaging fewer than this many characters needs OCR. Verbatim from munyin.py. */
+/** A page averaging fewer than this many characters needs OCR. */
 export const TEXT_LAYER_MIN_CHARS_PER_PAGE = 200;
 
 const defaultParse: PdfParseFn = async (buf) => {
