@@ -560,7 +560,7 @@ describe("GET /api/ingestion/capture/pending", () => {
     expect((await agent.get("/api/ingestion/capture/pending")).status).toBe(403);
   });
 
-  it("counts only captured TORs that are pending and have no stored document", async () => {
+  it("counts only captured TORs that are pending and have no stored document or HTML announcement", async () => {
     await Tor.create([
       { title: "stuck-missing", pipelineStatus: "pending", sourceListingUrl: url("1"), procurement: { source: "gproc", stage: "inviting", announcements: [], lastCheckedAt: new Date() } },
       { title: "stuck-null-key", pipelineStatus: "pending", sourceListingUrl: url("2"), procurement: { source: "gproc", stage: "inviting", announcements: [], lastCheckedAt: new Date() }, sourceDocument: { storageKey: null, textLayer: "missing", filename: "f.pdf", egpUrl: "https://egp.test/f" } },
@@ -568,6 +568,7 @@ describe("GET /api/ingestion/capture/pending", () => {
       { title: "enriched", pipelineStatus: "enriched", sourceListingUrl: url("4"), procurement: { source: "gproc", stage: "inviting", announcements: [], lastCheckedAt: new Date() } },
       { title: "has-doc", pipelineStatus: "pending", sourceListingUrl: url("5"), procurement: { source: "gproc", stage: "inviting", announcements: [], lastCheckedAt: new Date() }, sourceDocument: doc },
       { title: "rejected", pipelineStatus: "rejected", sourceListingUrl: url("6"), procurement: { source: "gproc", stage: "inviting", announcements: [], lastCheckedAt: new Date() } },
+      { title: "html-only", pipelineStatus: "pending", sourceListingUrl: url("7"), sourceAnnouncementHtmlUrl: "https://process3.gprocurement.go.th/x", procurement: { source: "gproc", stage: "inviting", announcements: [], lastCheckedAt: new Date() } },
     ] as any);
     const agent = await adminAgent();
 
