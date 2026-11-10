@@ -53,14 +53,14 @@ CI runs on PRs into `main` (`.github/workflows/ci.yml`): backend typecheck + tes
 The frontend has no database connection and no Next.js API route handlers: every read and write goes through the Express API, which enforces authentication and authorization. Do not add Mongoose (or any DB credential) to the frontend.
 
 ### Backend data model (`backend/src/models/`, index in `models/index.ts`)
-8 collections: `users`, `vendorprofiles` (1:1 with vendor user), `tors` (central entity), `bookmarks` (vendor↔TOR join + application status), `notifications`, `errorreports` (public-submitted TOR corrections), `ingestionruns`, `systemlogs`.
+16 collections, drawn in full in `docs/design/er-diagram.md`. The main ones: `users`, `vendorprofiles` (1:1 with vendor user), `tors` (central entity), `bookmarks` (vendor↔TOR join + application status), `notifications`, `errorreports` (public-submitted TOR corrections), `ingestionruns`, `systemlogs`. The rest: `sessions`, `chatconversations`, `chatmessages`, `faqs`, `announcements`, `enrichmentjobs`, `adminnotifications`, `settings`.
 
 `Tor` embeds `aiSummary` and `fairnessFlags` (fetched with the TOR, never queried alone). The AI-written description lives at `aiSummary.summary` — never presented as the agency's own text, since it's a model-generated summary of a government document, not an official field. PDF binaries live in GCS, not Mongo — `sourceDocumentUrl` is a reference. `similarTORs` is a precomputed array of ObjectIds. There is a text index on `title`/`agency` (search actually uses a regex on `title`, not `$text` — see the RULING in `torController.ts`).
 
-### Frontend runs on mock data
-Pages currently render from `frontend/src/lib/mockData.ts` and `frontend/src/lib/adminMockData.ts`. Domain types and enum values are **in Thai** (e.g. status `"เปิดรับ"`, categories). Route groups: `(site)/` for public+vendor pages, `admin/` for the admin panel. All frontend work is implementation from existing mockups — not UI design.
+### Frontend data
+Pages read and write through the Express API (`frontend/src/lib/api.ts` and the `use*` hooks). `frontend/src/lib/mockData.ts` and `adminMockData.ts` now hold mostly types, labels and formatting helpers (plus sample rows that are no longer shown). Domain types and enum values are **in Thai** (e.g. status `"เปิดรับ"`, categories). Route groups: `(site)/` for public+vendor pages, `admin/` for the admin panel. All frontend work is implementation from existing mockups — not UI design.
 
-**Auth is real**, though: `useAuth` (`frontend/src/lib/useAuth.ts`) calls the Express backend (`/api/auth/*` via `frontend/src/lib/api.ts`, `NEXT_PUBLIC_API_BASE_URL`) with `credentials: "include"` — email/password + Google OAuth, HttpOnly cookie. The other `use*` hooks (`useProfile`, `useBookmarks`, …) are still localStorage mocks.
+**Auth** is `useAuth` (`frontend/src/lib/useAuth.ts`) calls the Express backend (`/api/auth/*` via `frontend/src/lib/api.ts`, `NEXT_PUBLIC_API_BASE_URL`) with `credentials: "include"` — email/password + Google OAuth, HttpOnly cookie. The other `use*` hooks (`useProfile`, `useBookmarks`, `useHiddenTors`, …) call the API too; `localStorage` is only read once by `useDayNotes` to upload notes an older version kept there.
 
 Next 16 note: `searchParams` in page components is a `Promise` and must be `await`ed.
 
