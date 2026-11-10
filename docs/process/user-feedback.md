@@ -13,6 +13,8 @@ How the TOR Checker team handled feedback about the product, and what we changed
 
 ## 1. TOR data did not match e-GP (6 October 2026)
 
+Tracked in issue [#188](https://github.com/SW-Process/TOR_website/issues/188) (label `user-feedback`), opened on 10 November to record work done between 6 and 22 October.
+
 ### What was reported
 
 In the talk on 6 October, some of the TOR data we showed did not match what e-GP shows for the same project. We opened our follow-up talk with this: "That was our mistake, and we are sorry." The slides "From last talk" and "Why we did wrong" are the source of this entry.
