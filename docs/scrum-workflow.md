@@ -21,14 +21,15 @@ One person holds two roles, so there is no second view on priorities. Reviews of
 | Scrum element | How we do it | Where to see it |
 |---|---|---|
 | Product backlog | Every piece of work is a GitHub issue with a problem, a solution, context and a link to the requirement it implements (for example FR-19) | Issues, and the Backlog column of the project board |
-| Sprint planning meeting | The team picks issues for the sprint, adds the sprint label and moves them to the Ready column, once each one meets the [Definition of Ready](#definition-of-ready) | The `sprint: ...` label on an issue and the Ready (Sprint backlog) column |
+| Sprint planning meeting | The team picks issues for the sprint, sets the board's **Sprint** field and moves them to the Ready column, once each one meets the [Definition of Ready](#definition-of-ready) | The Sprint field and the Ready (Sprint backlog) column of the project board |
 | Sprint backlog | The issues in the Ready column | The project board |
-| Sprint | Two weeks. The labelled sprints ran 10 Sep to 24 Sep and 25 Sep to 9 Oct | The two `sprint:` labels |
+| Sprint | 15 days. Six sprints ran from 11 Aug to 8 Nov 2026. Sprints 3 and 4 were tracked with `sprint: ...` labels at first; after Sprint 4 the team moved to the board's Sprint (iteration) field, which now covers all six sprints | The board's *Sprint* and *Sprint Summary* views |
 | Stand-up | A short check-in on what is done, what is next and what blocks, every Monday, Wednesday and Friday | Held by the team, no trace in the repository |
 | Sprint review | At the end of the sprint the team shows the finished work | Held by the team, no trace in the repository |
+| Sprint retrospective | At the end of the sprint the team looks at what went well and what to change, and sets action items for the next sprint. Sprint 5 had a retrospective meeting; the other sprints were reviewed afterwards from the board and the git history | [`process/retrospectives.md`](process/retrospectives.md) |
 | Finished work | Pull requests merged into `main`, with the card in the Done column | Merged pull requests and the Done column |
 
-The planning, stand-up and review meetings were confirmed by the team. They leave no record in the repository, so this page cannot show their dates or notes.
+The planning, stand-up and review meetings were confirmed by the team. They leave no record in the repository, so this page cannot show their dates or notes. The retrospectives are the exception: they are written up in [`process/retrospectives.md`](process/retrospectives.md).
 
 ## Definition of Ready
 
@@ -85,9 +86,8 @@ The strip at the bottom of the diagram is what happens inside a sprint for each 
 
 ## How we differ from standard Scrum
 
-- **No sprint retrospective.** The team does not hold one, so there is no regular moment to change how we work. This is the biggest gap against Scrum.
+- **Not every sprint had a retrospective meeting.** Only Sprint 5 did; the others were reviewed afterwards in [`process/retrospectives.md`](process/retrospectives.md). Holding the meeting at the end of every sprint is the biggest gap left against Scrum.
 - **One person is Product Owner and Scrum Master.** See the roles above.
-- **Sprint labels stop after 9 October.** Later issues have none, so the board does not show which sprint they belong to. If the sprints went on, the labels should too.
 - **The stand-up is three times a week, not daily.** Scrum asks for a daily one. On the days without a stand-up, someone who is blocked has to wait or ask in the chat.
-- **The two-week length is a team choice.** Scrum allows one to four weeks.
+- **The 15-day length is a team choice.** Scrum allows one to four weeks.
 - **Reviews are a team rule, not enforced.** GitHub does not block a merge without approval, because `main` has no branch protection.
