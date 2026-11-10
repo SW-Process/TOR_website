@@ -138,6 +138,7 @@ Backend checks: `npm test`, `npm run typecheck`. Frontend checks: `npm run lint`
 
 ## Documentation
 
+- [docs/SRS.md](docs/SRS.md) — software requirements specification (version 0.8): functional and non-functional requirements, data model, UI mockups
 - [docs/design/class-diagram.md](docs/design/class-diagram.md) — class diagrams: backend classes, interfaces and modules
 - [CONTRIBUTING.md](CONTRIBUTING.md) — branching, commit messages, and pull requests
 - [docs/design/er-diagram.md](docs/design/er-diagram.md) — ER diagram: MongoDB collections, fields, keys and references
