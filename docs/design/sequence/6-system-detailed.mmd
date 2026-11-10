@@ -279,7 +279,7 @@ sequenceDiagram
         A-->>AD: 403
     else
         A->>M: do the work
-        A->>M: write an audit entry for every change (who, route, outcome, field names)
+        A->>A: log every change to the application log (who, route, outcome, field names)
         A-->>AD: the response
     end
     end
