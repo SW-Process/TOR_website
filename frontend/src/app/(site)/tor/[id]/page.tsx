@@ -8,6 +8,7 @@ import {
   Download,
   ExternalLink,
   Eye,
+  FileCode2,
   FileX2,
   Flag,
   Hash,
@@ -330,6 +331,17 @@ export default async function TORDetailPage({
                 >
                   <Download size={16} />
                   ดาวน์โหลดเอกสารต้นฉบับ (PDF)
+                </a>
+              ) : tor.announcementHtmlUrl ? (
+                // e-GP publishes this kind of project (ประกาศเชิญชวนทั่วไป) as an HTML page, not a PDF.
+                <a
+                  href={tor.announcementHtmlUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-pill btn-pill-primary w-full py-2.5 text-sm"
+                >
+                  <FileCode2 size={16} />
+                  ไปที่เอกสารต้นฉบับ (HTML)
                 </a>
               ) : (
                 <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-alt)] px-4 py-5 text-center">

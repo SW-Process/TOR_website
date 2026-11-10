@@ -172,6 +172,7 @@ export interface ApiTor {
   viewCount?: number;
   sourceDocumentUrl?: string;
   sourceListingUrl?: string;
+  sourceAnnouncementHtmlUrl?: string;
   sourceDocument?: { kind?: "tor" | "invitation" } | null;
   aiSummary?: ApiAiSummary | null;
   fairnessFlags?: ApiFairnessFlag[];
@@ -248,6 +249,8 @@ export function mapApiTor(raw: ApiTor): TOR {
         ? raw.sourceDocumentUrl
         : `${API_BASE}${raw.sourceDocumentUrl}`
       : null,
+    // Some e-GP projects (ประกาศเชิญชวนทั่วไป) have no PDF, only an HTML announcement on the old e-GP.
+    announcementHtmlUrl: raw.sourceAnnouncementHtmlUrl?.startsWith("https://") ? raw.sourceAnnouncementHtmlUrl : null,
     // Always the original e-GP announcement page, regardless of whether we have a PDF.
     sourceListingUrl: raw.sourceListingUrl ?? null,
     sourceDocument: raw.sourceDocument ? { kind: raw.sourceDocument.kind } : null,

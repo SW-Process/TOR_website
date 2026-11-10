@@ -144,6 +144,8 @@ export interface ITor {
   sourceDocumentUrl?: string;
   referencePrice?: number;
   sourceListingUrl?: string;
+  /** Old e-GP (process3) HTML announcement page, for a project published there with no PDF (see gprocUrl.ts). */
+  sourceAnnouncementHtmlUrl?: string;
   procurementMethod?: string;
   procurementType?: string;
   goodsCategory?: string;
@@ -335,6 +337,8 @@ const torSchema = new Schema<ITor>(
     referencePrice: { type: Number, min: 0 },
     // link back to the e-GP project page (FR-05)
     sourceListingUrl: { type: String },
+    // the announcement as an HTML page on the old e-GP when process5 has no PDF for it
+    sourceAnnouncementHtmlUrl: { type: String },
     procurementMethod: { type: String },
     procurementType: { type: String },
     goodsCategory: { type: String },

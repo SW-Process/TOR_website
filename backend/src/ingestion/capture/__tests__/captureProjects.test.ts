@@ -367,6 +367,55 @@ describe("captureProjects", () => {
     }
   });
 
+  describe("8c. ประกาศเชิญชวนทั่วไป (process5 method 20): HTML announcement only, no PDF on e-GP", () => {
+    const HTML_URL = `https://process3.gprocurement.go.th/egp2procmainWeb/jsp/procsearch.sch?pid=${CODE}&servlet=gojsp&proc_id=ShowHTMLFile&processFlows=Procure`;
+    const method20 = () => fakeGproc({ detail: (code) => detail(code, { methodId: "20" }), zip: noTorZip, bundle: () => null, invitation: null });
+
+    it("creates the TOR with the old e-GP HTML link and queues it from the project details", async () => {
+      const { run: r, enq } = await run([{ projectCode: CODE }], { gproc: method20() });
+
+      const tor = (await Tor.findOne({ projectCode: CODE }))!;
+      expect(tor.sourceAnnouncementHtmlUrl).toBe(HTML_URL);
+      expect(tor.sourceDocument?.storageKey).toBeFalsy();
+      expect(enq).toHaveBeenCalledWith(tor._id, tor.sourceContentHash);
+      expect(r?.stats.torsCreated).toBe(1);
+      expect(await SystemLog.countDocuments({ message: new RegExp(`${CODE}: created \\(no PDF on e-GP`) })).toBe(1);
+    });
+
+    it("gives an already-captured pending TOR the link when it is captured again", async () => {
+      await seedTor({ pipelineStatus: "pending" });
+      const gproc = method20();
+
+      const { run: r, enq } = await run([{ projectCode: CODE }], { gproc });
+
+      const tor = (await Tor.findOne({ projectCode: CODE }))!;
+      expect(tor.sourceAnnouncementHtmlUrl).toBe(HTML_URL);
+      expect(enq).toHaveBeenCalledWith(tor._id, "old");
+      expect(gproc.detailCalls).toEqual([CODE]);
+      expect(r?.stats.torsUnchanged).toBe(1);
+    });
+
+    it("leaves an e-bidding project with no PDF as before: no link, not queued", async () => {
+      await seedTor({ pipelineStatus: "pending" });
+      const { enq } = await run([{ projectCode: CODE }], {
+        gproc: fakeGproc({ zip: noTorZip, bundle: () => null, invitation: null }),
+      });
+
+      expect((await Tor.findOne({ projectCode: CODE }))!.sourceAnnouncementHtmlUrl).toBeUndefined();
+      expect(enq).not.toHaveBeenCalled();
+    });
+
+    it("reports a process5 failure while checking the method of an existing TOR", async () => {
+      await seedTor({ pipelineStatus: "pending" });
+      const { run: r, enq } = await run([{ projectCode: CODE }], {
+        gproc: fakeGproc({ detail: () => new Error("timeout"), zip: noTorZip, bundle: () => null, invitation: null }),
+      });
+
+      expect(r?.stats.torsFailed).toBe(1);
+      expect(enq).not.toHaveBeenCalled();
+    });
+  });
+
   it("9. falls back from the draft bundle to the published bundle", async () => {
     const gproc = fakeGproc({ bundle: (_c, draft) => (draft ? null : { zipId: "z-pub", name: "p.zip" }) });
     const { enq } = await run([{ projectCode: CODE }], { gproc });

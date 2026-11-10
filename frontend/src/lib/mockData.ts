@@ -108,6 +108,8 @@ export interface TOR {
   documentUrl: string | null;
   /** Link back to the TOR's original e-GP announcement page. */
   sourceListingUrl: string | null;
+  /** Old e-GP (process3) HTML announcement, for a project e-GP publishes with no PDF; only set when documentUrl is null. */
+  announcementHtmlUrl?: string | null;
   summary: AISummary;
   description: string;
   fairnessFlags: FairnessFlag[];
