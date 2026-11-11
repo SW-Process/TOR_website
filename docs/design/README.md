@@ -103,6 +103,52 @@ The code that implements these use cases is shown in the [class diagram](class-d
 
 How the data behind these use cases is stored is shown in the [ER diagram](er-diagram.md).
 
+## Traceability to requirements and issues
+
+Each use case, the functional requirements in the [SRS](../SRS.md) it covers, and the issues on the [project board](https://github.com/orgs/SW-Process/projects/4) that built it. Each issue in turn links to the design documents it follows, in its *Design reference* section. Use cases marked "no FR" were added during the project and have no requirement in the SRS yet, so the pull request is listed instead.
+
+| Use case | Requirements | Issues |
+|---|---|---|
+| UC-01 Search TORs | FR-1, FR-2, FR-10 | [#78](https://github.com/SW-Process/TOR_website/issues/78), [#79](https://github.com/SW-Process/TOR_website/issues/79), [#80](https://github.com/SW-Process/TOR_website/issues/80), [#90](https://github.com/SW-Process/TOR_website/issues/90) |
+| UC-02 Filter by Agency, Budget & Deadline | FR-3 – FR-7 | [#81](https://github.com/SW-Process/TOR_website/issues/81) – [#87](https://github.com/SW-Process/TOR_website/issues/87) |
+| UC-03 Compare Price Statistics | FR-18 | [#97](https://github.com/SW-Process/TOR_website/issues/97) |
+| UC-04 Browse Help Center | no FR | — |
+| UC-05 View TOR Details | FR-8, FR-10, FR-11 | [#88](https://github.com/SW-Process/TOR_website/issues/88), [#90](https://github.com/SW-Process/TOR_website/issues/90), [#91](https://github.com/SW-Process/TOR_website/issues/91), [#92](https://github.com/SW-Process/TOR_website/issues/92) |
+| UC-06 Read AI Summary | FR-12 – FR-14, FR-20 | [#21](https://github.com/SW-Process/TOR_website/issues/21), [#22](https://github.com/SW-Process/TOR_website/issues/22), [#113](https://github.com/SW-Process/TOR_website/issues/113), [#114](https://github.com/SW-Process/TOR_website/issues/114) |
+| UC-07 View Fairness Signals | FR-15 – FR-17, FR-20 | [#43](https://github.com/SW-Process/TOR_website/issues/43), [#93](https://github.com/SW-Process/TOR_website/issues/93) – [#96](https://github.com/SW-Process/TOR_website/issues/96), [#114](https://github.com/SW-Process/TOR_website/issues/114) |
+| UC-08 Download TOR PDF | FR-9, FR-13 | [#89](https://github.com/SW-Process/TOR_website/issues/89), [#161](https://github.com/SW-Process/TOR_website/issues/161) |
+| UC-09 Report Incorrect Data | FR-41 | [#45](https://github.com/SW-Process/TOR_website/issues/45), [#46](https://github.com/SW-Process/TOR_website/issues/46) |
+| UC-10 Log In | FR-21 | [#17](https://github.com/SW-Process/TOR_website/issues/17), [#18](https://github.com/SW-Process/TOR_website/issues/18) |
+| UC-11 Log In with Google | FR-21 | [#17](https://github.com/SW-Process/TOR_website/issues/17), [#18](https://github.com/SW-Process/TOR_website/issues/18) |
+| UC-12 Verify 2FA Code | no FR | PR [#160](https://github.com/SW-Process/TOR_website/pull/160) |
+| UC-13 Sign Up | FR-21, FR-23 | [#17](https://github.com/SW-Process/TOR_website/issues/17), [#18](https://github.com/SW-Process/TOR_website/issues/18), [#20](https://github.com/SW-Process/TOR_website/issues/20) |
+| UC-14 Reset Forgotten Password | no FR | PR [#149](https://github.com/SW-Process/TOR_website/pull/149) |
+| UC-15 Manage Account & Security | no FR | PR [#160](https://github.com/SW-Process/TOR_website/pull/160) |
+| UC-16 Manage Company Profile | FR-22, FR-23 | [#19](https://github.com/SW-Process/TOR_website/issues/19), [#20](https://github.com/SW-Process/TOR_website/issues/20), [#66](https://github.com/SW-Process/TOR_website/issues/66) |
+| UC-17 View Matched TORs | FR-24 – FR-26 | [#42](https://github.com/SW-Process/TOR_website/issues/42), [#44](https://github.com/SW-Process/TOR_website/issues/44), [#67](https://github.com/SW-Process/TOR_website/issues/67) |
+| UC-18 Hide Irrelevant TOR | no FR | — |
+| UC-19 Bookmark TOR | FR-27 | [#52](https://github.com/SW-Process/TOR_website/issues/52), [#53](https://github.com/SW-Process/TOR_website/issues/53) |
+| UC-20 Track Application Status | FR-31, FR-32 | [#54](https://github.com/SW-Process/TOR_website/issues/54), [#55](https://github.com/SW-Process/TOR_website/issues/55) |
+| UC-21 Save Search Criteria | FR-28 | [#106](https://github.com/SW-Process/TOR_website/issues/106), [#107](https://github.com/SW-Process/TOR_website/issues/107), [#108](https://github.com/SW-Process/TOR_website/issues/108) |
+| UC-22 View Deadline Calendar | FR-33 | [#56](https://github.com/SW-Process/TOR_website/issues/56) |
+| UC-23 Add Day Notes | no FR | — |
+| UC-24 Receive Match & Deadline Alerts | FR-29, FR-30 | [#100](https://github.com/SW-Process/TOR_website/issues/100) – [#105](https://github.com/SW-Process/TOR_website/issues/105) |
+| UC-25 Chat with Admin | no FR | PR [#126](https://github.com/SW-Process/TOR_website/pull/126) |
+| UC-26 Review TOR Records | FR-19, FR-40 | [#111](https://github.com/SW-Process/TOR_website/issues/111), [#112](https://github.com/SW-Process/TOR_website/issues/112), [#117](https://github.com/SW-Process/TOR_website/issues/117), [#118](https://github.com/SW-Process/TOR_website/issues/118) |
+| UC-27 Edit / Remove TOR | FR-40 | [#117](https://github.com/SW-Process/TOR_website/issues/117), [#120](https://github.com/SW-Process/TOR_website/issues/120) |
+| UC-28 Handle Error Reports | FR-40, FR-41 | [#118](https://github.com/SW-Process/TOR_website/issues/118), [#119](https://github.com/SW-Process/TOR_website/issues/119), [#120](https://github.com/SW-Process/TOR_website/issues/120) |
+| UC-29 Reply to User Chats | no FR | PR [#126](https://github.com/SW-Process/TOR_website/pull/126) |
+| UC-30 Manage Help Content | no FR | — |
+| UC-31 Monitor Logs & User Sessions | FR-34, FR-37 – FR-39 | [#57](https://github.com/SW-Process/TOR_website/issues/57), [#58](https://github.com/SW-Process/TOR_website/issues/58), [#98](https://github.com/SW-Process/TOR_website/issues/98), [#99](https://github.com/SW-Process/TOR_website/issues/99), [#109](https://github.com/SW-Process/TOR_website/issues/109), [#110](https://github.com/SW-Process/TOR_website/issues/110), [#162](https://github.com/SW-Process/TOR_website/issues/162) |
+| UC-32 Run Ingestion Manually | FR-35, FR-36 | [#49](https://github.com/SW-Process/TOR_website/issues/49), [#50](https://github.com/SW-Process/TOR_website/issues/50) |
+| UC-33 Capture Projects via Browser Extension | FR-42 | [#188](https://github.com/SW-Process/TOR_website/issues/188) (PR [#144](https://github.com/SW-Process/TOR_website/pull/144)) |
+| UC-34 Discover New TORs | FR-42, FR-43 | [#11](https://github.com/SW-Process/TOR_website/issues/11) |
+| UC-35 Enrich TOR with AI | FR-12, FR-15, FR-18, FR-20 | [#13](https://github.com/SW-Process/TOR_website/issues/13), [#21](https://github.com/SW-Process/TOR_website/issues/21), [#93](https://github.com/SW-Process/TOR_website/issues/93) – [#97](https://github.com/SW-Process/TOR_website/issues/97), [#113](https://github.com/SW-Process/TOR_website/issues/113), [#115](https://github.com/SW-Process/TOR_website/issues/115) |
+| UC-36 Match & Notify Vendors | FR-24, FR-29, FR-30 | [#42](https://github.com/SW-Process/TOR_website/issues/42), [#100](https://github.com/SW-Process/TOR_website/issues/100), [#101](https://github.com/SW-Process/TOR_website/issues/101), [#104](https://github.com/SW-Process/TOR_website/issues/104), [#105](https://github.com/SW-Process/TOR_website/issues/105) |
+| UC-37 Refresh Procurement Lifecycle | FR-8, FR-42 | [#152](https://github.com/SW-Process/TOR_website/issues/152), [#188](https://github.com/SW-Process/TOR_website/issues/188) |
+
+All 43 requirements appear in at least one row. The "no FR" rows are a gap in the SRS, not in the code: these features exist, but the SRS has not been updated to name them.
+
 ## Modeling notes
 
 - **Login is a precondition** for every Vendor and Admin use case, so the diagram does not draw an «include» to Log In from each one.

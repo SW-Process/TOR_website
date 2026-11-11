@@ -2,6 +2,8 @@
 
 The structure of the TOR Checker backend code: its classes, interfaces and modules, what each one offers, and how they depend on each other. It is drawn from [`backend/src`](../../backend/src). The [domain model](domain-model.md) shows the problem's concepts, the [ER diagram](er-diagram.md) shows how data is stored, and this diagram shows how the code is built.
 
+Which requirement and issue each use case traces to is in the [traceability table](README.md#traceability-to-requirements-and-issues).
+
 There are two diagrams:
 
 1. **Data pipeline:** the jobs that bring TORs in, and the classes and interfaces they work through: e-GP clients, the Gemini extractor, storage and e-mail.
