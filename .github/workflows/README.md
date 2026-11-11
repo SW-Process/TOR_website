@@ -6,32 +6,33 @@ Runs on every pull request into `main` and on every push to `main`.
 
 | Job | Steps | Gates against |
 |---|---|---|
-| `backend` | `npm ci` → `npm run typecheck` → `npm test` → `npm run build` | type errors, failing tests, broken build |
-| `frontend` | `npm ci` → `npm run build` | type errors (`next build` runs `tsc`), broken build |
+| `backend` | `npm ci` → `npm run typecheck` → `npm test` → `npm run build` → `npm audit --omit=dev --audit-level=high` → SBOM | type errors, failing tests, broken build, high or critical advisories in production dependencies |
+| `frontend` | `npm ci` → `npm run build` → `npm audit --omit=dev --audit-level=high` → SBOM | type errors (`next build` runs `tsc`), broken build, high or critical advisories |
+
+Each job also writes a CycloneDX SBOM of its production dependencies (`npm sbom`) and uploads it as a build artifact. See [`docs/security/dependency-management.md`](../../docs/security/dependency-management.md).
 
 Backend tests use `mongodb-memory-server`, which downloads a throwaway `mongod`
 binary on the runner — no database service is needed.
 
 ### Not gated yet
 
-`frontend` **`npm run lint`** currently reports 9 pre-existing errors
-(`react-hooks/set-state-in-effect` in the localStorage hooks). Once those are
-fixed, add back a `Lint` step to the `frontend` job:
+`frontend` **`npm run lint`** passes, but CI does not run it. To gate it, add a `Lint` step to the `frontend` job:
 
 ```yaml
       - name: Lint
         run: npm run lint
 ```
 
-and add `frontend (build)` → `frontend (lint · build)` to the required checks.
+## What protects `main`
 
-## Making these checks required
+The **Protect main branch** ruleset (active since 10 August) applies to `main`:
 
-CI only protects `main` if merges are blocked when it fails:
+- no direct pushes: every change goes through a pull request;
+- one approving review, and the last push must be approved (`require_last_push_approval`);
+- no force-pushes and no deletion of the branch.
 
-1. Repo **Settings → Branches → Add branch ruleset** (or *Add rule*) for `main`.
-2. Enable **Require a pull request before merging** (≥ 1 approval — matches `CONTRIBUTING.md`).
-3. Enable **Require status checks to pass** and select `backend (typecheck · test · build)`
-   and `frontend (build)`.
-4. Enable **Require branches to be up to date before merging**.
-5. Optionally **Do not allow bypassing the above settings** so admins are held to it too.
+CI is **not** a required check yet, so GitHub would allow a merge while CI is failing. To require it:
+
+1. Repo **Settings → Rules → Rulesets → Protect main branch**.
+2. Add **Require status checks to pass** and select `backend (typecheck · test · build)` and `frontend (build)`.
+3. Optionally enable **Require branches to be up to date before merging**.
