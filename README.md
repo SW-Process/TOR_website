@@ -14,9 +14,9 @@ unusually short submission window), never accusations of wrongdoing.
 
 | Role | What they can do |
 |---|---|
-| **Public** | Search and filter TORs by keyword, agency, category, budget, and deadline; read AI summaries; report incorrect data |
-| **Vendor** | Everything above, plus a company profile, TOR matching, bookmarks with application tracking, a deadline calendar, and notifications |
-| **Admin** | Data-quality review, fairness-flag review, error reports, ingestion runs, system logs, and user chat |
+| **Public** | Search and filter TORs by keyword, agency, category, budget, dates, technology and project type; read AI summaries and fairness signals; download the original document; report incorrect data |
+| **Vendor** | Everything above, plus a company profile, TOR matching with a score, bookmarks with application tracking, a deadline calendar with day notes, saved searches, in-app notifications and an email digest of new matches, chat with the admin team, and two-step verification |
+| **Admin** | Data-quality review and correction, the queue of reported TORs, fairness-flag details and pre-filter thresholds, ingestion, enrichment and lifecycle runs, capture from the national e-GP with a Chrome extension, pipeline alerts, system logs, help content, and user chat |
 
 ## Tech stack
 
@@ -26,8 +26,8 @@ unusually short submission window), never accusations of wrongdoing.
 | `backend/` | Express 5, Mongoose 9, TypeScript, Jest |
 | Database | MongoDB |
 | AI | Gemini on Vertex AI (`@google/genai`) |
-| Ingestion | e-GP public API scraper, PDF inspection, enrichment queue |
-| Deploy | Docker, Google Cloud Run + Cloud Scheduler, Cloud Storage |
+| Ingestion | BMA e-GP API and national e-GP (process5), PDF inspection, enrichment queue, Chrome extension (`extension/`) |
+| Deploy | Docker, Google Cloud Run + Cloud Scheduler, Cloud Storage (not deployed publicly yet) |
 
 ## Project structure
 
@@ -35,7 +35,8 @@ unusually short submission window), never accusations of wrongdoing.
 TOR_website/
 ├── frontend/   # Next.js app — public, vendor, and admin pages
 ├── backend/    # Express API, TOR ingestion, AI enrichment jobs
-└── docs/       # Deployment guide, security docs and design (use case and domain models)
+├── extension/  # Chrome extension for capturing projects from the national e-GP
+└── docs/       # Requirements, design, process, security and deployment docs
 ```
 
 ## Run with Docker
@@ -138,17 +139,32 @@ Backend checks: `npm test`, `npm run typecheck`. Frontend checks: `npm run lint`
 
 ## Documentation
 
-- [docs/SRS.md](docs/SRS.md) — software requirements specification (version 0.8): functional and non-functional requirements, data model, UI mockups
-- [docs/design/class-diagram.md](docs/design/class-diagram.md) — class diagrams: backend classes, interfaces and modules
-- [CONTRIBUTING.md](CONTRIBUTING.md) — branching, commit messages, and pull requests
-- [docs/design/er-diagram.md](docs/design/er-diagram.md) — ER diagram: MongoDB collections, fields, keys and references
-- [docs/deployment/gcp.md](docs/deployment/gcp.md) — deploying to Google Cloud
-- [docs/design/system-design.md](docs/design/system-design.md) — system design: architecture, components, connections and main flows
+**Requirements**
+- [docs/SRS.md](docs/SRS.md) — software requirements specification: functional and non-functional requirements, data model, UI mockups
+- [docs/traceability.md](docs/traceability.md) — every requirement with its use cases, issues, pull requests and status
+
+**Design**
 - [docs/design/](docs/design/README.md) — use case model: diagram, actors and use case descriptions
 - [docs/design/domain-model.md](docs/design/domain-model.md) — domain model: concepts, attributes and associations
-- [docs/security/](docs/security/README.md) — security documentation (OWASP ASVS 5.0): input validation, sign-in defenses, authorization rules, dependency policy
+- [docs/design/system-design.md](docs/design/system-design.md) — system design: architecture, components, connections and main flows
+- [docs/design/er-diagram.md](docs/design/er-diagram.md) — ER diagram: MongoDB collections, fields, keys and references
+- [docs/design/class-diagram.md](docs/design/class-diagram.md) — class diagrams: backend classes, interfaces and modules
+- [docs/design/sequence-diagram.md](docs/design/sequence-diagram.md) — sequence diagrams of the main flows
 - [docs/design/api.md](docs/design/api.md) — API reference: every backend endpoint, its access, parameters and responses
+- [docs/superpowers/](docs/superpowers) — design specs and implementation plans for the larger features
+
+**Process**
+- [CONTRIBUTING.md](CONTRIBUTING.md) — issues, branching, commit messages, and pull requests
+- [docs/scrum-workflow.md](docs/scrum-workflow.md) — how the team runs Scrum, with the Definition of Ready and Definition of Done
 - [docs/development-process.md](docs/development-process.md) — how the project is built, by software development cycle activity, with the gaps we know about
+- [docs/process/retrospectives.md](docs/process/retrospectives.md) — sprint retrospectives and action items
+- [docs/process/user-feedback.md](docs/process/user-feedback.md) — feedback from users and what we changed
+
+**Operations and security**
+- [docs/deployment/gcp.md](docs/deployment/gcp.md) — deploying to Google Cloud
+- [docs/security/](docs/security/README.md) — security documentation (OWASP ASVS 5.0): input validation, sign-in defenses, authorization rules, dependency policy
+- [extension/README.md](extension/README.md) — loading and using the e-GP capture extension
+- [.github/workflows/README.md](.github/workflows/README.md) — what CI checks and what protects `main`
 
 ## Team
 
