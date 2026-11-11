@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "jest --runInBand",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "create-admin": "tsx src/scripts/createAdmin.ts",
     "reset-mfa": "tsx src/scripts/resetMfa.ts",
     "seed:help": "tsx src/scripts/seedHelp.ts",

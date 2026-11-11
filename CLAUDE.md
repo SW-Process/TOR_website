@@ -31,7 +31,7 @@ npm run lint       # eslint (flat config, eslint.config.mjs)
 npm run dev        # tsx watch src/server.ts
 npm run build      # tsc -> dist/
 npm start          # node dist/server.js
-npm test           # jest --runInBand
+npm test           # jest --runInBand, started with --experimental-vm-modules (needed by mongodb driver 7.6+; see jest.config.js)
 npm run typecheck  # tsc --noEmit
 
 # Full local stack via Docker (from repo root) — frontend + backend + mongo, all hot-reloading
