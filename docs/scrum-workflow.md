@@ -55,7 +55,7 @@ An issue moves from **Backlog (Product backlog)** to **Ready (Sprint backlog)** 
 Admins can't change the fairness pre-filter thresholds, so the pipeline always uses the defaults.
 
 ### Design reference
-- SRS §6.2, FR-20
+- SRS §4.2, FR-20
 - Spec: docs/superpowers/specs/2026-09-08-fairness-flag-detection-design.md
 - API: docs/design/api.md, GET/PUT /api/admin/settings/fairness-prefilter
 
@@ -66,11 +66,26 @@ Admins can't change the fairness pre-filter thresholds, so the pipeline always u
 - [ ] The next enrichment run uses the new values
 
 ### Traceability
-Maps to FR-20 (SRS §6.2)
+Maps to FR-20 (SRS §4.2)
 
 ### Dependencies
 Blocked by #116 (thresholds API)
 ```
+
+## Definition of Done
+
+An issue moves to **Done** only when all of these are true. The reviewer checks them before approving.
+
+| # | Done means | How to check |
+|---|---|---|
+| 1 | Every acceptance criterion is met | All boxes in the issue's *Acceptance criteria* are ticked, or the issue has a *Note* saying what was left out and why |
+| 2 | The pull request closes the issue | The description says `Closes #<issue>`, so the board shows the link, and the issue's *Implemented in* names the pull request |
+| 3 | CI is green | Backend typecheck, tests and build; frontend build; `npm audit` finds nothing high or critical |
+| 4 | New behaviour is tested | A backend change comes with tests. A frontend change was checked by hand, and the pull request's *How to Test* says how |
+| 5 | Someone else approved it | One approval from a teammate who is not the author (the `main` ruleset enforces this) |
+| 6 | The docs match the code | A new endpoint is in [`docs/design/api.md`](design/api.md), a new collection or field is in the [ER diagram](design/er-diagram.md), a new environment variable is in `.env.example` |
+| 7 | Fairness wording is neutral | Text about fairness signals reads as a prompt to review, never as an accusation (see `CLAUDE.md`) |
+| 8 | It is merged | The pull request is merged into `main` and the card is in the Done column |
 
 ## One issue, from start to finish
 
@@ -79,16 +94,16 @@ The strip at the bottom of the diagram is what happens inside a sprint for each 
 1. Take an issue from the Ready column (it meets the [Definition of Ready](#definition-of-ready)) and move it to In Progress.
 2. Branch from `main`, named `<type>/<what-you-are-doing>`. Nobody pushes to `main` directly.
 3. Commit in small steps. Each commit does one thing and follows Conventional Commits.
-4. Open a pull request into `main` on the organization's template, and link the issue.
-5. CI runs type checking, tests and the build. It runs on every pull request.
-6. A teammate reviews and approves. 87 of the 89 pull requests so far have at least one review.
-7. The pull request is merged into `main` and the card moves to Done.
+4. Open a pull request into `main` on the organization's template, with `Closes #<issue>` in the description.
+5. CI runs type checking, tests, the build and `npm audit`. It runs on every pull request.
+6. A teammate reviews and approves. The `main` ruleset requires one approval, and all 95 merged pull requests so far were approved by someone other than their author.
+7. The pull request is merged into `main` and the card moves to Done, once it meets the [Definition of Done](#definition-of-done).
 
 ## How we differ from standard Scrum
 
 - **The retrospective is not regular.** A retrospective meeting was held for Sprint 5, with action items. For the other sprints the reflections in [`docs/process/retrospectives.md`](process/retrospectives.md) were written from the board and the git history. Holding one at the end of every sprint is the biggest gap against Scrum.
 - **One person is Product Owner and Scrum Master.** See the roles above.
-- **Some board items have no sprint.** 17 of the 98 items have no value in the Sprint field.
+- **Some board items have no sprint.** 16 of the 99 items have no value in the Sprint field.
 - **The stand-up is three times a week, not daily.** Scrum asks for a daily one. On the days without a stand-up, someone who is blocked has to wait or ask in the chat.
 - **The 15-day length is a team choice.** Scrum allows one to four weeks.
-- **Reviews are a team rule, not enforced.** GitHub does not block a merge without approval, because `main` has no branch protection.
+- **CI is not enforced.** The `main` ruleset requires an approval, but CI is not a required check, so GitHub would allow a merge while CI is failing. The reviewer checks it instead.
