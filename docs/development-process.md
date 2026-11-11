@@ -1,12 +1,12 @@
 # Development Process
 
-How TOR Checker is built, organized by the six activities of the software development cycle: planning, analysis, design, implementation, testing and integration, and maintenance. For each activity this page says what the team does today, where to find the result, and what is still missing. The numbers come from the repository and GitHub as of 9 November 2026.
+How TOR Checker is built, organized by the six activities of the software development cycle: planning, analysis, design, implementation, testing and integration, and maintenance. For each activity this page says what the team does today, where to find the result, and what is still missing. The numbers come from the repository and GitHub as of 11 November 2026.
 
 ![The TOR Checker development cycle](development-cycle.png)
 
 [`development-cycle.svg`](development-cycle.svg) is the vector version.
 
-The cycle is not run once. The project started on 9 August 2026 and has since had 573 commits, 89 issues (87 closed) and 89 pull requests (87 merged). Every feature goes around the cycle on its own, from an issue to a merged pull request, and the larger ones get a written design first.
+The cycle is not run once. The project started on 9 August 2026 and has since had 601 commits on `main`, 91 issues (all closed) and 98 pull requests (94 merged). Every feature goes around the cycle on its own, from an issue to a merged pull request, and the larger ones get a written design first.
 
 ## At a glance
 
@@ -25,13 +25,17 @@ The cycle is not run once. The project started on 9 August 2026 and has since ha
 
 Before a larger feature, the team writes a design spec and then an implementation plan. There are six specs and nine plans so far, for example the [fairness flag detection spec](superpowers/specs/2026-09-08-fairness-flag-detection-design.md) and its [plan](superpowers/plans/2026-09-08-fairness-flag-detection.md).
 
-**Missing.** 17 of the 98 items on the board have no sprint set. Issue [#51](https://github.com/SW-Process/TOR_website/issues/51) ("Test issue") is still open and looks like a leftover that should be closed.
+What each sprint delivered, and which issues cover each requirement, is in [`docs/process/deliverables.md`](process/deliverables.md).
+
+**Missing.** 17 of the 99 items on the board have no sprint set. 16 of them are draft items that only point a requirement to its issue ("FR-43 → see #11"), so they need no sprint. The other one is issue [#188](https://github.com/SW-Process/TOR_website/issues/188), opened on 10 November to record user feedback handled in October.
 
 ## 2. Analysis
 
-**What we do.** The requirements are in a software requirements specification (SRS) with numbered functional requirements (FR-01 and up) and non-functional requirements (NFR). Code comments and issues refer to these numbers, for example `FR-40` on the admin queue of reported TORs. The [domain model](design/domain-model.md) shows the concepts of the system and how they relate.
+**What we do.** The requirements are in the [software requirements specification](SRS.md) (SRS) with numbered functional requirements (FR-01 and up) and non-functional requirements (NFR). Code comments and issues refer to these numbers, for example `FR-40` on the admin queue of reported TORs. The [domain model](design/domain-model.md) shows the concepts of the system and how they relate.
 
-**Missing.** The SRS is not in the repository. [`CLAUDE.md`](../CLAUDE.md) calls `docs/SRS.md` the source of truth, but that file does not exist, so a new contributor cannot read the requirements the code points to. Committing it (or linking to where it lives) is the most useful fix on this page.
+Every one of FR-1 to FR-43 has at least one issue on the board (see [deliverables](process/deliverables.md#3-requirement-coverage)).
+
+**Missing.** The SRS uses `FR-1`, while issues and labels use `FR-01`. Both mean the same requirement, but a plain text search for one form misses the other.
 
 ## 3. Design
 
@@ -43,9 +47,9 @@ Before a larger feature, the team writes a design spec and then an implementatio
 - [Sequence diagrams](design/sequence-diagram.md): the main flows in order, including one for the whole system.
 - [API reference](design/api.md): every endpoint.
 
-For the frontend, pages are built from existing mockups rather than designed on the spot. Choices that matter are written down before coding, as in the issue for admin fairness flag details, which asked "decide whether extra fields are needed" and was settled while implementing it.
+For the frontend, pages are built from existing mockups rather than designed on the spot. The mockups are in SRS §3.4 (images in [`docs/srs-images/`](srs-images)). Choices that matter are written down before coding, as in the issue for admin fairness flag details, which asked "decide whether extra fields are needed" and was settled while implementing it.
 
-**Missing.** The mockups themselves are not in the repository, so a reviewer cannot compare a page with its design.
+**Missing.** The design documents were drawn from the code near the end of the project (5 to 10 November), so they record the system as built rather than guiding it from the start. Only 32 of the 91 issues link to a design document or spec.
 
 ## 4. Implementation
 
@@ -64,7 +68,7 @@ The backend is Express 5 with MongoDB, the frontend is Next.js, and both are Typ
 
 - **Tests.** The backend has 104 test files with more than 1,300 tests, running against an in-memory MongoDB so no database service is needed.
 - **Continuous integration.** [`ci.yml`](../.github/workflows/ci.yml) runs on every pull request into `main` and on every push to `main`. The backend job runs type checking, the tests and the build, and the frontend job runs the build.
-- **Review.** 87 of the 89 pull requests have at least one review, as `CONTRIBUTING.md` requires. Pull request #173 below, for example, was approved and merged by a teammate, not by its author.
+- **Review.** All 94 merged pull requests have at least one review, as `CONTRIBUTING.md` requires. Pull request #173 below, for example, was approved and merged by a teammate, not by its author.
 
 **Missing.**
 
@@ -100,9 +104,8 @@ Issue [#111](https://github.com/SW-Process/TOR_website/issues/111), "admin endpo
 
 In order of effect:
 
-1. Commit the SRS, or link to it, so the requirements the code refers to can be read.
-2. Turn on branch protection for `main` with the two CI checks and one required review.
-3. Add the frontend lint step to CI and fix the outdated note about it.
-4. Add tests for the frontend, and a few end-to-end checks of the main flows (search, sign in, admin correction).
-5. Set a sprint on every board item, and close issue #51.
-6. Either build the deadline reminder or remove its notification type.
+1. Turn on branch protection for `main` with the two CI checks and one required review.
+2. Add the frontend lint step to CI and fix the outdated note about it.
+3. Add tests for the frontend, and a few end-to-end checks of the main flows (search, sign in, admin correction).
+4. Link each new issue to its design document or spec, and write `Closes #xx` in every pull request.
+5. Either build the deadline reminder or remove its notification type.
