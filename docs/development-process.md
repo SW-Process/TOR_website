@@ -25,13 +25,17 @@ The cycle is not run once. The project started on 9 August 2026 and has since ha
 
 Before a larger feature, the team writes a design spec and then an implementation plan. There are six specs and nine plans so far, for example the [fairness flag detection spec](superpowers/specs/2026-09-08-fairness-flag-detection-design.md) and its [plan](superpowers/plans/2026-09-08-fairness-flag-detection.md).
 
-**Missing.** 17 of the 98 items on the board have no sprint set. Issue [#51](https://github.com/SW-Process/TOR_website/issues/51) ("Test issue") is still open and looks like a leftover that should be closed.
+Since 10 November every sprint issue also meets the [Definition of Ready](scrum-workflow.md#definition-of-ready): it links its design reference, lists acceptance criteria and dependencies, and names the pull requests that built it.
+
+**Missing.** 16 of the 99 items on the board have no sprint set. Pull requests opened before November did not use `Closes #<issue>`, so many board items show no linked pull request; the pull requests are named in each issue's *Implemented in* section instead.
 
 ## 2. Analysis
 
 **What we do.** The requirements are in a software requirements specification (SRS) with numbered functional requirements (FR-01 and up) and non-functional requirements (NFR). Code comments and issues refer to these numbers, for example `FR-40` on the admin queue of reported TORs. The [domain model](design/domain-model.md) shows the concepts of the system and how they relate.
 
-**Missing.** The SRS is not in the repository. [`CLAUDE.md`](../CLAUDE.md) calls `docs/SRS.md` the source of truth, but that file does not exist, so a new contributor cannot read the requirements the code points to. Committing it (or linking to where it lives) is the most useful fix on this page.
+The SRS is in the repository at [`docs/SRS.md`](SRS.md).
+
+**Missing.** Three requirements are only partly built: FR-11 and FR-18 ask for AI similarity between TORs, but no embedding pipeline exists (similar TORs come from the same category), and FR-25's per-criteria match breakdown is not shown. The [traceability matrix](traceability.md) lists the status of every requirement.
 
 ## 3. Design
 
@@ -64,12 +68,12 @@ The backend is Express 5 with MongoDB, the frontend is Next.js, and both are Typ
 
 - **Tests.** The backend has 104 test files with more than 1,300 tests, running against an in-memory MongoDB so no database service is needed.
 - **Continuous integration.** [`ci.yml`](../.github/workflows/ci.yml) runs on every pull request into `main` and on every push to `main`. The backend job runs type checking, the tests and the build, and the frontend job runs the build.
-- **Review.** 87 of the 89 pull requests have at least one review, as `CONTRIBUTING.md` requires. Pull request #173 below, for example, was approved and merged by a teammate, not by its author.
+- **Review.** A ruleset on `main` blocks direct pushes, force-pushes and deletion, and requires one approval before a pull request can merge. All 95 merged pull requests were approved by someone other than their author. Pull request #173 below, for example, was approved and merged by a teammate, not by its author.
 
 **Missing.**
 
-- The review rule is only a convention. `main` has no branch protection, so GitHub does not block a merge when CI fails or when nobody has approved. [`.github/workflows/README.md`](../.github/workflows/README.md) already explains how to switch it on.
-- The frontend has no automated tests. Its CI job only builds. `npm run lint` is not run in CI. That page says lint reports 9 errors, but it is clean now, so the step can be added back and the note removed.
+- CI is not a required check. The ruleset requires an approval, but GitHub still allows a merge while CI is failing. [`.github/workflows/README.md`](../.github/workflows/README.md) explains how to add the checks.
+- The frontend has no automated tests. Its CI job only builds. `npm run lint` passes but is not run in CI.
 - There are no end-to-end tests that drive the site in a browser.
 
 ## 6. Maintenance
@@ -100,9 +104,9 @@ Issue [#111](https://github.com/SW-Process/TOR_website/issues/111), "admin endpo
 
 In order of effect:
 
-1. Commit the SRS, or link to it, so the requirements the code refers to can be read.
-2. Turn on branch protection for `main` with the two CI checks and one required review.
-3. Add the frontend lint step to CI and fix the outdated note about it.
-4. Add tests for the frontend, and a few end-to-end checks of the main flows (search, sign in, admin correction).
-5. Set a sprint on every board item, and close issue #51.
+1. Add the two CI checks as required status checks in the `main` ruleset.
+2. Add the frontend lint step to CI.
+3. Add tests for the frontend, and a few end-to-end checks of the main flows (search, sign in, admin correction).
+4. Put `Closes #<issue>` in every pull request, so the board links the pull request to its issue.
+5. Set a sprint on every board item.
 6. Either build the deadline reminder or remove its notification type.
