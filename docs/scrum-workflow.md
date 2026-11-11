@@ -21,7 +21,7 @@ One person holds two roles, so there is no second view on priorities. Reviews of
 | Scrum element | How we do it | Where to see it |
 |---|---|---|
 | Product backlog | Every piece of work is a GitHub issue with a problem, a solution, context and a link to the requirement it implements (for example FR-19) | Issues, and the Backlog column of the project board |
-| Sprint planning meeting | The team picks issues for the sprint, adds the sprint label and moves them to the Ready column, once each one meets the [Definition of Ready](#definition-of-ready) | The `sprint: ...` label on an issue and the Ready (Sprint backlog) column |
+| Sprint planning meeting | The team picks issues for the sprint, sets the Sprint field and moves them to the Ready column, once each one meets the [Definition of Ready](#definition-of-ready) | The Sprint field and the Ready (Sprint backlog) column of the board |
 | Sprint backlog | The issues in the Ready column | The project board |
 | Sprint | 15 days. Six sprints, from 11 August to 8 November | The Sprint field of the board |
 | Stand-up | A short check-in on what is done, what is next and what blocks, every Monday, Wednesday and Friday | Held by the team, no trace in the repository |
