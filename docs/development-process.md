@@ -49,7 +49,7 @@ Every one of FR-1 to FR-43 has at least one issue on the board (see [deliverable
 
 For the frontend, pages are built from existing mockups rather than designed on the spot. The mockups are in SRS §3.4 (images in [`docs/srs-images/`](srs-images)). Choices that matter are written down before coding, as in the issue for admin fairness flag details, which asked "decide whether extra fields are needed" and was settled while implementing it.
 
-**Missing.** The design documents were drawn from the code near the end of the project (5 to 10 November), so they record the system as built rather than guiding it from the start. Only 32 of the 91 issues link to a design document or spec.
+**Missing.** The design documents were drawn from the code near the end of the project (5 to 10 November), so they record the system as built rather than guiding it from the start. The links from issues to them were also added afterwards, on 12 November: 82 of the 91 issues now have a *Design reference* section. The other nine are the proposal, the SRS, the slides, the three mockup issues (which link the SRS mockups instead), the CI and TypeScript setup, and a test issue.
 
 ## 4. Implementation
 
@@ -107,5 +107,5 @@ In order of effect:
 1. Turn on branch protection for `main` with the two CI checks and one required review.
 2. Add the frontend lint step to CI and fix the outdated note about it.
 3. Add tests for the frontend, and a few end-to-end checks of the main flows (search, sign in, admin correction).
-4. Link each new issue to its design document or spec, and write `Closes #xx` in every pull request.
+4. Fill in the *Design reference* section when an issue is opened, not afterwards, and write `Closes #xx` in every pull request.
 5. Either build the deadline reminder or remove its notification type.
