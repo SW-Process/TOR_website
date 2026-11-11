@@ -1,10 +1,10 @@
-**\_\_0Software Requirements  Specification** 
+**Software Requirements Specification** 
 
 **for** 
 
 **TOR Checker**
 
-**Version 0.8**
+**Version 0.9**
 
 **Prepared by** 
 
@@ -99,6 +99,7 @@
 | :---- | :---- | :---- | :---- |
 | **Pakorn, Paranyu, Karnpon** | **20 August 2026** | **Initial creation**  | **0.1** |
 | **Pakorn, Paranyu, Karnpon** | **27 August 2026** | **First Revise** | **0.8** |
+| **Pakorn** | **12 November 2026** | **FR-42 adds the national e-GP (process5) as a source next to the BMA e-GP API, after the 6 October feedback ([#188](https://github.com/SW-Process/TOR_website/issues/188)); title typo fixed** | **0.9** |
 
 # 
 
@@ -396,7 +397,7 @@ Description: Provides platform administrators with visibility into and control o
 
 | ID | Requirement |
 | :---- | :---- |
-| FR-42 | The system shall retrieve TOR announcements from the BMA e-GP procurement data API. |
+| FR-42 | The system shall retrieve TOR announcements from the BMA e-GP procurement data API and from the national e-GP (process5), using the national e-GP first for the procurement stage and bid deadline. |
 | FR-43 | The system shall filter retrieved announcements to include only software/IT-related procurement. |
 
 # 
