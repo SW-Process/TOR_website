@@ -2,6 +2,8 @@
 
 How TOR Checker is built and deployed: the parts that run, where they run, and how they talk to each other and to the outside world. It is drawn from the code, [`docker-compose.yml`](../../docker-compose.yml) and the [deployment guide](../deployment/gcp.md). For what users do with the system see the [use case model](README.md), for the concepts it handles the [domain model](domain-model.md), and for every endpoint the [API reference](api.md).
 
+Which requirement and issue each use case traces to is in the [traceability table](README.md#traceability-to-requirements-and-issues).
+
 ![TOR Checker system design](system-design.png)
 
 [`system-design.svg`](system-design.svg) is the vector version and stays sharp at any zoom level.

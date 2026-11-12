@@ -100,109 +100,111 @@ Paged lists take `page` (from 1) and `pageSize`, and answer with
 
 ## Endpoint index
 
-| Method | Path | Access | Purpose |
-|---|---|---|---|
-| GET | [`/api/health`](#get-apihealth) | Public | Check that the backend is up |
-| POST | [`/api/auth/register`](#post-apiauthregister) | Public | Create a vendor account |
-| POST | [`/api/auth/login`](#post-apiauthlogin) | Public | Sign in with email and password |
-| POST | [`/api/auth/mfa/verify`](#post-apiauthmfaverify) | Public | Finish signing in with a two-step code |
-| POST | [`/api/auth/logout`](#post-apiauthlogout) | Public | Sign out this device |
-| POST | [`/api/auth/forgot-password`](#post-apiauthforgot-password) | Public | Email a password reset link |
-| POST | [`/api/auth/reset-password`](#post-apiauthreset-password) | Public | Set a new password from the link |
-| GET | [`/api/auth/google`](#get-apiauthgoogle) | Public | Sign in with Google |
-| GET | [`/api/auth/google/callback`](#get-apiauthgooglecallback) | Public | Google's return address |
-| GET | [`/api/auth/avatar/:userId`](#get-apiauthavataruserid) | Public | A user's profile picture |
-| GET | [`/api/auth/me`](#get-apiauthme) | Signed in | The signed-in account |
-| PATCH | [`/api/auth/me`](#patch-apiauthme) | Signed in | Change the display name |
-| DELETE | [`/api/auth/me`](#delete-apiauthme) | Vendor, re-auth | Delete the account |
-| PUT | [`/api/auth/password`](#put-apiauthpassword) | Signed in, re-auth | Change or set the password |
-| PUT | [`/api/auth/email`](#put-apiauthemail) | Signed in, re-auth | Change the sign-in email |
-| GET | [`/api/auth/reauth`](#get-apiauthreauth) | Signed in | Whether this session may make sensitive changes |
-| POST | [`/api/auth/reauth`](#post-apiauthreauth) | Signed in | Re-authenticate for 10 minutes |
-| POST | [`/api/auth/mfa/setup`](#post-apiauthmfasetup) | Signed in, re-auth | Start setting up an authenticator app |
-| POST | [`/api/auth/mfa/enable`](#post-apiauthmfaenable) | Signed in | Turn two-step verification on |
-| POST | [`/api/auth/mfa/disable`](#post-apiauthmfadisable) | Vendor, re-auth | Turn two-step verification off |
-| POST | [`/api/auth/mfa/recovery-codes`](#post-apiauthmfarecovery-codes) | Signed in, re-auth | Replace the recovery codes |
-| GET | [`/api/auth/sessions`](#get-apiauthsessions) | Signed in | Signed-in devices |
-| DELETE | [`/api/auth/sessions/:id`](#delete-apiauthsessionsid) | Signed in, re-auth for other devices | Sign one device out |
-| POST | [`/api/auth/logout-others`](#post-apiauthlogout-others) | Signed in, re-auth | Sign out every other device |
-| GET | [`/api/auth/reports`](#get-apiauthreports) | Signed in | Error reports I sent |
-| POST | [`/api/auth/avatar`](#post-apiauthavatar) | Signed in | Upload a profile picture |
-| GET | [`/api/auth/google/link`](#get-apiauthgooglelink) | Signed in, re-auth | Connect Google to this account |
-| DELETE | [`/api/auth/google`](#delete-apiauthgoogle) | Signed in, re-auth | Disconnect Google |
-| GET | [`/api/tors`](#get-apitors) | Optional session | Search TORs |
-| GET | [`/api/tors/price-stats`](#get-apitorsprice-stats) | Public | Price statistics by category |
-| GET | [`/api/tors/agencies`](#get-apitorsagencies) | Public | Agencies, for the filter |
-| GET | [`/api/tors/technologies`](#get-apitorstechnologies) | Public | Technologies, for the filter |
-| GET | [`/api/tors/:id`](#get-apitorsid) | Public | One TOR in full |
-| GET | [`/api/tors/:id/document`](#get-apitorsiddocument) | Public | Download the TOR PDF |
-| POST | [`/api/tors/:id/report`](#post-apitorsidreport) | Optional session | Report incorrect data |
-| POST | [`/api/tors/:id/view`](#post-apitorsidview) | Public | Count a page view |
-| GET | [`/api/vendor/profile`](#get-apivendorprofile) | Vendor or admin | Business profile |
-| PUT | [`/api/vendor/profile`](#put-apivendorprofile) | Vendor or admin | Update the business profile |
-| GET | [`/api/vendor/profile/saved-searches`](#get-apivendorprofilesaved-searches) | Vendor | Saved searches |
-| POST | [`/api/vendor/profile/saved-searches`](#post-apivendorprofilesaved-searches) | Vendor | Save a search |
-| PATCH | [`/api/vendor/profile/saved-searches/:searchId`](#patch-apivendorprofilesaved-searchessearchid) | Vendor | Edit a saved search |
-| DELETE | [`/api/vendor/profile/saved-searches/:searchId`](#delete-apivendorprofilesaved-searchessearchid) | Vendor | Delete a saved search |
-| GET | [`/api/vendor/matches`](#get-apivendormatches) | Vendor or admin | TORs that match the profile |
-| GET | [`/api/vendor/bookmarks`](#get-apivendorbookmarks) | Vendor or admin | Saved TORs |
-| PUT | [`/api/vendor/bookmarks/:torId`](#put-apivendorbookmarkstorid) | Vendor or admin | Save a TOR |
-| PATCH | [`/api/vendor/bookmarks/:torId`](#patch-apivendorbookmarkstorid) | Vendor or admin | Update application status or note |
-| DELETE | [`/api/vendor/bookmarks/:torId`](#delete-apivendorbookmarkstorid) | Vendor or admin | Remove a saved TOR |
-| GET | [`/api/vendor/hidden-tors`](#get-apivendorhidden-tors) | Vendor | Hidden TORs |
-| PUT | [`/api/vendor/hidden-tors/:torId`](#put-apivendorhidden-torstorid) | Vendor | Hide a TOR |
-| DELETE | [`/api/vendor/hidden-tors/:torId`](#delete-apivendorhidden-torstorid) | Vendor | Show a hidden TOR again |
-| GET | [`/api/vendor/day-notes`](#get-apivendorday-notes) | Vendor or admin | Calendar notes |
-| PUT | [`/api/vendor/day-notes/:date`](#put-apivendorday-notesdate) | Vendor or admin | Set or remove one day's note |
-| GET | [`/api/vendor/notifications`](#get-apivendornotifications) | Vendor or admin | In-app notifications |
-| PATCH | [`/api/vendor/notifications/:id/read`](#patch-apivendornotificationsidread) | Vendor or admin | Mark a notification read |
-| GET | [`/api/chat/conversation`](#get-apichatconversation) | Signed in | My chat with the team |
-| POST | [`/api/chat/messages`](#post-apichatmessages) | Signed in | Send a message |
-| POST | [`/api/chat/read`](#post-apichatread) | Signed in | Mark replies as read |
-| GET | [`/api/help`](#get-apihelp) | Public | Help-center front page |
-| GET | [`/api/help/announcements`](#get-apihelpannouncements) | Public | Published announcements |
-| GET | [`/api/help/announcements/:id`](#get-apihelpannouncementsid) | Public | One announcement |
-| GET | [`/api/help/faqs`](#get-apihelpfaqs) | Public | Published FAQs |
-| GET | [`/api/help/faqs/:id`](#get-apihelpfaqsid) | Public | One FAQ |
-| GET | [`/api/admin/stats`](#get-apiadminstats) | Admin | Dashboard numbers |
-| GET | [`/api/admin/tors`](#get-apiadmintors) | Admin | TOR records for review |
-| GET | [`/api/admin/tors/reported`](#get-apiadmintorsreported) | Admin | TORs with open error reports |
-| GET | [`/api/admin/tors/:id`](#get-apiadmintorsid) | Admin | One TOR for the edit form |
-| GET | [`/api/admin/tors/:id/fairness-flags`](#get-apiadmintorsidfairness-flags) | Admin | Fairness flags in full |
-| PATCH | [`/api/admin/tors/:id`](#patch-apiadmintorsid) | Admin | Correct a TOR |
-| DELETE | [`/api/admin/tors/:id`](#delete-apiadmintorsid) | Admin | Hide a TOR from the site |
-| GET | [`/api/admin/reports`](#get-apiadminreports) | Admin | Error reports |
-| PATCH | [`/api/admin/reports/:id`](#patch-apiadminreportsid) | Admin | Resolve or reopen a report |
-| GET | [`/api/admin/settings/fairness-prefilter`](#get-apiadminsettingsfairness-prefilter) | Admin | Fairness thresholds |
-| PUT | [`/api/admin/settings/fairness-prefilter`](#put-apiadminsettingsfairness-prefilter) | Admin | Change the fairness thresholds |
-| GET | [`/api/admin/notifications`](#get-apiadminnotifications) | Admin | Pipeline alerts |
-| PATCH | [`/api/admin/notifications/:id/read`](#patch-apiadminnotificationsidread) | Admin | Mark an alert read |
-| GET | [`/api/admin/logs`](#get-apiadminlogs) | Admin | System logs |
-| GET | [`/api/admin/users`](#get-apiadminusers) | Admin | Find accounts by email |
-| POST | [`/api/admin/users/:id/sessions/revoke`](#post-apiadminusersidsessionsrevoke) | Admin | Sign a user out everywhere |
-| POST | [`/api/admin/sessions/revoke-all`](#post-apiadminsessionsrevoke-all) | Admin, re-auth | Sign everyone out |
-| GET | [`/api/admin/chats`](#get-apiadminchats) | Admin | Chat inbox |
-| GET | [`/api/admin/chats/:id/messages`](#get-apiadminchatsidmessages) | Admin | Messages in a thread |
-| POST | [`/api/admin/chats/:id/messages`](#post-apiadminchatsidmessages) | Admin | Reply |
-| POST | [`/api/admin/chats/:id/read`](#post-apiadminchatsidread) | Admin | Mark a thread read |
-| PATCH | [`/api/admin/chats/:id`](#patch-apiadminchatsid) | Admin | Close or reopen a thread |
-| GET | [`/api/admin/help/announcements`](#get-apiadminhelpannouncements) | Admin | All announcements, drafts included |
-| POST | [`/api/admin/help/announcements`](#post-apiadminhelpannouncements) | Admin | Create an announcement |
-| PATCH | [`/api/admin/help/announcements/:id`](#patch-apiadminhelpannouncementsid) | Admin | Edit an announcement |
-| DELETE | [`/api/admin/help/announcements/:id`](#delete-apiadminhelpannouncementsid) | Admin | Delete an announcement |
-| GET | [`/api/admin/help/faqs`](#get-apiadminhelpfaqs) | Admin | All FAQs, drafts included |
-| POST | [`/api/admin/help/faqs`](#post-apiadminhelpfaqs) | Admin | Create a FAQ |
-| PATCH | [`/api/admin/help/faqs/:id`](#patch-apiadminhelpfaqsid) | Admin | Edit a FAQ |
-| DELETE | [`/api/admin/help/faqs/:id`](#delete-apiadminhelpfaqsid) | Admin | Delete a FAQ |
-| POST | [`/api/ingestion/runs`](#post-apiingestionruns) | Admin | Discover new TORs now |
-| GET | [`/api/ingestion/runs`](#get-apiingestionruns) | Admin | Recent runs |
-| GET | [`/api/ingestion/runs/:id`](#get-apiingestionrunsid) | Admin | One run |
-| POST | [`/api/ingestion/enrichment/runs`](#post-apiingestionenrichmentruns) | Admin | Run AI enrichment now |
-| GET | [`/api/ingestion/enrichment/pending`](#get-apiingestionenrichmentpending) | Admin | TORs waiting for AI |
-| POST | [`/api/ingestion/lifecycle/runs`](#post-apiingestionlifecycleruns) | Admin | Refresh procurement stages now |
-| GET | [`/api/ingestion/lifecycle/pending`](#get-apiingestionlifecyclepending) | Admin | TORs the refresh would check |
-| POST | [`/api/ingestion/capture`](#post-apiingestioncapture) | Admin | Add projects from the browser extension |
-| GET | [`/api/ingestion/capture/pending`](#get-apiingestioncapturepending) | Admin | Captured TORs still without a PDF |
+The *Requirements* column names the functional requirements in the [SRS](../SRS.md) each endpoint serves. A dash means the endpoint supports a use case with no FR yet; see [traceability](README.md#traceability-to-requirements-and-issues).
+
+| Method | Path | Access | Purpose | Requirements |
+|---|---|---|---|---|
+| GET | [`/api/health`](#get-apihealth) | Public | Check that the backend is up | — |
+| POST | [`/api/auth/register`](#post-apiauthregister) | Public | Create a vendor account | FR-21 |
+| POST | [`/api/auth/login`](#post-apiauthlogin) | Public | Sign in with email and password | FR-21 |
+| POST | [`/api/auth/mfa/verify`](#post-apiauthmfaverify) | Public | Finish signing in with a two-step code | — |
+| POST | [`/api/auth/logout`](#post-apiauthlogout) | Public | Sign out this device | — |
+| POST | [`/api/auth/forgot-password`](#post-apiauthforgot-password) | Public | Email a password reset link | — |
+| POST | [`/api/auth/reset-password`](#post-apiauthreset-password) | Public | Set a new password from the link | — |
+| GET | [`/api/auth/google`](#get-apiauthgoogle) | Public | Sign in with Google | FR-21 |
+| GET | [`/api/auth/google/callback`](#get-apiauthgooglecallback) | Public | Google's return address | FR-21 |
+| GET | [`/api/auth/avatar/:userId`](#get-apiauthavataruserid) | Public | A user's profile picture | — |
+| GET | [`/api/auth/me`](#get-apiauthme) | Signed in | The signed-in account | — |
+| PATCH | [`/api/auth/me`](#patch-apiauthme) | Signed in | Change the display name | — |
+| DELETE | [`/api/auth/me`](#delete-apiauthme) | Vendor, re-auth | Delete the account | — |
+| PUT | [`/api/auth/password`](#put-apiauthpassword) | Signed in, re-auth | Change or set the password | — |
+| PUT | [`/api/auth/email`](#put-apiauthemail) | Signed in, re-auth | Change the sign-in email | — |
+| GET | [`/api/auth/reauth`](#get-apiauthreauth) | Signed in | Whether this session may make sensitive changes | — |
+| POST | [`/api/auth/reauth`](#post-apiauthreauth) | Signed in | Re-authenticate for 10 minutes | — |
+| POST | [`/api/auth/mfa/setup`](#post-apiauthmfasetup) | Signed in, re-auth | Start setting up an authenticator app | — |
+| POST | [`/api/auth/mfa/enable`](#post-apiauthmfaenable) | Signed in | Turn two-step verification on | — |
+| POST | [`/api/auth/mfa/disable`](#post-apiauthmfadisable) | Vendor, re-auth | Turn two-step verification off | — |
+| POST | [`/api/auth/mfa/recovery-codes`](#post-apiauthmfarecovery-codes) | Signed in, re-auth | Replace the recovery codes | — |
+| GET | [`/api/auth/sessions`](#get-apiauthsessions) | Signed in | Signed-in devices | — |
+| DELETE | [`/api/auth/sessions/:id`](#delete-apiauthsessionsid) | Signed in, re-auth for other devices | Sign one device out | — |
+| POST | [`/api/auth/logout-others`](#post-apiauthlogout-others) | Signed in, re-auth | Sign out every other device | — |
+| GET | [`/api/auth/reports`](#get-apiauthreports) | Signed in | Error reports I sent | FR-41 |
+| POST | [`/api/auth/avatar`](#post-apiauthavatar) | Signed in | Upload a profile picture | — |
+| GET | [`/api/auth/google/link`](#get-apiauthgooglelink) | Signed in, re-auth | Connect Google to this account | — |
+| DELETE | [`/api/auth/google`](#delete-apiauthgoogle) | Signed in, re-auth | Disconnect Google | — |
+| GET | [`/api/tors`](#get-apitors) | Optional session | Search TORs | FR-1 – FR-7, FR-10 |
+| GET | [`/api/tors/price-stats`](#get-apitorsprice-stats) | Public | Price statistics by category | FR-18 |
+| GET | [`/api/tors/agencies`](#get-apitorsagencies) | Public | Agencies, for the filter | FR-5 |
+| GET | [`/api/tors/technologies`](#get-apitorstechnologies) | Public | Technologies, for the filter | FR-6 |
+| GET | [`/api/tors/:id`](#get-apitorsid) | Public | One TOR in full | FR-8, FR-10 – FR-17, FR-20 |
+| GET | [`/api/tors/:id/document`](#get-apitorsiddocument) | Public | Download the TOR PDF | FR-9, FR-13 |
+| POST | [`/api/tors/:id/report`](#post-apitorsidreport) | Optional session | Report incorrect data | FR-41 |
+| POST | [`/api/tors/:id/view`](#post-apitorsidview) | Public | Count a page view | — |
+| GET | [`/api/vendor/profile`](#get-apivendorprofile) | Vendor or admin | Business profile | FR-22, FR-23 |
+| PUT | [`/api/vendor/profile`](#put-apivendorprofile) | Vendor or admin | Update the business profile | FR-22, FR-23 |
+| GET | [`/api/vendor/profile/saved-searches`](#get-apivendorprofilesaved-searches) | Vendor | Saved searches | — |
+| POST | [`/api/vendor/profile/saved-searches`](#post-apivendorprofilesaved-searches) | Vendor | Save a search | — |
+| PATCH | [`/api/vendor/profile/saved-searches/:searchId`](#patch-apivendorprofilesaved-searchessearchid) | Vendor | Edit a saved search | — |
+| DELETE | [`/api/vendor/profile/saved-searches/:searchId`](#delete-apivendorprofilesaved-searchessearchid) | Vendor | Delete a saved search | — |
+| GET | [`/api/vendor/matches`](#get-apivendormatches) | Vendor or admin | TORs that match the profile | FR-24 – FR-26 |
+| GET | [`/api/vendor/bookmarks`](#get-apivendorbookmarks) | Vendor or admin | Saved TORs | FR-27, FR-32 |
+| PUT | [`/api/vendor/bookmarks/:torId`](#put-apivendorbookmarkstorid) | Vendor or admin | Save a TOR | FR-27 |
+| PATCH | [`/api/vendor/bookmarks/:torId`](#patch-apivendorbookmarkstorid) | Vendor or admin | Update application status or note | FR-31 |
+| DELETE | [`/api/vendor/bookmarks/:torId`](#delete-apivendorbookmarkstorid) | Vendor or admin | Remove a saved TOR | FR-27 |
+| GET | [`/api/vendor/hidden-tors`](#get-apivendorhidden-tors) | Vendor | Hidden TORs | — |
+| PUT | [`/api/vendor/hidden-tors/:torId`](#put-apivendorhidden-torstorid) | Vendor | Hide a TOR | — |
+| DELETE | [`/api/vendor/hidden-tors/:torId`](#delete-apivendorhidden-torstorid) | Vendor | Show a hidden TOR again | — |
+| GET | [`/api/vendor/day-notes`](#get-apivendorday-notes) | Vendor or admin | Calendar notes | — |
+| PUT | [`/api/vendor/day-notes/:date`](#put-apivendorday-notesdate) | Vendor or admin | Set or remove one day's note | — |
+| GET | [`/api/vendor/notifications`](#get-apivendornotifications) | Vendor or admin | In-app notifications | FR-30 |
+| PATCH | [`/api/vendor/notifications/:id/read`](#patch-apivendornotificationsidread) | Vendor or admin | Mark a notification read | FR-30 |
+| GET | [`/api/chat/conversation`](#get-apichatconversation) | Signed in | My chat with the team | — |
+| POST | [`/api/chat/messages`](#post-apichatmessages) | Signed in | Send a message | — |
+| POST | [`/api/chat/read`](#post-apichatread) | Signed in | Mark replies as read | — |
+| GET | [`/api/help`](#get-apihelp) | Public | Help-center front page | — |
+| GET | [`/api/help/announcements`](#get-apihelpannouncements) | Public | Published announcements | — |
+| GET | [`/api/help/announcements/:id`](#get-apihelpannouncementsid) | Public | One announcement | — |
+| GET | [`/api/help/faqs`](#get-apihelpfaqs) | Public | Published FAQs | — |
+| GET | [`/api/help/faqs/:id`](#get-apihelpfaqsid) | Public | One FAQ | — |
+| GET | [`/api/admin/stats`](#get-apiadminstats) | Admin | Dashboard numbers | — |
+| GET | [`/api/admin/tors`](#get-apiadmintors) | Admin | TOR records for review | FR-40 |
+| GET | [`/api/admin/tors/reported`](#get-apiadmintorsreported) | Admin | TORs with open error reports | FR-40, FR-41 |
+| GET | [`/api/admin/tors/:id`](#get-apiadmintorsid) | Admin | One TOR for the edit form | FR-40 |
+| GET | [`/api/admin/tors/:id/fairness-flags`](#get-apiadmintorsidfairness-flags) | Admin | Fairness flags in full | FR-19 |
+| PATCH | [`/api/admin/tors/:id`](#patch-apiadmintorsid) | Admin | Correct a TOR | FR-40 |
+| DELETE | [`/api/admin/tors/:id`](#delete-apiadmintorsid) | Admin | Hide a TOR from the site | FR-40 |
+| GET | [`/api/admin/reports`](#get-apiadminreports) | Admin | Error reports | FR-40, FR-41 |
+| PATCH | [`/api/admin/reports/:id`](#patch-apiadminreportsid) | Admin | Resolve or reopen a report | FR-40, FR-41 |
+| GET | [`/api/admin/settings/fairness-prefilter`](#get-apiadminsettingsfairness-prefilter) | Admin | Fairness thresholds | FR-20 |
+| PUT | [`/api/admin/settings/fairness-prefilter`](#put-apiadminsettingsfairness-prefilter) | Admin | Change the fairness thresholds | FR-20 |
+| GET | [`/api/admin/notifications`](#get-apiadminnotifications) | Admin | Pipeline alerts | FR-39 |
+| PATCH | [`/api/admin/notifications/:id/read`](#patch-apiadminnotificationsidread) | Admin | Mark an alert read | FR-39 |
+| GET | [`/api/admin/logs`](#get-apiadminlogs) | Admin | System logs | FR-37, FR-38 |
+| GET | [`/api/admin/users`](#get-apiadminusers) | Admin | Find accounts by email | — |
+| POST | [`/api/admin/users/:id/sessions/revoke`](#post-apiadminusersidsessionsrevoke) | Admin | Sign a user out everywhere | — |
+| POST | [`/api/admin/sessions/revoke-all`](#post-apiadminsessionsrevoke-all) | Admin, re-auth | Sign everyone out | — |
+| GET | [`/api/admin/chats`](#get-apiadminchats) | Admin | Chat inbox | — |
+| GET | [`/api/admin/chats/:id/messages`](#get-apiadminchatsidmessages) | Admin | Messages in a thread | — |
+| POST | [`/api/admin/chats/:id/messages`](#post-apiadminchatsidmessages) | Admin | Reply | — |
+| POST | [`/api/admin/chats/:id/read`](#post-apiadminchatsidread) | Admin | Mark a thread read | — |
+| PATCH | [`/api/admin/chats/:id`](#patch-apiadminchatsid) | Admin | Close or reopen a thread | — |
+| GET | [`/api/admin/help/announcements`](#get-apiadminhelpannouncements) | Admin | All announcements, drafts included | — |
+| POST | [`/api/admin/help/announcements`](#post-apiadminhelpannouncements) | Admin | Create an announcement | — |
+| PATCH | [`/api/admin/help/announcements/:id`](#patch-apiadminhelpannouncementsid) | Admin | Edit an announcement | — |
+| DELETE | [`/api/admin/help/announcements/:id`](#delete-apiadminhelpannouncementsid) | Admin | Delete an announcement | — |
+| GET | [`/api/admin/help/faqs`](#get-apiadminhelpfaqs) | Admin | All FAQs, drafts included | — |
+| POST | [`/api/admin/help/faqs`](#post-apiadminhelpfaqs) | Admin | Create a FAQ | — |
+| PATCH | [`/api/admin/help/faqs/:id`](#patch-apiadminhelpfaqsid) | Admin | Edit a FAQ | — |
+| DELETE | [`/api/admin/help/faqs/:id`](#delete-apiadminhelpfaqsid) | Admin | Delete a FAQ | — |
+| POST | [`/api/ingestion/runs`](#post-apiingestionruns) | Admin | Discover new TORs now | FR-35, FR-42, FR-43 |
+| GET | [`/api/ingestion/runs`](#get-apiingestionruns) | Admin | Recent runs | FR-34, FR-36 |
+| GET | [`/api/ingestion/runs/:id`](#get-apiingestionrunsid) | Admin | One run | FR-36 |
+| POST | [`/api/ingestion/enrichment/runs`](#post-apiingestionenrichmentruns) | Admin | Run AI enrichment now | FR-35 |
+| GET | [`/api/ingestion/enrichment/pending`](#get-apiingestionenrichmentpending) | Admin | TORs waiting for AI | FR-34 |
+| POST | [`/api/ingestion/lifecycle/runs`](#post-apiingestionlifecycleruns) | Admin | Refresh procurement stages now | FR-35 |
+| GET | [`/api/ingestion/lifecycle/pending`](#get-apiingestionlifecyclepending) | Admin | TORs the refresh would check | FR-34 |
+| POST | [`/api/ingestion/capture`](#post-apiingestioncapture) | Admin | Add projects from the browser extension | FR-42 |
+| GET | [`/api/ingestion/capture/pending`](#get-apiingestioncapturepending) | Admin | Captured TORs still without a PDF | FR-34 |
 
 ## Shared objects
 

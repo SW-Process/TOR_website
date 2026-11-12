@@ -96,14 +96,13 @@ The strip at the bottom of the diagram is what happens inside a sprint for each 
 3. Commit in small steps. Each commit does one thing and follows Conventional Commits.
 4. Open a pull request into `main` on the organization's template, with `Closes #<issue>` in the description.
 5. CI runs type checking, tests, the build and `npm audit`. It runs on every pull request.
-6. A teammate reviews and approves. The `main` ruleset requires one approval, and all 95 merged pull requests so far were approved by someone other than their author.
+6. A teammate reviews and approves. The `main` ruleset requires one approval, and all 97 merged pull requests so far were approved by someone other than their author.
 7. The pull request is merged into `main` and the card moves to Done, once it meets the [Definition of Done](#definition-of-done).
 
 ## How we differ from standard Scrum
 
 - **The retrospective is not regular.** A retrospective meeting was held for Sprint 5, with action items. For the other sprints the reflections in [`docs/process/retrospectives.md`](process/retrospectives.md) were written from the board and the git history. Holding one at the end of every sprint is the biggest gap against Scrum.
 - **One person is Product Owner and Scrum Master.** See the roles above.
-- **Some board items have no sprint.** 16 of the 99 items have no value in the Sprint field.
 - **The stand-up is three times a week, not daily.** Scrum asks for a daily one. On the days without a stand-up, someone who is blocked has to wait or ask in the chat.
 - **The 15-day length is a team choice.** Scrum allows one to four weeks.
 - **CI is not enforced.** The `main` ruleset requires an approval, but CI is not a required check, so GitHub would allow a merge while CI is failing. The reviewer checks it instead.

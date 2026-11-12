@@ -156,6 +156,7 @@ Backend checks: `npm test`, `npm run typecheck`. Frontend checks: `npm run lint`
 **Process**
 - [CONTRIBUTING.md](CONTRIBUTING.md) — issues, branching, commit messages, and pull requests
 - [docs/scrum-workflow.md](docs/scrum-workflow.md) — how the team runs Scrum, with the Definition of Ready and Definition of Done
+- [docs/process/deliverables.md](docs/process/deliverables.md) — deliverables: where each one is, what each sprint delivered, and requirement coverage
 - [docs/development-process.md](docs/development-process.md) — how the project is built, by software development cycle activity, with the gaps we know about
 - [docs/process/retrospectives.md](docs/process/retrospectives.md) — sprint retrospectives and action items
 - [docs/process/user-feedback.md](docs/process/user-feedback.md) — feedback from users and what we changed
