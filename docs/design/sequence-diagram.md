@@ -2,14 +2,14 @@
 
 How the parts of TOR Checker talk to each other over time, for the flows that matter most. Each diagram is drawn from the code ([`backend/src`](../../backend/src) and [`frontend/src`](../../frontend/src)) and uses the use case numbers from the [use case model](README.md). The parts and where they run are in the [system design](system-design.md), the classes behind them in the [class diagram](class-diagram.md), and every endpoint in the [API reference](api.md).
 
-| # | Diagram | Use cases |
-|---|---|---|
-| 0 | [System overview](#0-system-overview) | the whole system in one picture |
-| 00 | [Whole system in detail](#00-whole-system-in-detail) | every flow in one tall diagram |
-| 1 | [Discover, enrich and notify](#1-discover-enrich-and-notify) | UC-34, UC-35, UC-36, UC-37 |
-| 2 | [Search and view a TOR](#2-search-and-view-a-tor) | UC-01, UC-02, UC-05 to UC-08 |
-| 3 | [Report incorrect data and resolve it](#3-report-incorrect-data-and-resolve-it) | UC-09, UC-26, UC-27, UC-28 |
-| 4 | [Sign in with two-step verification](#4-sign-in-with-two-step-verification) | UC-10, UC-11, UC-12 |
+| # | Diagram | Use cases | Requirements |
+|---|---|---|---|
+| 0 | [System overview](#0-system-overview) | the whole system in one picture | — |
+| 00 | [Whole system in detail](#00-whole-system-in-detail) | every flow in one tall diagram | — |
+| 1 | [Discover, enrich and notify](#1-discover-enrich-and-notify) | UC-34, UC-35, UC-36, UC-37 | FR-8, FR-12, FR-15, FR-18, FR-24, FR-29, FR-30, FR-42, FR-43 |
+| 2 | [Search and view a TOR](#2-search-and-view-a-tor) | UC-01, UC-02, UC-05 to UC-08 | FR-1 – FR-17 |
+| 3 | [Report incorrect data and resolve it](#3-report-incorrect-data-and-resolve-it) | UC-09, UC-26, UC-27, UC-28 | FR-40, FR-41 |
+| 4 | [Sign in with two-step verification](#4-sign-in-with-two-step-verification) | UC-10, UC-11, UC-12 | FR-21 |
 
 ## Notation
 

@@ -25,24 +25,26 @@ Types are the Mongoose types: `ObjectId`, `String`, `Number`, `Boolean`, `Date`,
 
 ## Collections
 
-| Collection | Holds | Notable indexes |
-|---|---|---|
-| `users` | Every account, vendor or admin, with password, Google link and two-step verification fields | `email` unique; `googleOAuthId` unique where set |
-| `sessions` | One row per signed-in device | `userId`; TTL on `expiresAt` deletes expired sessions automatically |
-| `vendorprofiles` | A vendor's business profile, saved searches, hidden TORs and calendar notes | `userId` unique (one profile per user) |
-| `bookmarks` | Saved TORs and their application status | `{ vendorId, torId }` unique |
-| `notifications` | In-app alerts for vendors | `{ vendorId, read, createdAt }` |
-| `tors` | TOR projects with everything the pipeline adds: the document, procurement stage, AI summary, fairness flags, classification | `projectCode` unique where set; text index on `title` and `agency`; `category`, `agency`, `pipelineStatus` (each with `announcementDate`); `categoryTags`; `technologyStack`; `procurement.stage`; `procurement.lastCheckedAt` |
-| `errorreports` | Reports that a TOR's data is wrong | `torId`; `status` |
-| `chatconversations` | One chat thread per user | `user` unique; `lastMessageAt` |
-| `chatmessages` | Messages in a thread | `{ conversation, _id }` |
-| `faqs` | Help-center questions and answers | `slug` unique where set; `{ status, category, order }` |
-| `announcements` | Help-center news, updates and maintenance notices | `slug` unique where set; `{ status, pinned, publishedAt }` |
-| `ingestionruns` | One row per discovery, enrichment, lifecycle or capture run, with counters in `stats.*` | `startedAt`; `phase`; `status` |
-| `enrichmentjobs` | The AI work queue: one job per TOR, with retries and a lock | `torId` unique; `{ status, nextRunAt, lockedUntil }` |
-| `adminnotifications` | Pipeline alerts, one copy per admin | `{ adminId, read, createdAt }` |
-| `systemlogs` | Ingestion, AI pipeline and application logs shown on the admin logs page | `source`; `severity`; `timestamp` |
-| `settings` | Admin-editable settings, one document per key (today only `fairness-prefilter`) | `key` unique |
+The *Requirements* column names the functional requirements in the [SRS](../SRS.md) that each collection stores data for. A dash means it supports a use case with no FR yet; see [traceability](README.md#traceability-to-requirements-and-issues).
+
+| Collection | Holds | Notable indexes | Requirements |
+|---|---|---|---|
+| `users` | Every account, vendor or admin, with password, Google link and two-step verification fields | `email` unique; `googleOAuthId` unique where set | FR-21 |
+| `sessions` | One row per signed-in device | `userId`; TTL on `expiresAt` deletes expired sessions automatically | — |
+| `vendorprofiles` | A vendor's business profile, saved searches, hidden TORs and calendar notes | `userId` unique (one profile per user) | FR-22, FR-23, FR-28 |
+| `bookmarks` | Saved TORs and their application status | `{ vendorId, torId }` unique | FR-27, FR-31 – FR-33 |
+| `notifications` | In-app alerts for vendors | `{ vendorId, read, createdAt }` | FR-30 |
+| `tors` | TOR projects with everything the pipeline adds: the document, procurement stage, AI summary, fairness flags, classification | `projectCode` unique where set; text index on `title` and `agency`; `category`, `agency`, `pipelineStatus` (each with `announcementDate`); `categoryTags`; `technologyStack`; `procurement.stage`; `procurement.lastCheckedAt` | FR-1 – FR-20, FR-42, FR-43 |
+| `errorreports` | Reports that a TOR's data is wrong | `torId`; `status` | FR-40, FR-41 |
+| `chatconversations` | One chat thread per user | `user` unique; `lastMessageAt` | — |
+| `chatmessages` | Messages in a thread | `{ conversation, _id }` | — |
+| `faqs` | Help-center questions and answers | `slug` unique where set; `{ status, category, order }` | — |
+| `announcements` | Help-center news, updates and maintenance notices | `slug` unique where set; `{ status, pinned, publishedAt }` | — |
+| `ingestionruns` | One row per discovery, enrichment, lifecycle or capture run, with counters in `stats.*` | `startedAt`; `phase`; `status` | FR-34 – FR-36 |
+| `enrichmentjobs` | The AI work queue: one job per TOR, with retries and a lock | `torId` unique; `{ status, nextRunAt, lockedUntil }` | FR-12, FR-15 |
+| `adminnotifications` | Pipeline alerts, one copy per admin | `{ adminId, read, createdAt }` | FR-39 |
+| `systemlogs` | Ingestion, AI pipeline and application logs shown on the admin logs page | `source`; `severity`; `timestamp` | FR-37, FR-38 |
+| `settings` | Admin-editable settings, one document per key (today only `fairness-prefilter`) | `key` unique | FR-20 |
 
 ## Relationships
 

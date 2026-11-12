@@ -2,6 +2,8 @@
 
 The concepts of the TOR Checker problem domain, their attributes, and how they relate. It describes **what the system is about**, not how it is stored: the database structure belongs in an ER diagram and the code structure in a class diagram. The concepts come from the actual codebase (the Mongoose models in [`backend/src/models`](../../backend/src/models) and the features built on them), named the way users and the [use case model](README.md) talk about them.
 
+Which requirement and issue each use case traces to is in the [traceability table](README.md#traceability-to-requirements-and-issues).
+
 ![TOR Checker domain model](domain-model.png)
 
 [`domain-model.svg`](domain-model.svg) is the vector version and stays sharp at any zoom level.
