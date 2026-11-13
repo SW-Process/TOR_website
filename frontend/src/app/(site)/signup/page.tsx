@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Lock, Mail, User } from "lucide-react";
+import { ArrowUpRight, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
 import { useAuth } from "@/lib/useAuth";
 
@@ -16,6 +16,7 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (authReady && isLoggedIn && !signingUp) router.replace("/dashboard");
@@ -102,12 +103,21 @@ export default function SignUpPage() {
               <Lock size={16} className="shrink-0 text-[var(--color-text-faint)]" />
               <input
                 required
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-transparent text-sm focus:outline-none"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                aria-pressed={showPassword}
+                className="shrink-0 text-[var(--color-text-faint)] transition-colors hover:text-[var(--color-text)]"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
           </label>
           <label className="flex flex-col gap-1">
@@ -116,12 +126,21 @@ export default function SignUpPage() {
               <Lock size={16} className="shrink-0 text-[var(--color-text-faint)]" />
               <input
                 required
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full bg-transparent text-sm focus:outline-none"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                aria-pressed={showPassword}
+                className="shrink-0 text-[var(--color-text-faint)] transition-colors hover:text-[var(--color-text)]"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
             {passwordError && (
               <span className="text-xs font-medium text-[var(--color-rose-dark)]">{passwordError}</span>
