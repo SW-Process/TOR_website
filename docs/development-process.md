@@ -6,7 +6,7 @@ How TOR Checker is built, organized by the six activities of the software develo
 
 [`development-cycle.svg`](development-cycle.svg) is the vector version.
 
-The cycle is not run once. The project started on 9 August 2026 and has since had 601 commits on `main`, 91 issues (all closed) and 98 pull requests (94 merged). Every feature goes around the cycle on its own, from an issue to a merged pull request, and the larger ones get a written design first.
+The cycle is not run once. The project started on 9 August 2026 and has since had 611 commits on `main`, 91 issues (all closed) and 101 pull requests (97 merged). Every feature goes around the cycle on its own, from an issue to a merged pull request, and the larger ones get a written design first.
 
 ## At a glance
 
@@ -25,17 +25,20 @@ The cycle is not run once. The project started on 9 August 2026 and has since ha
 
 Before a larger feature, the team writes a design spec and then an implementation plan. There are six specs and nine plans so far, for example the [fairness flag detection spec](superpowers/specs/2026-09-08-fairness-flag-detection-design.md) and its [plan](superpowers/plans/2026-09-08-fairness-flag-detection.md).
 
-What each sprint delivered, and which issues cover each requirement, is in [`docs/process/deliverables.md`](process/deliverables.md).
+Since 10 November every sprint issue also meets the [Definition of Ready](scrum-workflow.md#definition-of-ready): it links its design reference, lists acceptance criteria and dependencies, and names the pull requests that built it. What each sprint delivered, and which issues cover each requirement, is in [`docs/process/deliverables.md`](process/deliverables.md).
 
-**Missing.** 17 of the 99 items on the board have no sprint set. 16 of them are draft items that only point a requirement to its issue ("FR-43 → see #11"), so they need no sprint. The other one is issue [#188](https://github.com/SW-Process/TOR_website/issues/188), opened on 10 November to record user feedback handled in October.
+**Missing.** 16 of the 99 items on the board have no sprint set. All 16 are draft items that only point a requirement to its issue ("FR-43 → see #11"), so they need no sprint. Pull requests opened before November did not use `Closes #<issue>`, so many board items show no linked pull request; the pull requests are named in each issue's *Implemented in* section instead.
 
 ## 2. Analysis
 
 **What we do.** The requirements are in the [software requirements specification](SRS.md) (SRS) with numbered functional requirements (FR-01 and up) and non-functional requirements (NFR). Code comments and issues refer to these numbers, for example `FR-40` on the admin queue of reported TORs. The [domain model](design/domain-model.md) shows the concepts of the system and how they relate.
 
-Every one of FR-1 to FR-43 has at least one issue on the board (see [deliverables](process/deliverables.md#3-requirement-coverage)).
+Every one of FR-1 to FR-43 has at least one issue on the board (see [deliverables](process/deliverables.md#3-requirement-coverage)), and the [traceability matrix](traceability.md) gives each requirement's pull requests and status.
 
-**Missing.** The SRS uses `FR-1`, while issues and labels use `FR-01`. Both mean the same requirement, but a plain text search for one form misses the other.
+**Missing.**
+
+- Three requirements are only partly built: FR-11 and FR-18 ask for AI similarity between TORs, but no embedding pipeline exists (similar TORs come from the same category), and FR-25's per-criteria match breakdown is not shown.
+- The SRS uses `FR-1`, while issues and labels use `FR-01`. Both mean the same requirement, but a plain text search for one form misses the other.
 
 ## 3. Design
 
@@ -68,12 +71,12 @@ The backend is Express 5 with MongoDB, the frontend is Next.js, and both are Typ
 
 - **Tests.** The backend has 104 test files with more than 1,300 tests, running against an in-memory MongoDB so no database service is needed.
 - **Continuous integration.** [`ci.yml`](../.github/workflows/ci.yml) runs on every pull request into `main` and on every push to `main`. The backend job runs type checking, the tests and the build, and the frontend job runs the build.
-- **Review.** All 94 merged pull requests have at least one review, as `CONTRIBUTING.md` requires. Pull request #173 below, for example, was approved and merged by a teammate, not by its author.
+- **Review.** A ruleset on `main` blocks direct pushes, force-pushes and deletion, and requires one approval before a pull request can merge. All 97 merged pull requests were approved by someone other than their author. Pull request #173 below, for example, was approved and merged by a teammate, not by its author.
 
 **Missing.**
 
-- The review rule is only a convention. `main` has no branch protection, so GitHub does not block a merge when CI fails or when nobody has approved. [`.github/workflows/README.md`](../.github/workflows/README.md) already explains how to switch it on.
-- The frontend has no automated tests. Its CI job only builds. `npm run lint` is not run in CI. That page says lint reports 9 errors, but it is clean now, so the step can be added back and the note removed.
+- CI is not a required check. The ruleset requires an approval, but GitHub still allows a merge while CI is failing. [`.github/workflows/README.md`](../.github/workflows/README.md) explains how to add the checks.
+- The frontend has no automated tests. Its CI job only builds. `npm run lint` passes but is not run in CI.
 - There are no end-to-end tests that drive the site in a browser.
 
 ## 6. Maintenance
@@ -104,8 +107,8 @@ Issue [#111](https://github.com/SW-Process/TOR_website/issues/111), "admin endpo
 
 In order of effect:
 
-1. Turn on branch protection for `main` with the two CI checks and one required review.
-2. Add the frontend lint step to CI and fix the outdated note about it.
+1. Add the two CI checks as required status checks in the `main` ruleset.
+2. Add the frontend lint step to CI.
 3. Add tests for the frontend, and a few end-to-end checks of the main flows (search, sign in, admin correction).
-4. Fill in the *Design reference* section when an issue is opened, not afterwards, and write `Closes #xx` in every pull request.
+4. Fill in the *Design reference* section when an issue is opened, not afterwards (the issue templates now ask for it), and write `Closes #<issue>` in every pull request.
 5. Either build the deadline reminder or remove its notification type.

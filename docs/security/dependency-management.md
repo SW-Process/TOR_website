@@ -22,7 +22,7 @@ The lock files are committed, and CI installs with `npm ci`, so builds use exact
 
 ## 2. Inventory of runtime dependencies
 
-Versions as resolved in the lock files on 2026-10-22. Every package comes from the public npm registry (`registry.npmjs.org`), pinned by integrity hash in the lock files, and installed with `npm ci`; no package is fetched from a git URL, tarball or private mirror.
+Versions as resolved in the lock files on 2026-11-12. Every package comes from the public npm registry (`registry.npmjs.org`), pinned by integrity hash in the lock files, and installed with `npm ci`; no package is fetched from a git URL, tarball or private mirror.
 
 ### 2.1 Software bill of materials (ASVS 15.1.2)
 
@@ -42,13 +42,13 @@ The tables below are the hand-kept summary of the direct dependencies and their 
 | `bcrypt` | 6.0.0 | Password hashing | Security-critical; native module. |
 | `cookie-parser` | 1.4.7 | Reads the session cookie | Handles every request. |
 | `cors` | 2.8.6 | CORS headers | |
-| `multer` | 2.4.0 | Avatar uploads | Parses untrusted multipart data. **High exposure.** |
-| `zod` | 3.25.76 | Input validation | |
-| `mongoose` / `mongodb` | 9.9.2 / 7.5.0 | Database access | |
+| `multer` | 2.5.0 | Avatar uploads | Parses untrusted multipart data. **High exposure.** |
+| `zod` | 4.6.7 | Input validation | Major upgrade from 3.x on 2026-11-02 (#164). |
+| `mongoose` / `mongodb` | 9.12.1 / 7.8.0 | Database access | |
 | `google-auth-library` | 11.0.2 | Google sign-in (verifies ID tokens) | Security-critical. |
 | `pdf-parse` | 1.1.4 | Reads text layers of downloaded TOR PDFs | Parses untrusted files and bundles an old PDF.js build (v1.10.100). **"Risky component"**: watch closely, plan to replace (section 6). |
 | `fflate` | 0.8.3 | Unzips e-GP document bundles | Parses untrusted archives. |
-| `@google/genai` | 0.14.1 | Gemini on Vertex AI | Pre-1.0 release line; behind a newer major. Used only by batch jobs, not by user requests. |
+| `@google/genai` | 1.52.0 | Gemini on Vertex AI | Upgraded from 0.14.1 on 2026-11-02 (#164). Used only by batch jobs, not by user requests. |
 | `@google-cloud/storage` | 7.22.0 | PDF and avatar storage | |
 | `@sendgrid/mail` | 8.1.6 | Outbound email | |
 | `dotenv` | 17.4.2 | Loads `.env` in development | |
@@ -58,7 +58,7 @@ The tables below are the hand-kept summary of the direct dependencies and their 
 
 | Package | Version | Purpose | Risk notes |
 | --- | --- | --- | --- |
-| `next` | 16.3.8 (pinned) | Framework and server | Renders every page; handles routing and server components. **High exposure.** |
+| `next` | 16.4.3 (pinned) | Framework and server | Renders every page; handles routing and server components. **High exposure.** |
 | `react`, `react-dom` | 19.2.8 | UI | |
 | `lucide-react` | 1.30.0 | Icons | Low exposure. |
 
@@ -143,13 +143,14 @@ When a fix can't be applied in time (no fixed version, or it would break the app
 | --- | --- | --- | --- |
 | 2026-10-22 | `npm audit --omit=dev` (backend) | 9 findings: **critical** `proxy-addr` ≤ 2.0.7 (IP spoofing via IPv4-mapped IPv6, reachable: `trust proxy` uses it for `req.ip`, which the rate limits count by); **high** `follow-redirects` 1.16.0 (via SendGrid's axios); moderate `multer` 2.3.0, `qs`, `uuid` (via `@google-cloud/storage`) | `npm audit fix`: `proxy-addr` 2.0.8, `follow-redirects` 1.16.1, `multer` 2.4.0, `qs` 6.16.1. **Remaining: `uuid` 9.0.1, moderate, not reachable** (the bug is in `v3`/`v5`/`v6` called with a `buf` argument; `gaxios` and `teeny-request` only call `uuid.v4()` with none, to make multipart boundaries); the fix is a major upgrade of `@google-cloud/storage` to 8.x, due within 90 days (by 2027-01-20). |
 | 2026-10-22 | `npm audit --omit=dev` (frontend) | 3 findings: **critical** `next` 16.3.0 (fixed in 16.3.8), **high** `sharp` (bundled libheif/librsvg), **high** `source-map-js` | `next` 16.3.8, `npm audit fix` for `sharp` and `source-map-js`. **0 findings remain.** |
+| 2026-11-02 | CI audit gate (backend and frontend) | **critical** advisories in `next` 16.3.8 (frontend); new findings in the backend tree | Frontend: `next` 16.4.3, pinned together with `eslint-config-next`. Backend: `zod` 4.6.7, `@google/genai` 1.52.0 and the patched transitive packages (#164). Backend tests and the frontend build pass. |
+| 2026-11-11 | CI audit gate (backend) | **high** advisory in `mongoose` 9.0.0 – 9.11.3 | `mongoose` 9.12.1 and the non-breaking fixes (`mongodb`, `fast-xml-parser` and a few helpers) (#190). The remaining findings are low or moderate. |
 
 Known items from the inventory:
 
 | Item | Category | Plan |
 | --- | --- | --- |
 | `pdf-parse` 1.1.4 parses untrusted PDFs with an old bundled PDF.js | Risky component | It runs only while ingesting TORs (the scheduled jobs and admin-started capture runs), on PDFs downloaded from the government e-GP systems, never on files users upload. Check for advisories at every monthly update; evaluate `pdf-parse` 2.x or `pdfjs-dist` as a replacement. |
-| `@google/genai` 0.14.1 is behind its current major | Routine major update | Upgrade within the 3-month window, testing the enrichment job with real TORs. |
 
 ## 7. Responsibilities
 
