@@ -61,8 +61,8 @@ flowchart LR
   end
 
   V -- "HTTPS: pages" --> FE
-  V -- "HTTPS: API calls + session cookie<br/>T01 T02 T05 T06 T07 T13 T19 T24" --> API
-  A -- "HTTPS: admin API<br/>T03 T04 T18" --> API
+  V -- "HTTPS: API calls + session cookie<br/>T01 T02 T03 T05 T06 T07 T08 T13 T16 T19 T21 T24" --> API
+  A -- "HTTPS: admin API<br/>T04 T18" --> API
   X -- "project codes<br/>T27" --> API
   V -. "OAuth redirect T10" .-> G
   G -- "code + ID token T10" --> API
