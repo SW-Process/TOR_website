@@ -133,7 +133,8 @@ When a fix can't be applied in time (no fixed version, or it would break the app
 
 | Advisory | Package | Severity | Why not fixed | Workaround | Review by |
 | --- | --- | --- | --- | --- | --- |
-| *(none yet)* | | | | | |
+| GHSA for `uuid` < 11 (missing buffer bounds check in `v3`/`v5`/`v6`) | `uuid` 9.0.1 via `@google-cloud/storage` → `retry-request` / `teeny-request` | Moderate (not reachable) | The fix is a major upgrade of `@google-cloud/storage` (to 9.x), which needs testing of every storage call | Our code paths call only `uuid.v4()` with no `buf` argument, which is not affected | 2027-01-20 |
+| [GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4) (prototype poisoning in `mergeObject()`) | `deepmerge` 4.3.1 via `@sendgrid/mail` → `@sendgrid/helpers` | Low (not reachable) | No fixed `deepmerge` release exists; `npm audit fix --force` would downgrade `@sendgrid/mail` to 6.x | SendGrid merges only the email settings our own code builds, never objects parsed from user input | Next routine update (monthly) |
 
 ## 6. Current status
 
@@ -142,6 +143,7 @@ When a fix can't be applied in time (no fixed version, or it would break the app
 | Date | Command | Result | Action |
 | --- | --- | --- | --- |
 | 2026-10-22 | `npm audit --omit=dev` (backend) | 9 findings: **critical** `proxy-addr` ≤ 2.0.7 (IP spoofing via IPv4-mapped IPv6, reachable: `trust proxy` uses it for `req.ip`, which the rate limits count by); **high** `follow-redirects` 1.16.0 (via SendGrid's axios); moderate `multer` 2.3.0, `qs`, `uuid` (via `@google-cloud/storage`) | `npm audit fix`: `proxy-addr` 2.0.8, `follow-redirects` 1.16.1, `multer` 2.4.0, `qs` 6.16.1. **Remaining: `uuid` 9.0.1, moderate, not reachable** (the bug is in `v3`/`v5`/`v6` called with a `buf` argument; `gaxios` and `teeny-request` only call `uuid.v4()` with none, to make multipart boundaries); the fix is a major upgrade of `@google-cloud/storage` to 8.x, due within 90 days (by 2027-01-20). |
+| 2026-11-14 | `npm audit --omit=dev` (backend and frontend) | Frontend: 0. Backend: 8 findings, none high or critical: the known `uuid` moderate (reported 4 times along the `@google-cloud/storage` chain) and a new **low** `deepmerge` 4.3.1 via `@sendgrid/mail` | No fix available for `deepmerge` (4.3.1 is the latest release). Both recorded as exceptions above. CI still passes (`--audit-level=high`). |
 | 2026-10-22 | `npm audit --omit=dev` (frontend) | 3 findings: **critical** `next` 16.3.0 (fixed in 16.3.8), **high** `sharp` (bundled libheif/librsvg), **high** `source-map-js` | `next` 16.3.8, `npm audit fix` for `sharp` and `source-map-js`. **0 findings remain.** |
 | 2026-11-02 | CI audit gate (backend and frontend) | **critical** advisories in `next` 16.3.8 (frontend); new findings in the backend tree | Frontend: `next` 16.4.3, pinned together with `eslint-config-next`. Backend: `zod` 4.6.7, `@google/genai` 1.52.0 and the patched transitive packages (#164). Backend tests and the frontend build pass. |
 | 2026-11-11 | CI audit gate (backend) | **high** advisory in `mongoose` 9.0.0 – 9.11.3 | `mongoose` 9.12.1 and the non-breaking fixes (`mongodb`, `fast-xml-parser` and a few helpers) (#190). The remaining findings are low or moderate. |
