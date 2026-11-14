@@ -1,0 +1,106 @@
+%%{init: {
+  "theme": "base",
+  "flowchart": { "curve": "basis", "nodeSpacing": 30, "rankSpacing": 70, "padding": 14, "wrappingWidth": 320 },
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial, sans-serif",
+    "fontSize": "14px",
+    "lineColor": "#8a94a6",
+    "primaryTextColor": "#1f2937",
+    "edgeLabelBackground": "#ffffff"
+  }
+}}%%
+flowchart LR
+
+  subgraph TB1["TRUST BOUNDARY 1 · Internet (untrusted)"]
+    direction TB
+    guest["<b>Guest / Vendor</b><br/>web browser"]
+    admin["<b>Administrator</b><br/>web browser"]
+    ext["<b>Capture extension</b><br/>Chrome, admins only"]
+  end
+
+  subgraph TB2["TRUST BOUNDARY 2 · Our cloud (trusted)"]
+    direction LR
+    fe["<b>Frontend</b><br/>Next.js · Cloud Run<br/><i>T07 · T14</i>"]
+
+    subgraph API["tor-api · Express 5"]
+      direction TB
+      mw["<b>Middleware</b> · checks every request<br/>CORS · CSRF · rate limit<br/>session · role · input"]
+      routes["<b>Routes</b><br/>/api/auth · /api/tors · /api/vendor<br/>/api/chat · /api/help<br/>/api/admin · /api/ingestion"]
+      mw --> routes
+    end
+
+    sched["<b>Cloud Scheduler</b>"]
+    jobs["<b>Cloud Run jobs</b><br/>discovery · enrichment<br/>lifecycle · stalled-runs"]
+    gcs[("<b>Cloud Storage</b><br/>PDFs, avatars")]
+
+    subgraph PLATFORM["Used by every service"]
+      direction LR
+      sm["<b>Secret Manager</b><br/><i>T09</i>"]
+      logs["<b>Cloud Logging</b><br/><i>T18 · T25</i>"]
+    end
+  end
+
+  subgraph TB3["TRUST BOUNDARY 3 · Database"]
+    atlas[("<b>MongoDB Atlas</b><br/>all app data")]
+  end
+
+  subgraph TB4["TRUST BOUNDARY 4 · Identity and e-mail (trusted, verified)"]
+    direction TB
+    google["<b>Google OAuth</b>"]
+    sendgrid["<b>SendGrid</b>"]
+    hibp["<b>Pwned Passwords</b>"]
+  end
+
+  subgraph TB5["TRUST BOUNDARY 5 · Data sources (untrusted content)"]
+    direction TB
+    bma["<b>BMA e-GP</b>"]
+    nat["<b>National e-GP</b>"]
+    vertex["<b>Vertex AI · Gemini</b>"]
+  end
+
+  guest -->|"pages"| fe
+  admin -->|"pages"| fe
+  fe -->|"server render"| mw
+  guest ==>|"<b>T01 T02 T03 T05 T06 T07<br/>T08 T13 T16 T19 T21 T24</b>"| mw
+  admin ==>|"<b>T04</b>"| mw
+  ext ==>|"<b>T27</b>"| mw
+
+  sched --> jobs
+  jobs ~~~ PLATFORM
+
+  routes -->|"<b>T10</b> · ID token"| google
+  routes -->|"<b>T11</b> · reset link"| sendgrid
+  routes -->|"hash prefix only"| hibp
+  routes -->|"<b>T20</b> · TLS"| atlas
+  routes -->|"<b>T15</b> · uploads"| gcs
+  jobs -->|"TLS"| atlas
+  jobs --> gcs
+  jobs ==>|"<b>T22 T23</b>"| bma
+  jobs ==>|"<b>T22 T23</b>"| nat
+  jobs ==>|"<b>T17 T26</b>"| vertex
+
+  legend["<b>How to read</b><br/>Red dashed box = trust boundary<br/>Red arrow = data from an untrusted zone,<br/>checked on our side before use<br/>T01–T27 = threat ids in section 4<br/>T12 (dependencies) applies to all our code"]
+
+  classDef user fill:#eaf1fb,stroke:#5b7db1,stroke-width:1.2px,color:#1f2937;
+  classDef svc fill:#ffffff,stroke:#3f8f5a,stroke-width:1.4px,color:#1f2937;
+  classDef store fill:#f5f0fb,stroke:#7c5cb4,stroke-width:1.2px,color:#1f2937;
+  classDef ops fill:#f6f7f9,stroke:#9aa3b2,stroke-width:1px,color:#374151;
+  classDef extn fill:#fff7ef,stroke:#c07a3a,stroke-width:1.2px,color:#1f2937;
+  classDef note fill:#fffdf2,stroke:#d6c98a,stroke-width:1px,color:#374151;
+
+  class guest,admin,ext user
+  class fe,mw,routes,jobs svc
+  class gcs,atlas store
+  class sched,sm,logs ops
+  class google,sendgrid,hibp,bma,nat,vertex extn
+  class legend note
+
+  style TB1 fill:#fff6f6,stroke:#d64545,stroke-width:2px,stroke-dasharray:8 5
+  style TB2 fill:#f7fcf8,stroke:#d64545,stroke-width:2px,stroke-dasharray:8 5
+  style TB3 fill:#fbf8ff,stroke:#d64545,stroke-width:2px,stroke-dasharray:8 5
+  style TB4 fill:#fffaf5,stroke:#d64545,stroke-width:2px,stroke-dasharray:8 5
+  style TB5 fill:#fff6f6,stroke:#d64545,stroke-width:2px,stroke-dasharray:8 5
+  style API fill:#ffffff,stroke:#3f8f5a
+  style PLATFORM fill:#ffffff,stroke:#c9ced6,stroke-dasharray:3 3
+
+  linkStyle 4,5,6,16,17,18 stroke:#d64545,stroke-width:2.2px

@@ -27,58 +27,11 @@ Each threat is rated:
 
 ### 2.1 Data-flow diagram
 
-Dashed boxes are trust boundaries. Labels on the flows are the threat ids from section 3.
+Red dashed boxes are trust boundaries. Red arrows carry data from an untrusted zone, which is checked on our side before use. Labels on the flows and in the boxes are the threat ids from section 3; T12 (dependencies) applies to all our code.
 
-```mermaid
-flowchart LR
-  subgraph INTERNET["Internet (untrusted)"]
-    direction TB
-    V["Visitor / vendor browser"]
-    A["Admin browser"]
-    X["Admin Chrome extension"]
-  end
+![Data-flow diagram with trust boundaries and threat ids](images/threat-model-dfd.png)
 
-  subgraph CLOUD["Our cloud: Google Cloud (trusted)"]
-    direction TB
-    FE["Next.js frontend<br/>(Cloud Run)"]
-    API["Express API<br/>(Cloud Run)"]
-    JOBS["Ingestion and AI jobs<br/>(Cloud Run Jobs)"]
-    GCS[("Cloud Storage<br/>PDFs, avatars")]
-    SM[("Secret Manager")]
-  end
-
-  subgraph DB["Database"]
-    MDB[("MongoDB Atlas")]
-  end
-
-  subgraph EXT["External services"]
-    direction TB
-    G["Google OAuth / OIDC"]
-    EGP["e-GP portals<br/>(untrusted content)"]
-    AI["Vertex AI Gemini<br/>(untrusted output)"]
-    HIBP["Have I Been Pwned"]
-    SG["SendGrid"]
-  end
-
-  V -- "HTTPS: pages" --> FE
-  V -- "HTTPS: API calls + session cookie<br/>T01 T02 T05 T06 T07 T13 T19 T24" --> API
-  A -- "HTTPS: admin API<br/>T03 T04 T18" --> API
-  X -- "project codes<br/>T27" --> API
-  V -. "OAuth redirect T10" .-> G
-  G -- "code + ID token T10" --> API
-  API -- "TLS T20" --> MDB
-  JOBS -- "TLS" --> MDB
-  API --> GCS
-  JOBS --> GCS
-  API -. "reads secrets T09" .-> SM
-  JOBS -- "safeFetch T22 T23" --> EGP
-  JOBS -- "TOR text T17 T26" --> AI
-  API -- "safeFetch, 5-char hash prefix" --> HIBP
-  API -- "reset / alert emails T11" --> SG
-
-  classDef boundary stroke-dasharray: 6 4
-  class INTERNET,CLOUD,DB,EXT boundary
-```
+Source: [`images/threat-model-dfd.mmd`](images/threat-model-dfd.mmd) (Mermaid; paste it into [mermaid.live](https://mermaid.live) to edit and re-export).
 
 ### 2.2 Trust boundaries
 
