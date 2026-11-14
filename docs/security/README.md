@@ -11,6 +11,7 @@ TOR Checker is secured against the [OWASP Application Security Verification Stan
 | Document | ASVS | What it covers |
 | --- | --- | --- |
 | [**ASVS compliance checklist**](asvs-checklist.md) | Level 1 and 2 | Every Level 1 and Level 2 requirement with status, code evidence and test evidence; OWASP Top 10:2025 mapping; Level 3 extras; what is left |
+| [**Threat model**](threat-model.md) | — | STRIDE threats with likelihood × impact ratings, priorities, mitigations, implementation order and residual risks; data-flow diagram with trust boundaries |
 | [Input validation rules](input-validation.md) | 2.1.1 | The rule every input field must pass, endpoint by endpoint |
 | [Business logic and resource limits](business-logic.md) | 2.1.2, 2.1.3, 15.1.3 | Cross-field rules, per-user and global limits, costly functions, atomicity |
 | [File handling](file-handling.md) | 5.1.1 | Accepted files, sizes, zip limits, safe serving, malicious files |
