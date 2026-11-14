@@ -44,7 +44,7 @@ Each app's `Dockerfile` is multi-stage: `dev` target (used by compose) and a
 The frontend production image needs `output: "standalone"` in `next.config.ts`.
 
 The backend has a Jest suite (`npm test`); the frontend has no test framework configured.
-CI runs on PRs into `main` (`.github/workflows/ci.yml`): backend typecheck + test + build, frontend build.
+CI runs on PRs into `main` (`.github/workflows/ci.yml`): backend typecheck + test + build, frontend build, and `npm audit --omit=dev --audit-level=high` plus a CycloneDX SBOM for both. `main` is protected by a ruleset (PR + one approval, no force-push); CI is not a required check.
 
 ## Architecture notes that span files
 
@@ -54,7 +54,7 @@ The frontend has no database connection and no Next.js API route handlers: every
 ### Backend data model (`backend/src/models/`, index in `models/index.ts`)
 16 collections, drawn in full in `docs/design/er-diagram.md`. The main ones: `users`, `vendorprofiles` (1:1 with vendor user), `tors` (central entity), `bookmarks` (vendor↔TOR join + application status), `notifications`, `errorreports` (public-submitted TOR corrections), `ingestionruns`, `systemlogs`. The rest: `sessions`, `chatconversations`, `chatmessages`, `faqs`, `announcements`, `enrichmentjobs`, `adminnotifications`, `settings`.
 
-`Tor` embeds `aiSummary` and `fairnessFlags` (fetched with the TOR, never queried alone). The AI-written description lives at `aiSummary.summary` — never presented as the agency's own text, since it's a model-generated summary of a government document, not an official field. PDF binaries live in GCS, not Mongo — `sourceDocumentUrl` is a reference. `similarTORs` is a precomputed array of ObjectIds. There is a text index on `title`/`agency` (search actually uses a regex on `title`, not `$text` — see the RULING in `torController.ts`).
+`Tor` embeds `aiSummary` and `fairnessFlags` (fetched with the TOR, never queried alone). The AI-written description lives at `aiSummary.summary` — never presented as the agency's own text, since it's a model-generated summary of a government document, not an official field. PDF binaries live in GCS, not Mongo — `sourceDocumentUrl` is a reference. `similarTORs` is an array of ObjectIds in the schema, but nothing fills it (there is no embedding pipeline); the TOR page picks similar TORs by category. There is a text index on `title`/`agency`, but search uses a case-insensitive regex over `title`, `agency`, `projectCode`, `aiSummary.summary`, `aiSummary.keyPoints` and `technologyStack`, not `$text` — see the RULING in `torController.ts`.
 
 ### Frontend data
 Pages read and write through the Express API (`frontend/src/lib/api.ts` and the `use*` hooks). `frontend/src/lib/mockData.ts` and `adminMockData.ts` now hold mostly types, labels and formatting helpers (plus sample rows that are no longer shown). Domain types and enum values are **in Thai** (e.g. status `"เปิดรับ"`, categories). Route groups: `(site)/` for public+vendor pages, `admin/` for the admin panel. All frontend work is implementation from existing mockups — not UI design.
@@ -63,15 +63,15 @@ Pages read and write through the Express API (`frontend/src/lib/api.ts` and the 
 
 Next 16 note: `searchParams` in page components is a `Promise` and must be `await`ed.
 
-### Planned AI pipeline (cost-control funnel)
-Cheap→expensive stages so not every TOR hits the LLM: scrape → parse/keyword-classify → embeddings + budget/timeline stats + brand-name regex (filters out most normal TORs) → Gemini review queue only for flagged candidates → results store. Each stage is its own queue/worker; jobs idempotent keyed by TOR id + content hash; dead-letter queue for unparseable PDFs.
+### AI pipeline (cost control)
+What is built: scrape → keyword gate on the title, goods category and procurement type (`looksSoftwareRelated`; non-software projects are rejected without an AI call) → one Gemini call per remaining TOR that writes the summary, scalar fields and fairness signals → the fairness pre-filter (`enrichment/fairnessPrefilter.ts`, admin-set thresholds `budgetDeviationPercent`, `minBidWindowDays`, `minSeverity`) drops signals below the thresholds, both in the prompt and as a deterministic gate on the output. Jobs are idempotent by TOR id + content hash and retried up to `maxAttempts`, then left `failed`. The original plan also had an embeddings stage and a brand-name regex before Gemini; neither was built (brand-locking is judged by Gemini as part of the `qualificationRequirements` signal).
 
 ### TOR ingestion (`backend/src/scraper/` + `backend/src/ingestion/`)
 `POST /api/ingestion/runs` (admin) creates an `IngestionRun` and kicks off
 `runIngestion` in-process — it pages the e-GP API (`scraper/egpClient.ts`), upserts
 `Tor` docs keyed by `projectCode` with change detection via `sourceContentHash`, and
 downloads each TOR PDF through the `BlobStorage` adapter (`storage/`, `STORAGE_DRIVER`
-= `local` now, `gcs` later). `pdfInspect` tags each file `digital` / `scanned` /
+= `local` for development, `gcs` in Docker and on Cloud Run). `pdfInspect` tags each file `digital` / `scanned` /
 `unreadable` / `missing`; OCR and AI stages consume that later. Binaries never go in
 Mongo. Progress and errors land in `IngestionRun` + `SystemLog` (source `ingestion`).
 

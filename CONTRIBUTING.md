@@ -6,9 +6,18 @@ Rules for working together on this project
 
 ```
 TOR_website/
-├── frontend/   # Next.js
-└── backend/    # Node.js + Express + MongoDB Atlas
+├── frontend/    # Next.js
+├── backend/     # Node.js + Express + MongoDB Atlas
+├── extension/   # Chrome extension for capturing projects from the national e-GP
+└── docs/        # SRS, design, process, security and deployment docs
 ```
+
+## Issues
+
+Every piece of work starts as an issue on the project board, from the organization's issue templates.
+
+- Before an issue goes into a sprint it must meet the [Definition of Ready](docs/scrum-workflow.md#definition-of-ready): a problem, a design reference, acceptance criteria, traceability to an FR, an estimate of 4 hours or less, a priority, its dependencies and one owner.
+- It is finished only when it meets the [Definition of Done](docs/scrum-workflow.md#definition-of-done).
 
 ## Branching
 
@@ -67,8 +76,11 @@ Rules:
 ## Pull Requests
 
 - Title the PR to reflect what it does (can reuse commit type format, e.g. `feat: add login page`)
-- Describe what was done and how it was tested
-- Don't merge your own PR — wait for review
+- Use the organization's PR template: describe what was done and how it was tested
+- Write `Closes #<issue>` in the description, so the board links the PR to its issue
+- CI must pass: backend typecheck, tests and build; frontend build; `npm audit`
+- Don't merge your own PR — wait for review. The `main` ruleset requires one approval
+- Update the docs your change affects: [`docs/design/api.md`](docs/design/api.md) for endpoints, the [ER diagram](docs/design/er-diagram.md) for collections and fields
 
 ## Environment Variables
 
