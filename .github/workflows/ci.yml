@@ -8,6 +8,10 @@ on:
     branches: [main]
 
 # If you push twice quickly to the same branch/PR, cancel the older run.
+# The workflow only reads the code; give its token nothing more (least privilege).
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

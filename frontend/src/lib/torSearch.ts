@@ -122,12 +122,14 @@ function pageNumber(v: string | string[] | undefined): number {
 /** Parse page search params, silently dropping values that aren't valid. */
 /** URLSearchParams (e.g. from useSearchParams) → the record shape parseTorFilters takes; repeated keys become arrays. */
 export function searchParamsToRaw(params: URLSearchParams): RawSearchParams {
-  const raw: RawSearchParams = {};
-  for (const key of new Set(params.keys())) {
-    const values = params.getAll(key);
-    raw[key] = values.length > 1 ? values : values[0];
-  }
-  return raw;
+  // Object.fromEntries defines plain own properties, so a key like `__proto__` from the
+  // URL can't reach the object's prototype (CodeQL js/remote-property-injection).
+  return Object.fromEntries(
+    [...new Set(params.keys())].map((key) => {
+      const values = params.getAll(key);
+      return [key, values.length > 1 ? values : values[0]];
+    })
+  );
 }
 
 export function parseTorFilters(params: RawSearchParams): TorFilters {

@@ -34,7 +34,19 @@ import {
   type GoogleIdentity,
 } from "../config/google";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Longest address SMTP allows (RFC 5321); also bounds the regex work below. */
+const MAX_EMAIL_LENGTH = 254;
+/**
+ * local@domain.tld with no spaces and no empty domain labels. Labels can't contain a dot,
+ * so there is only one way to match and the check runs in linear time. The old pattern
+ * (`[^\s@]+\.[^\s@]+` after the @) could split a long string of dots in many ways and
+ * was flagged by CodeQL as a ReDoS risk (js/polynomial-redos).
+ */
+const EMAIL_RE = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+
+function isValidEmail(email: unknown): email is string {
+  return typeof email === "string" && email.length <= MAX_EMAIL_LENGTH && EMAIL_RE.test(email);
+}
 /** The OAuth `state` cookie, `__Host-` prefixed in production like the session cookie. */
 const oauthStateCookie = () => cookieName("oauth_state");
 /**
@@ -58,7 +70,7 @@ interface OAuthFlowCookie extends GoogleFlowSecrets {
 function startGoogleFlow(res: Response, state: string): GoogleFlowSecrets {
   const secrets = newFlowSecrets();
   const value = Buffer.from(JSON.stringify({ state, ...secrets } satisfies OAuthFlowCookie)).toString("base64url");
-  res.cookie(oauthStateCookie(), value, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
+  res.cookie(oauthStateCookie(), value, { ...cookieOptions(), httpOnly: true, maxAge: 10 * 60 * 1000 });
   return secrets;
 }
 
@@ -86,7 +98,7 @@ interface Credentials {
 
 function validateCredentials(body: unknown): Credentials {
   const { email, password } = (body ?? {}) as Partial<Credentials>;
-  if (typeof email !== "string" || !EMAIL_RE.test(email)) {
+  if (!isValidEmail(email)) {
     throw httpError(400, "A valid email is required");
   }
   if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
@@ -170,7 +182,7 @@ function hashResetToken(raw: string): string {
  */
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
   const { email } = (req.body ?? {}) as Record<string, unknown>;
-  if (typeof email !== "string" || !EMAIL_RE.test(email.trim())) {
+  if (typeof email !== "string" || !isValidEmail(email.trim())) {
     throw httpError(400, "A valid email is required");
   }
 
@@ -437,7 +449,7 @@ export async function logoutOthers(req: Request, res: Response): Promise<void> {
  */
 export async function changeEmail(req: Request, res: Response): Promise<void> {
   const { email, currentPassword } = (req.body ?? {}) as Record<string, unknown>;
-  if (typeof email !== "string" || !EMAIL_RE.test(email.trim())) {
+  if (typeof email !== "string" || !isValidEmail(email.trim())) {
     throw httpError(400, "A valid email is required");
   }
   const next = email.trim().toLowerCase();

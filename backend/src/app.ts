@@ -15,6 +15,7 @@ import { rejectUnsupportedMethods, securityHeaders } from "./middleware/security
 import { originCheck } from "./middleware/originCheck";
 import { parseTrustProxy } from "./utils/trustProxy";
 import { requestId } from "./middleware/requestId";
+import { apiRateLimit } from "./middleware/apiRateLimit";
 
 const app = express();
 
@@ -26,6 +27,8 @@ const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
 if (trustProxy !== undefined) app.set("trust proxy", trustProxy);
 
 app.use(requestId);
+// Before everything else that does work: one per-IP ceiling for every route (threat T19).
+app.use(apiRateLimit);
 app.use(securityHeaders);
 app.use(rejectUnsupportedMethods);
 app.use(
