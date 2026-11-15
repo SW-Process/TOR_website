@@ -41,7 +41,7 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 | ID | Requirement | Status | Implementation (evidence) | Verified by | Top 10 |
 | --- | --- | :-: | --- | --- | :-: |
 | 2.1.1 | Input validation rules documented | ✅ | [input-validation.md](input-validation.md) | — | A06 |
-| 2.2.1 | Positive input validation | ✅ | Zod schemas in every controller (e.g. `listQuerySchema` in `torController.ts`, `updateSchema` in `adminTorController.ts`) | `torRoutes.test.ts`, `vendorProfile.test.ts`, `adminTors.test.ts` | A05 |
+| 2.2.1 | Positive input validation | ✅ | Zod schemas (e.g. `listQuerySchema` in `torController.ts`, `updateSchema` in `adminTorController.ts`), or explicit type and length checks where there is no schema (`authController.ts`, `vendorProfileController.ts`) | `torRoutes.test.ts`, `vendorProfile.test.ts`, `adminTors.test.ts` | A05 |
 | 2.2.2 | Validation enforced at a trusted service layer | ✅ | All checks run in the Express backend; frontend checks are UX only | API tests call the backend directly | A06 |
 | 2.3.1 | Business flows run in order, steps can't be skipped | ✅ | Password reset needs a valid single-use token; Google sign-in checks the `state` cookie | `passwordReset.test.ts`, `googleOAuth.test.ts` | A06 |
 
@@ -140,8 +140,8 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 | ID | Requirement | Status | Implementation (evidence) | Verified by | Top 10 |
 | --- | --- | :-: | --- | --- | :-: |
 | 12.1.1 | Only TLS 1.2 / 1.3 | ⏳ | Google Cloud Run terminates TLS; the accepted versions must be confirmed | Run [SSL Labs](https://www.ssllabs.com/ssltest/) on the production URL and record the result | A04 |
-| 12.2.1 | TLS for all external HTTP traffic | ✅ | Cloud Run serves HTTPS only; HSTS set | Browser | A04 |
-| 12.2.2 | Publicly trusted certificates | ✅ | Google-managed certificates | Browser | A04 |
+| 12.2.1 | TLS for all external HTTP traffic | ✅ | Cloud Run serves HTTPS only; HSTS set on every response | Review of the deployment configuration (not yet deployed); HSTS header checked with `curl` | A04 |
+| 12.2.2 | Publicly trusted certificates | ✅ | Google-managed certificates | Review of the deployment configuration (not yet deployed) | A04 |
 
 ### V13 Configuration
 
@@ -161,7 +161,7 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 | ID | Requirement | Status | Implementation (evidence) | Verified by | Top 10 |
 | --- | --- | :-: | --- | --- | :-: |
 | 15.1.1 | Remediation time frames for dependencies documented | ✅ | [dependency-management.md](dependency-management.md) | — | A03 |
-| 15.2.1 | No component past its remediation time frame | ✅ | `npm audit --omit=dev` run and recorded on 2026-10-22: critical and high findings fixed the same day; one moderate, unreachable finding inside its 90-day window ([dependency-management.md §6](dependency-management.md#6-current-status)). CI now fails on any new high or critical finding | `npm audit` in CI | A03 |
+| 15.2.1 | No component past its remediation time frame | ✅ | `npm audit --omit=dev` run and recorded on 2026-10-22, 2026-11-02, 2026-11-11 and 2026-11-14: every critical and high finding fixed; on 2026-11-14 the frontend has none and the backend has two unreachable advisories (`uuid` moderate, `deepmerge` low) recorded as exceptions with review dates ([dependency-management.md §6](dependency-management.md#6-current-status)). CI now fails on any new high or critical finding | `npm audit` in CI | A03 |
 | 15.3.1 | Only required fields returned | ✅ | Mongoose projections and `toJSON` transforms (no `passwordHash`, tokens or storage keys) | `sessions.test.ts`, `torProcurementExposure.test.ts` | A01 |
 
 V16 (Security Logging and Error Handling) and V17 (WebRTC) contain no Level 1 requirements; V16 is covered at Level 2 in section 4.
@@ -243,7 +243,7 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 | 3.4.4 | nosniff on every response | ✅ | `securityHeaders.ts`, `next.config.ts` | `securityHeaders.test.ts` |
 | 3.4.5 | Referrer policy | ✅ | `no-referrer` (API), `strict-origin-when-cross-origin` (frontend) | `securityHeaders.test.ts` |
 | 3.4.6 | CSP frame-ancestors | ✅ | `frame-ancestors 'none'` on the API, the pages and the static files | `securityHeaders.test.ts` |
-| 3.5.4 | Separate apps on separate hostnames | ✅ | Frontend and API are separate Cloud Run services with their own hostnames | Deployment |
+| 3.5.4 | Separate apps on separate hostnames | ✅ | Frontend and API are separate Cloud Run services with their own hostnames | Review of the deployment configuration (not yet deployed) |
 | 3.5.5 | postMessage origin and shape checked | ✅ | Extension: `isCaptureMessage()` checks source, origin and shape; the frontend uses no `postMessage` | `extension/test/parse.test.js` |
 | 3.7.1 | Only supported client technology | ✅ | React 19, Next.js 16; no plugins | — |
 | 3.7.2 | Off-site redirects only via allowlist | ✅ | `safeNextPath()`; the API redirects only to `CLIENT_ORIGIN` or Google | Code review |

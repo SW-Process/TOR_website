@@ -49,7 +49,7 @@ Key properties:
 2. **Security headers**: HSTS, nosniff, CSP, `Cache-Control: no-store`; unused methods (TRACE) refused
 3. **CORS**: only `CLIENT_ORIGIN` may read responses
 4. **CSRF guard**: `Origin` / `Sec-Fetch-Site` must be ours
-5. **Rate limit**: sign-in, MFA codes, password reset, reports, chat
+5. **Rate limit**: sign-in, sign-up, MFA codes, password reset, re-authentication, reports, views, chat
 6. **Authentication**: HS256 JWT with issuer, audience and purpose, a live session row, 30-minute idle and 12-hour limits
 7. **Role check**: vendor or admin; admins also need an MFA-verified session
 8. **Re-authentication**: for changes to the account's own e-mail, password, MFA, Google link and sessions
