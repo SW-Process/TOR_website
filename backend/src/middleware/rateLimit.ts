@@ -21,7 +21,7 @@ interface Window {
  * Limits are on everywhere except under Jest, where suites log in hundreds of times.
  * RATE_LIMIT_ENABLED=true|false overrides that (the limiter's own tests turn it on).
  */
-function enabled(): boolean {
+export function rateLimitEnabled(): boolean {
   const flag = process.env.RATE_LIMIT_ENABLED;
   if (flag === "true") return true;
   if (flag === "false") return false;
@@ -44,7 +44,7 @@ export function rateLimit({ windowMs, max, key = clientIp, name = "unnamed" }: R
   let lastSweep = Date.now();
 
   return function rateLimiter(req: Request, res: Response, next: NextFunction): void {
-    if (!enabled()) return next();
+    if (!rateLimitEnabled()) return next();
 
     const now = Date.now();
     // Drop finished windows now and then, so the map can't grow without bound.
