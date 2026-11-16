@@ -32,3 +32,8 @@ next-env.d.ts
 .vercel
 # curl cookie jar from local debugging
 c.txt
+
+# OWASP ZAP scan reports (evidence for the project report, not source code)
+zap*.html
+zap*.json
+zap.yaml
