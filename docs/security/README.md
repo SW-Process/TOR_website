@@ -4,7 +4,7 @@ TOR Checker is secured against the [OWASP Application Security Verification Stan
 
 | ASVS Level 1 | ASVS Level 2 | Level 3 extras | Automated checks |
 | :-: | :-: | :-: | :-: |
-| **62 / 63** applicable met, 1 awaiting an SSL Labs scan | **135 / 140** applicable met | **22** met | 1,250+ backend tests, `npm audit` and an SBOM on every pull request |
+| **62 / 63** applicable met, 1 awaiting an SSL Labs scan | **135 / 140** applicable met | **22** met | 1,250+ backend tests, `npm audit` and an SBOM on every pull request; CodeQL code scanning and secret scanning on GitHub |
 
 ## Documents
 
@@ -46,10 +46,10 @@ Key properties:
 ## Defense in depth: what a request passes through, in order
 
 1. **Request id**: every request gets one, for the logs and the `X-Request-Id` header
-2. **Security headers**: HSTS, nosniff, CSP, `Cache-Control: no-store`; unused methods (TRACE) refused
+2. **Security headers**: HSTS, nosniff, CSP, `X-Frame-Options`, `Referrer-Policy`, `Cross-Origin-Opener-Policy`, `Cache-Control: no-store`; unused methods (TRACE) refused. The frontend sends its own set: a per-page nonce CSP, HSTS, nosniff, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy`
 3. **CORS**: only `CLIENT_ORIGIN` may read responses
 4. **CSRF guard**: `Origin` / `Sec-Fetch-Site` must be ours
-5. **Rate limit**: sign-in, sign-up, MFA codes, password reset, re-authentication, reports, views, chat
+5. **Rate limit**: a global limit of 300 requests per minute per IP on every API route, plus stricter limits on sign-in, sign-up, MFA codes, password reset, re-authentication, reports, views and chat
 6. **Authentication**: HS256 JWT with issuer, audience and purpose, a live session row, 30-minute idle and 12-hour limits
 7. **Role check**: vendor or admin; admins also need an MFA-verified session
 8. **Re-authentication**: for changes to the account's own e-mail, password, MFA, Google link and sessions
@@ -66,7 +66,7 @@ Each layer stops a different attack, so a mistake in one layer is caught by anot
 | Two-step verification | `backend/src/services/mfa.ts`, `backend/src/controllers/mfaController.ts`, `backend/src/utils/totp.ts`, `backend/src/utils/secretBox.ts` |
 | Re-authentication | `backend/src/services/reauth.ts`, `frontend/src/components/ReauthDialog.tsx` |
 | Password policy | `backend/src/utils/passwordPolicy.ts`, `backend/src/config/commonPasswords.ts`, `backend/src/config/contextWords.ts`, `backend/src/utils/breachedPasswords.ts` |
-| Rate limits | `backend/src/middleware/rateLimit.ts`, `backend/src/middleware/rateLimits.ts` |
+| Rate limits | `backend/src/middleware/apiRateLimit.ts` (global), `backend/src/middleware/rateLimit.ts`, `backend/src/middleware/rateLimits.ts` |
 | Security headers, CSP | `backend/src/middleware/securityHeaders.ts`, `frontend/next.config.ts`, `frontend/src/proxy.ts` |
 | CSRF guard | `backend/src/middleware/originCheck.ts` |
 | Security log, admin audit | `backend/src/utils/securityLog.ts`, `backend/src/middleware/requestId.ts`, `backend/src/middleware/auditLog.ts` |
