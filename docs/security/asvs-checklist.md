@@ -230,7 +230,7 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 | 2.3.2 | Business limits enforced | ✅ | 50 saved searches, 1,000 bookmarks / hidden TORs / notes, chat 30 per 5 min, AI calls per run | `businessLimits.test.ts`, `vendorHiddenTors.test.ts` |
 | 2.3.3 | Transactions all-or-nothing | ✅ | Account deletion in one MongoDB transaction (`utils/transaction.ts`) | `accountDeleteTransaction.test.ts` (real replica set, rollback) |
 | 2.3.4 | Locking against double use | ✅ | Job leases, unique indexes, atomic single use of codes and tokens | `mfa.test.ts`, enrichment tests |
-| 2.4.1 | Anti-automation on costly functions | ✅ | Rate limits on sign-in, sign-up, reset, MFA, reports, views, chat; capped AI calls per run | `rateLimit.test.ts`, `businessLimits.test.ts` |
+| 2.4.1 | Anti-automation on costly functions | ✅ | Global limit of 300 requests per minute per IP on every API route (`apiRateLimit.ts`); stricter limits on sign-in, sign-up, reset, MFA, reports, views, chat; capped AI calls per run | `rateLimit.test.ts`, `codeqlFindings.test.ts`, `businessLimits.test.ts` |
 
 ### V3 Web Frontend Security
 
@@ -509,5 +509,5 @@ Of these, 22 are met; the last two rows are listed so they aren't mistaken for o
 
 1. Every Level 1 and Level 2 requirement was read from the official ASVS 5.0.0 release (`OWASP_Application_Security_Verification_Standard_5.0.0_en.flat.json`).
 2. Each one was checked against the code, and marked ✅ only when the code was found and, where possible, an automated test exercises it. Where the evidence is a document, a deployment setting or a manual check, the "Verified by" column says so.
-3. The backend test suite (`cd backend && npm test`, over 1,250 tests) runs on every pull request in GitHub Actions, together with `npm audit` and the SBOM.
-4. SAST (CodeQL/Semgrep) and DAST (OWASP ZAP) results will be attached to the project report as further evidence.
+3. The backend test suite (`cd backend && npm test`, over 1,300 tests) runs on every pull request in GitHub Actions, together with `npm audit` and the SBOM.
+4. SAST (GitHub CodeQL), DAST (OWASP ZAP) and secret scanning (gitleaks, GitHub secret scanning) were run, and their findings triaged and fixed in pull requests #202 and #203; the results are in section 6 of the project report.
