@@ -69,6 +69,30 @@ MONGODB_URI=mongodb://mongo:27017/tor_website
 `JWT_SECRET` is required and has no default. Before the first `docker compose up`,
 create a `.env` file in the project root (it is gitignored):
 
+### Demo data
+
+The first time the stack starts, the `mongo` container loads a snapshot of real
+TORs (with their AI summaries and fairness signals) from
+`seed/mongo-init/tors.archive.gz`, so the search page has data right away. It only
+contains public procurement data, no user accounts. To load the starter help-center
+articles as well:
+
+```sh
+docker compose exec backend npm run seed:help
+```
+
+To reset to the snapshot, run `docker compose down -v` and start again.
+
+To see the vendor pages, sign up at http://localhost:3000. To see the admin pages,
+create an admin (two-step verification is set up on first sign-in):
+
+```sh
+docker compose exec backend npm run create-admin -- admin@example.com '<a strong password>'
+```
+
+Syncing new TORs from e-GP in the admin panel needs the team's Google Cloud access
+(PDF storage and Vertex AI) and is not needed to try the app.
+
 ```sh
 cp .env.example .env
 # then set JWT_SECRET, e.g. the output of:
