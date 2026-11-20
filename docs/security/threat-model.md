@@ -85,7 +85,7 @@ Ordered by priority. Status: ✅ Implemented · 🟡 Partial · ⚪ Accepted ris
 | T16 | T | **Mass assignment and prototype pollution** | Write APIs | 2 | 2 | 4 | **P2** | `.strict()` schemas; `__proto__` refused; `Map` for day notes | 15.3.3, 15.3.6 | ✅ |
 | T17 | T | **Poisoned TOR content / AI prompt injection**: a crafted TOR document makes the AI write a false summary or fairness signal | Ingestion and AI pipeline | 2 | 2 | 4 | **P2** | Prompts tell the model to treat documents as untrusted data; structured response schema; TORs public only after enrichment; fairness signals shown as prompts for review, never verdicts; admins can correct or hide TORs | 1.3, 2.1 | 🟡 AI output can still be wrong; relies on admin review |
 | T18 | R | **Repudiation**: an admin or user denies an action (data edit, session revocation) | Admin actions, auth events | 2 | 2 | 4 | **P2** | Structured security log for auth, session, authz and every admin action (`admin.action`), with user id, request id and UTC time | 16.2, 16.3 | 🟡 Logs go to stdout; tamper-proof retention in Cloud Logging only once deployed |
-| T19 | D | **Resource exhaustion**: request floods, huge bodies, expensive queries | Public API | 2 | 2 | 4 | **P2** | Rate limits on sensitive endpoints; 100 KB body limit; page size capped at 100; business limits per user | 2.3.2, 2.4.1 | 🟡 No global rate limit on every API; counters are per server instance |
+| T19 | D | **Resource exhaustion**: request floods, huge bodies, expensive queries | Public API | 2 | 2 | 4 | **P2** | Global limit of 300 requests per minute per IP in front of every API route (`apiRateLimit.ts`); stricter limits on sensitive endpoints; 100 KB body limit; page size capped at 100; business limits per user | 2.3.2, 2.4.1 | ✅ |
 | T20 | I | **Traffic interception** (no TLS) | Browser ↔ API, API ↔ DB | 1 | 3 | 3 | **P2** | Outbound: TLS with certificate checks (Atlas, Google, e-GP); inbound: HTTPS on Cloud Run with HSTS | 12.2, 12.3 | 🟡 Outbound done; inbound HTTPS applies once deployed |
 | T21 | D | **Malicious lockout**: failing logins on purpose to lock out the real owner | Login | 2 | 2 | 4 | **P2** | No account lockout; limits keyed by IP+email and IP, never by account alone | 6.3.1 | ✅ |
 | T22 | I | **SSRF**: scraped data points our server at internal addresses (cloud metadata) | Ingestion, outbound calls | 1 | 3 | 3 | **P2** | `safeFetch`: HTTPS only, allowlisted hosts, redirects checked hop by hop | 1.3.6, 13.2.4, 15.3.2 | ✅ |
@@ -95,7 +95,7 @@ Ordered by priority. Status: ✅ Implemented · 🟡 Partial · ⚪ Accepted ris
 | T26 | D | **AI cost abuse**: forcing many AI calls | AI pipeline | 1 | 2 | 2 | **P3** | Only admins (with MFA) start runs; `MAX_AI_CALLS_PER_RUN` cap | 15.2.2 | ✅ |
 | T27 | S | **Abuse of the extension exception**: the capture route accepts any `chrome-extension://` origin | `POST /api/ingestion/capture` | 1 | 2 | 2 | **P3** | Still needs an MFA-verified admin session; only 11-digit project codes accepted; at most 100 per send | 3.5.1 | ⚪ Accepted |
 
-**Summary:** 27 threats: 12 P1, 11 P2, 4 P3. Implemented 19, partial 6, accepted 2. Every P1 threat is mitigated (T12 with two documented, unreachable exceptions).
+**Summary:** 27 threats: 12 P1, 11 P2, 4 P3. Implemented 20, partial 5, accepted 2. Every P1 threat is mitigated (T12 with two documented, unreachable exceptions).
 
 ## 4. Implementation order
 
@@ -111,7 +111,7 @@ Mitigations were implemented by priority:
 | --- | --- | --- | --- |
 | T17 | AI may still produce a wrong summary or fairness signal | AI output is shown as a review prompt, never a verdict; admins can correct or hide TORs | Add an admin approval step for fairness signals before they are published |
 | T18, T20 | Log retention and inbound HTTPS depend on the deployment | The configuration is ready ([GCP deployment guide](../deployment/gcp.md)); not deployed yet | Deploy to Cloud Run and verify |
-| T19 | No global API rate limit; counters per instance | Sensitive endpoints are limited; Cloud Run caps instances | Add a shared store (e.g. Redis) and a global limit |
+| T19 | Rate-limit counters are in memory, per server instance: they reset on restart, and with several instances one IP can make up to 300 × (number of instances) requests per minute | Every API route is limited and Cloud Run caps the number of instances | Move the counters to a shared store (e.g. Redis) |
 | T12, T23 | `uuid`, `deepmerge` advisories; old PDF.js in `pdf-parse` | Not reachable / only processes government PDFs in background jobs | Upgrade `@google-cloud/storage` by 2027-01-20; replace `pdf-parse` |
 | T24 | Sign-up reveals that an email is registered | Clear feedback for users; login and reset don't leak | Switch to an "if this email is new, we sent a confirmation" flow |
 | T27 | Any Chrome extension origin accepted on one admin route | Needs an MFA-verified admin session | Pin the published extension's id |
