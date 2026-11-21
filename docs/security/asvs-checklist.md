@@ -17,7 +17,7 @@ Every Level 1 (section 2) and Level 2 (section 4) requirement is listed below wi
 
 - **Level 1: 62 of the 63 applicable requirements met (98%);** the last one (12.1.1, TLS versions) only needs an SSL Labs scan to confirm.
 - **Level 2: 135 of the 140 applicable requirements met (96%).** One is not met (5.4.3, antivirus scanning of e-GP PDFs), three are partly met and one awaits the same SSL Labs scan; all five are listed with their next step in [section 4.18](#418-what-is-not-fully-met).
-- **Level 3:** 22 requirements met as well (section 5).
+- **Level 3:** 21 requirements met as well, plus the per-response nonce part of 3.4.3 (section 5).
 
 Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) · **A01–A10**: OWASP Top 10:2025 category the requirement mitigates.
 
@@ -29,10 +29,10 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 | --- | --- | :-: | --- | --- | :-: |
 | 1.2.1 | Context-aware output encoding for HTML | ✅ | React escapes all text output; no `dangerouslySetInnerHTML` in `frontend/src` | Code search | A05 |
 | 1.2.2 | URLs built safely, no `javascript:` / `data:` | ✅ | `safeHref()` in `frontend/src/components/help/HelpBody.tsx` allows only `/path` and `https://`; `safeNextPath()` in the login page | Manual test | A05 |
-| 1.2.3 | Encoding when building JSON/JS | ✅ | All API responses use `res.json()` | — | A05 |
+| 1.2.3 | Encoding when building JSON/JS | ✅ | All API responses use `res.json()` | Code search (no `res.jsonp` or hand-built JSON) | A05 |
 | 1.2.4 | Parameterized queries / ORM against injection | ✅ | Mongoose queries with Zod-validated values; Express 5 "simple" query parser (no `$` operators from the URL); `escapeRegExp()` for search text | `torRoutes.test.ts` (search, filters) | A05 |
 | 1.2.5 | No OS command injection | ✅ | The application runs no shell commands | Code search (`child_process` not used) | A05 |
-| 1.3.1 | Sanitize HTML from rich-text editors | ✅ | No HTML is accepted; help articles use a plain-text format rendered by React | — | A05 |
+| 1.3.1 | Sanitize HTML from rich-text editors | ✅ | No HTML is accepted; help articles use a plain-text format rendered by React | Code search (no HTML input accepted) | A05 |
 | 1.3.2 | No `eval()` or dynamic code | ✅ | No `eval` / `new Function` in the code | Code search; SAST | A05 |
 | 1.5.1 | XML parsers safe from XXE | ➖ | No XML is parsed anywhere | — | A05 |
 
@@ -40,7 +40,7 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by | Top 10 |
 | --- | --- | :-: | --- | --- | :-: |
-| 2.1.1 | Input validation rules documented | ✅ | [input-validation.md](input-validation.md) | — | A06 |
+| 2.1.1 | Input validation rules documented | ✅ | [input-validation.md](input-validation.md) | Document review (`input-validation.md`) | A06 |
 | 2.2.1 | Positive input validation | ✅ | Zod schemas (e.g. `listQuerySchema` in `torController.ts`, `updateSchema` in `adminTorController.ts`), or explicit type and length checks where there is no schema (`authController.ts`, `vendorProfileController.ts`) | `torRoutes.test.ts`, `vendorProfile.test.ts`, `adminTors.test.ts` | A05 |
 | 2.2.2 | Validation enforced at a trusted service layer | ✅ | All checks run in the Express backend; frontend checks are UX only | API tests call the backend directly | A06 |
 | 2.3.1 | Business flows run in order, steps can't be skipped | ✅ | Password reset needs a valid single-use token; Google sign-in checks the `state` cookie | `passwordReset.test.ts`, `googleOAuth.test.ts` | A06 |
@@ -50,7 +50,7 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 | ID | Requirement | Status | Implementation (evidence) | Verified by | Top 10 |
 | --- | --- | :-: | --- | --- | :-: |
 | 3.2.1 | Responses can't be rendered in the wrong context | ✅ | `X-Content-Type-Options: nosniff` on every response (`backend/src/middleware/securityHeaders.ts`); avatars served with `sandbox` CSP and the type detected from their bytes | `securityHeaders.test.ts`, `avatarUpload.test.ts` | A02 |
-| 3.2.2 | Text shown with safe rendering functions | ✅ | React text rendering | — | A05 |
+| 3.2.2 | Text shown with safe rendering functions | ✅ | React text rendering | Code search (no `dangerouslySetInnerHTML`) | A05 |
 | 3.3.1 | Cookies `Secure` with `__Host-`/`__Secure-` prefix | ✅ | `__Host-token`, `__Host-oauth_state`, `Secure`, `Path=/`, no `Domain` in production (`backend/src/utils/token.ts`) | `token.test.ts` | A02 |
 | 3.4.1 | HSTS of at least 1 year | ✅ | `max-age=31536000; includeSubDomains` on backend and frontend (`frontend/next.config.ts`) | `securityHeaders.test.ts`; browser DevTools | A02 |
 | 3.4.2 | CORS origin fixed or allowlisted, no `*` with credentials | ✅ | `cors({ origin: CLIENT_ORIGIN, credentials: true })` in `backend/src/app.ts` | Manual check | A02 |
@@ -69,16 +69,16 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by | Top 10 |
 | --- | --- | :-: | --- | --- | :-: |
-| 5.2.1 | Upload size limited | ✅ | Avatar ≤ 5 MB (multer in `backend/src/routes/authRoutes.ts`); JSON bodies ≤ 100 KB | — | A06 |
+| 5.2.1 | Upload size limited | ✅ | Avatar ≤ 5 MB (multer in `backend/src/routes/authRoutes.ts`); JSON bodies ≤ 100 KB | `inputHandling.test.ts` (413 for large body); Code review (multer limit) | A06 |
 | 5.2.2 | File content matches its type (magic bytes) | ✅ | `detectImageType()` in `backend/src/utils/imageType.ts` | `imageType.test.ts`, `avatarUpload.test.ts` | A06 |
-| 5.3.1 | Uploaded files never executed | ✅ | Files go to Cloud Storage and are streamed back; never served from a code directory | — | A06 |
+| 5.3.1 | Uploaded files never executed | ✅ | Files go to Cloud Storage and are streamed back; never served from a code directory | Code review | A06 |
 | 5.3.2 | File paths built from trusted data only | ✅ | Storage key is always `avatars/<userId>` | Code review | A01 |
 
 ### V6 Authentication
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by | Top 10 |
 | --- | --- | :-: | --- | --- | :-: |
-| 6.1.1 | Brute-force and lockout defenses documented | ✅ | [authentication-defenses.md](authentication-defenses.md) | — | A07 |
+| 6.1.1 | Brute-force and lockout defenses documented | ✅ | [authentication-defenses.md](authentication-defenses.md) | Document review (`authentication-defenses.md`); `loginRateLimit.test.ts` | A07 |
 | 6.2.1 | Passwords at least 8 characters | ✅ | `MIN_PASSWORD_LENGTH = 8` in `backend/src/utils/passwordPolicy.ts` | `passwordPolicy.test.ts` | A07 |
 | 6.2.2 | Users can change their password | ✅ | `PUT /api/auth/password` | `account.test.ts` | A07 |
 | 6.2.3 | Change needs current and new password | ✅ | `confirmPassword()` in `authController.ts` | `account.test.ts` | A07 |
@@ -90,7 +90,7 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 | 6.3.1 | Brute force and credential stuffing prevented | ✅ | Rate limits (`backend/src/middleware/rateLimits.ts`): login 10 per IP+email and 50 per IP per 15 min | `rateLimit.test.ts`, `loginRateLimit.test.ts` | A07 |
 | 6.3.2 | No default accounts | ✅ | Admins only created by `npm run create-admin` with a chosen email and password | Code review | A07 |
 | 6.4.1 | Generated secrets random, expiring, single use | ✅ | Reset token: 256-bit random, SHA-256 stored, 1 hour, single use | `passwordReset.test.ts` | A07 |
-| 6.4.2 | No password hints or secret questions | ✅ | None exist | — | A07 |
+| 6.4.2 | No password hints or secret questions | ✅ | None exist | Code search | A07 |
 
 ### V7 Session Management
 
@@ -107,7 +107,7 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by | Top 10 |
 | --- | --- | :-: | --- | --- | :-: |
-| 8.1.1 | Authorization rules documented | ✅ | [authorization.md](authorization.md) | — | A01 |
+| 8.1.1 | Authorization rules documented | ✅ | [authorization.md](authorization.md) | Document review (`authorization.md`) | A01 |
 | 8.2.1 | Function-level access restricted | ✅ | `requireAuth` + `requireRole()`; admin and ingestion routers guarded as a whole | `adminTors.test.ts`, `ingestionRoutes.test.ts`, `help.test.ts` | A01 |
 | 8.2.2 | Data-level access restricted (no IDOR) | ✅ | Every owned-data query filters by `req.user.id` | `vendorNotifications.test.ts`, `vendorHiddenTors.test.ts`, `dayNotes.test.ts` | A01 |
 | 8.3.1 | Enforced in a trusted service layer | ✅ | All checks in Express; frontend checks are UX only | API tests | A01 |
@@ -118,7 +118,7 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 | --- | --- | :-: | --- | --- | :-: |
 | 9.1.1 | Token signature verified before use | ✅ | `jwt.verify()` in `backend/src/utils/token.ts` | `token.test.ts` | A08 |
 | 9.1.2 | Algorithm allowlist, never `none` | ✅ | `algorithms: ["HS256"]` | `token.test.ts` (rejects `none` and HS512) | A08 |
-| 9.1.3 | Keys from trusted configuration | ✅ | `JWT_SECRET` from the environment / Secret Manager; no `jku`/`jwk` headers used | — | A08 |
+| 9.1.3 | Keys from trusted configuration | ✅ | `JWT_SECRET` from the environment / Secret Manager; no `jku`/`jwk` headers used | `token.test.ts`; Code review | A08 |
 | 9.2.1 | `exp` / `nbf` checked | ✅ | `exp` = the session's absolute end (≤ 12 h), checked by `jwt.verify()` | `token.test.ts` | A07 |
 
 ### V10 OAuth and OIDC
@@ -147,7 +147,7 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by | Top 10 |
 | --- | --- | :-: | --- | --- | :-: |
-| 13.4.1 | No source control metadata deployed | ✅ | `.git` excluded in `backend/.dockerignore` and `frontend/.dockerignore` | — | A02 |
+| 13.4.1 | No source control metadata deployed | ✅ | `.git` excluded in `backend/.dockerignore` and `frontend/.dockerignore` | Code review (`backend/.dockerignore`, `frontend/.dockerignore`) | A02 |
 
 ### V14 Data Protection
 
@@ -160,7 +160,7 @@ Legend: ✅ met · ⏳ pending a tool run · ➖ not applicable (reason given) �
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by | Top 10 |
 | --- | --- | :-: | --- | --- | :-: |
-| 15.1.1 | Remediation time frames for dependencies documented | ✅ | [dependency-management.md](dependency-management.md) | — | A03 |
+| 15.1.1 | Remediation time frames for dependencies documented | ✅ | [dependency-management.md](dependency-management.md) | Document review (`dependency-management.md`) | A03 |
 | 15.2.1 | No component past its remediation time frame | ✅ | `npm audit --omit=dev` run and recorded on 2026-10-22, 2026-11-02, 2026-11-11 and 2026-11-14: every critical and high finding fixed; on 2026-11-14 the frontend has none and the backend has two unreachable advisories (`uuid` moderate, `deepmerge` low) recorded as exceptions with review dates ([dependency-management.md §6](dependency-management.md#6-current-status)). CI now fails on any new high or critical finding | `npm audit` in CI | A03 |
 | 15.3.1 | Only required fields returned | ✅ | Mongoose projections and `toJSON` transforms (no `passwordHash`, tokens or storage keys) | `sessions.test.ts`, `torProcurementExposure.test.ts` | A01 |
 
@@ -224,8 +224,8 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by |
 | --- | --- | :-: | --- | --- |
-| 2.1.2 | Combined-data consistency documented | ✅ | [business-logic.md §1](business-logic.md) | — |
-| 2.1.3 | Business limits documented | ✅ | [business-logic.md §2–3](business-logic.md) | — |
+| 2.1.2 | Combined-data consistency documented | ✅ | [business-logic.md §1](business-logic.md) | Document review (`business-logic.md`) |
+| 2.1.3 | Business limits documented | ✅ | [business-logic.md §2–3](business-logic.md) | Document review (`business-logic.md`); `businessLimits.test.ts` |
 | 2.2.3 | Related fields consistent | ✅ | Budget and date ranges, saved filters re-validated, real calendar days | `businessLimits.test.ts`, `dayNotes.test.ts`, `torRoutes.test.ts` |
 | 2.3.2 | Business limits enforced | ✅ | 50 saved searches, 1,000 bookmarks / hidden TORs / notes, chat 30 per 5 min, AI calls per run | `businessLimits.test.ts`, `vendorHiddenTors.test.ts` |
 | 2.3.3 | Transactions all-or-nothing | ✅ | Account deletion in one MongoDB transaction (`utils/transaction.ts`) | `accountDeleteTransaction.test.ts` (real replica set, rollback) |
@@ -245,7 +245,7 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 | 3.4.6 | CSP frame-ancestors | ✅ | `frame-ancestors 'none'` on the API, the pages and the static files | `securityHeaders.test.ts` |
 | 3.5.4 | Separate apps on separate hostnames | ✅ | Frontend and API are separate Cloud Run services with their own hostnames | Review of the deployment configuration (not yet deployed) |
 | 3.5.5 | postMessage origin and shape checked | ✅ | Extension: `isCaptureMessage()` checks source, origin and shape; the frontend uses no `postMessage` | `extension/test/parse.test.js` |
-| 3.7.1 | Only supported client technology | ✅ | React 19, Next.js 16; no plugins | — |
+| 3.7.1 | Only supported client technology | ✅ | React 19, Next.js 16; no plugins | Code review (`package.json` versions) |
 | 3.7.2 | Off-site redirects only via allowlist | ✅ | `safeNextPath()`; the API redirects only to `CLIENT_ORIGIN` or Google | Code review |
 
 ### V4 API and Web Service
@@ -265,7 +265,7 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by |
 | --- | --- | :-: | --- | --- |
-| 5.1.1 | Upload types, sizes, handling documented | ✅ | [file-handling.md](file-handling.md) | — |
+| 5.1.1 | Upload types, sizes, handling documented | ✅ | [file-handling.md](file-handling.md) | Document review (`file-handling.md`) |
 | 5.2.3 | Archive size and file count checked before unpacking | ✅ | 500 files, 200 MB unpacked, 50 MB per entry (`torFromBundle.ts`) | `torFromBundle.test.ts` (zip bomb) |
 | 5.4.1 | Server chooses the download name | ✅ | `Content-Disposition` set by the server for PDFs and avatars | `torDocument.test.ts` |
 | 5.4.2 | Served file names encoded (RFC 6266) | ✅ | `utils/contentDisposition.ts`: ASCII fallback + `filename*` | `contentDisposition.test.ts` |
@@ -275,10 +275,10 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by |
 | --- | --- | :-: | --- | --- |
-| 6.1.2 | Context-specific words documented | ✅ | [authentication-defenses.md §5.2](authentication-defenses.md), `config/contextWords.ts` | — |
-| 6.1.3 | All authentication pathways documented | ✅ | [authentication-defenses.md §8](authentication-defenses.md) | — |
+| 6.1.2 | Context-specific words documented | ✅ | [authentication-defenses.md §5.2](authentication-defenses.md), `config/contextWords.ts` | Document review (`authentication-defenses.md`); `passwordPolicy.test.ts` |
+| 6.1.3 | All authentication pathways documented | ✅ | [authentication-defenses.md §8](authentication-defenses.md) | Document review (`authentication-defenses.md` §8) |
 | 6.2.9 | Passwords of 64+ characters allowed | ✅ | Up to 128 characters; HMAC-SHA256 pre-hash before bcrypt | `passwordPolicy.test.ts`, `passwordPolicyRoutes.test.ts` (64 Thai characters) |
-| 6.2.10 | No forced periodic rotation | ✅ | No expiry on passwords | — |
+| 6.2.10 | No forced periodic rotation | ✅ | No expiry on passwords | Code search (no password expiry) |
 | 6.2.11 | Context words refused | ✅ | `passwordPolicy.ts` (padding and digit swaps handled; own e-mail/name refused) | `passwordPolicy.test.ts`, `passwordPolicyRoutes.test.ts` |
 | 6.2.12 | Breached passwords refused | ✅ | Pwned Passwords k-anonymity check (`utils/breachedPasswords.ts`) | `passwordPolicy.test.ts` |
 | 6.3.3 | Multi-factor authentication | ✅ | TOTP + recovery codes; **required for admins**; optional for vendors under the documented relaxation of [authentication-defenses.md §9.3](authentication-defenses.md) | `mfa.test.ts` |
@@ -288,7 +288,7 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 | 6.5.1 | Codes usable once | ✅ | Last TOTP step stored; recovery codes and pending sign-ins used up atomically | `mfa.test.ts` |
 | 6.5.2 | Low-entropy lookup secrets hashed with salt | ✅ | Recovery codes (50 bits) bcrypt-hashed, cost 10 | `mfa.test.ts` |
 | 6.5.3 | Seeds and codes from a CSPRNG | ✅ | `randomBytes` for TOTP seeds and recovery codes | Code review |
-| 6.5.4 | ≥ 20 bits of entropy | ✅ | 6-digit TOTP, 50-bit recovery codes | — |
+| 6.5.4 | ≥ 20 bits of entropy | ✅ | 6-digit TOTP, 50-bit recovery codes | `mfa.test.ts`, `totp.test.ts` |
 | 6.5.5 | TOTP lifetime ≤ 30 s | ✅ | Only the current 30-second step is accepted | `totp.test.ts` |
 | 6.6.1 | SMS/phone OTP | ➖ | No phone or SMS authentication | — |
 | 6.6.2 | Out-of-band codes bound to the request | ➖ | No out-of-band authenticators (the MFA-pending step is bound to its sign-in anyway) | — |
@@ -296,15 +296,15 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 | 6.8.1 | No identity spoofing across IdPs | ✅ | Google users matched by `sub`; e-mail linking only when Google verified the e-mail | `googleOAuth.test.ts` |
 | 6.8.2 | Assertion signatures checked | ✅ | `verifyIdToken()` | `google.test.ts` |
 | 6.8.3 | SAML replay | ➖ | No SAML | — |
-| 6.8.4 | IdP authentication strength | ✅ | No `acr`/`amr` from Google: treated as single-factor; our TOTP required where needed ([§8.3](authentication-defenses.md)) | — |
+| 6.8.4 | IdP authentication strength | ✅ | No `acr`/`amr` from Google: treated as single-factor; our TOTP required where needed ([§8.3](authentication-defenses.md)) | Code review; `mfa.test.ts` |
 
 ### V7 Session Management
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by |
 | --- | --- | :-: | --- | --- |
-| 7.1.1 | Timeouts documented with NIST justification | ✅ | [session-management.md §2](session-management.md) | — |
-| 7.1.2 | Concurrent sessions documented | ✅ | [session-management.md §3](session-management.md) | — |
-| 7.1.3 | Federated sessions documented | ✅ | [session-management.md §6](session-management.md) | — |
+| 7.1.1 | Timeouts documented with NIST justification | ✅ | [session-management.md §2](session-management.md) | Document review (`session-management.md`) |
+| 7.1.2 | Concurrent sessions documented | ✅ | [session-management.md §3](session-management.md) | Document review (`session-management.md`); `sessions.test.ts` |
+| 7.1.3 | Federated sessions documented | ✅ | [session-management.md §6](session-management.md) | Document review (`session-management.md`) |
 | 7.3.1 | Inactivity timeout | ✅ | 30 minutes; background polling doesn't count | `sessions.test.ts` |
 | 7.3.2 | Absolute session lifetime | ✅ | 12 hours, never extended | `sessions.test.ts`, `token.test.ts` |
 | 7.4.3 | Offer to end other sessions after a factor change | ✅ | Automatic on password change/reset; offered after MFA set-up | `sessions.test.ts` |
@@ -312,14 +312,14 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 | 7.4.5 | Admins can end one user's or all sessions | ✅ | *Admin → ความปลอดภัย*, `/api/admin/users/:id/sessions/revoke`, `/api/admin/sessions/revoke-all` | `adminSessions.test.ts` |
 | 7.5.1 | Re-authentication before changing auth attributes | ✅ | `requireRecentAuth()` on e-mail, password, MFA, Google link/unlink | `reauth.test.ts`, `mfa.test.ts` |
 | 7.5.2 | View and end sessions after re-authenticating | ✅ | Session list; ending another device needs re-authentication | `reauth.test.ts` |
-| 7.6.1 | RP/IdP session lifetimes as documented | ✅ | Our session is independent of Google's ([session-management.md §6](session-management.md)) | — |
+| 7.6.1 | RP/IdP session lifetimes as documented | ✅ | Our session is independent of Google's ([session-management.md §6](session-management.md)) | Document review (`session-management.md`); Code review |
 | 7.6.2 | No session without user action | ✅ | Sessions only from the login form or the Google button, with state/PKCE/nonce | `googleOAuth.test.ts` |
 
 ### V8 Authorization
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by |
 | --- | --- | :-: | --- | --- |
-| 8.1.2 | Field-level rules documented | ✅ | [authorization.md §4.3](authorization.md) | — |
+| 8.1.2 | Field-level rules documented | ✅ | [authorization.md §4.3](authorization.md) | Document review (`authorization.md`) |
 | 8.2.3 | Field-level access enforced (BOPLA) | ✅ | Strict schemas for writes; `select: false`, projections and `toJSON` for reads | `torProcurementExposure.test.ts`, `mfa.test.ts` |
 | 8.4.1 | Cross-tenant controls | ➖ | Not multi-tenant; each vendor's data is isolated by the ownership rules of 8.2.2 | — |
 
@@ -364,14 +364,14 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by |
 | --- | --- | :-: | --- | --- |
-| 11.1.1 | Key management policy | ✅ | [cryptography.md §1](cryptography.md) | — |
-| 11.1.2 | Cryptographic inventory | ✅ | [cryptography.md §2](cryptography.md) | — |
-| 11.2.1 | Industry-validated implementations | ✅ | Node.js `crypto` (OpenSSL), `bcrypt`, `jsonwebtoken`, Google libraries | — |
+| 11.1.1 | Key management policy | ✅ | [cryptography.md §1](cryptography.md) | Document review (`cryptography.md`) |
+| 11.1.2 | Cryptographic inventory | ✅ | [cryptography.md §2](cryptography.md) | Document review (`cryptography.md`) |
+| 11.2.1 | Industry-validated implementations | ✅ | Node.js `crypto` (OpenSSL), `bcrypt`, `jsonwebtoken`, Google libraries | Code review (`package.json`) |
 | 11.2.2 | Crypto agility | ✅ | Versioned hashes (`v2$`) and sealed values (`v1:`); re-hash at sign-in ([cryptography.md §3](cryptography.md)) | `passwordPolicyRoutes.test.ts` |
-| 11.2.3 | ≥ 128-bit security | ✅ | AES-256, HMAC-SHA256 with 256-bit keys, 160-bit TOTP seeds | — |
+| 11.2.3 | ≥ 128-bit security | ✅ | AES-256, HMAC-SHA256 with 256-bit keys, 160-bit TOTP seeds | Code review |
 | 11.3.3 | Encrypted data authenticated | ✅ | AES-256-GCM with associated data | `totp.test.ts` (tampering detected) |
 | 11.4.2 | Slow password hashing | ✅ | bcrypt cost 12 (over an HMAC-SHA256 pre-hash) | `passwordPolicyRoutes.test.ts` |
-| 11.4.3 | Collision-resistant hashes for integrity | ✅ | SHA-256 for file integrity, token hashes and PKCE | — |
+| 11.4.3 | Collision-resistant hashes for integrity | ✅ | SHA-256 for file integrity, token hashes and PKCE | Code search |
 | 11.4.4 | Key derivation from passwords | ➖ | No keys are derived from passwords | — |
 | 11.5.1 | CSPRNG with ≥ 128 bits | ✅ | `randomBytes`/`getRandomValues`; tokens 256 bits, CSP nonce and ids 128 bits | Code review |
 | 11.6.1 | Approved algorithms for keys and signatures | ✅ | HS256 with a 256-bit random key; RS256 ID tokens verified by Google's library | `token.test.ts` |
@@ -391,25 +391,25 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by |
 | --- | --- | :-: | --- | --- |
-| 13.1.1 | Communication needs documented | ✅ | [communications.md](communications.md) | — |
+| 13.1.1 | Communication needs documented | ✅ | [communications.md](communications.md) | Document review (`communications.md`) |
 | 13.2.1 | Backend services authenticated without static credentials | ⚠️ | Google services use short-lived service-account tokens; MongoDB Atlas and SendGrid still use long-lived secrets (in Secret Manager, least privilege) | — |
 | 13.2.2 | Least privilege between components | ✅ | Separate service accounts for the API and the jobs; frontend has no database access | Deployment |
 | 13.2.3 | No default credentials | ✅ | No default admin; the server refuses weak or missing `JWT_SECRET`, and a missing `MFA_ENCRYPTION_KEY` in production | Code review |
 | 13.2.4 | Outbound allowlist | ✅ | `utils/outbound.ts`, [communications.md §3](communications.md) | `outbound.test.ts` |
 | 13.2.5 | Server allowlist for requests and loads | ✅ | Same allowlist at the application layer (Cloud Run has no egress firewall without a VPC) | `outbound.test.ts` |
-| 13.3.1 | Secrets management | ✅ | Secret Manager in production; nothing in code or images | — |
+| 13.3.1 | Secrets management | ✅ | Secret Manager in production; nothing in code or images | Code search (no secrets in code) |
 | 13.3.2 | Least privilege on secrets | ✅ | Per-secret `secretAccessor` bindings for the runtime service accounts only | Deployment ([gcp.md](../deployment/gcp.md)) |
-| 13.4.2 | Debug modes off in production | ✅ | `NODE_ENV=production`; Next.js production build; no debug routes | — |
-| 13.4.3 | No directory listings | ✅ | Express serves no static folders; Next.js serves only its build output | — |
+| 13.4.2 | Debug modes off in production | ✅ | `NODE_ENV=production`; Next.js production build; no debug routes | Code review (`backend/Dockerfile` `prod-deps` and `runner` stages) |
+| 13.4.3 | No directory listings | ✅ | Express serves no static folders; Next.js serves only its build output | Code review |
 | 13.4.4 | TRACE not supported | ✅ | Methods outside an allowlist answer `405` | `securityHeaders.test.ts` |
-| 13.4.5 | No exposed docs or monitoring endpoints | ✅ | No API docs, metrics or admin consoles exposed; `/api/health` returns only `ok` | — |
+| 13.4.5 | No exposed docs or monitoring endpoints | ✅ | No API docs, metrics or admin consoles exposed; `/api/health` returns only `ok` | Code search |
 
 ### V14 Data Protection
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by |
 | --- | --- | :-: | --- | --- |
-| 14.1.1 | Sensitive data classified | ✅ | [data-protection.md §2](data-protection.md) | — |
-| 14.1.2 | Protection requirements per level | ✅ | [data-protection.md §3](data-protection.md) | — |
+| 14.1.1 | Sensitive data classified | ✅ | [data-protection.md §2](data-protection.md) | Document review (`data-protection.md`) |
+| 14.1.2 | Protection requirements per level | ✅ | [data-protection.md §3](data-protection.md) | Document review (`data-protection.md`) |
 | 14.2.2 | Not cached in server components | ✅ | `Cache-Control: no-store` on the API, `private, no-store` on pages; no server-side caches | `securityHeaders.test.ts` |
 | 14.2.3 | No data to untrusted parties | ✅ | No trackers or analytics; CSP would block them | Code search |
 | 14.2.4 | Protection implemented as documented | ✅ | [data-protection.md §4](data-protection.md) | Tests listed there |
@@ -421,7 +421,7 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 | ID | Requirement | Status | Implementation (evidence) | Verified by |
 | --- | --- | :-: | --- | --- |
 | 15.1.2 | SBOM from trusted repositories | ✅ | CycloneDX SBOM per app in CI (`npm sbom`); npm registry with lock-file integrity | CI artifacts `sbom-backend`, `sbom-frontend` |
-| 15.1.3 | Costly functions documented | ✅ | [business-logic.md §4](business-logic.md) | — |
+| 15.1.3 | Costly functions documented | ✅ | [business-logic.md §4](business-logic.md) | Document review (`business-logic.md` §4) |
 | 15.2.2 | Availability defenses implemented | ✅ | Separate jobs, queues with leases, per-run caps, timeouts, background runs | Ingestion and enrichment tests |
 | 15.2.3 | No extraneous functionality in production | ✅ | Images built without dev dependencies or tests (`npm prune --omit=dev`, Next.js standalone, `NODE_ENV=production`); no sample or debug routes | `backend/Dockerfile`, `frontend/Dockerfile` |
 | 15.3.2 | External redirects not followed | ✅ | `redirect: "manual"`, followed only within the allowlist | `outbound.test.ts` |
@@ -435,10 +435,10 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 
 | ID | Requirement | Status | Implementation (evidence) | Verified by |
 | --- | --- | :-: | --- | --- |
-| 16.1.1 | Log inventory | ✅ | [logging.md §1](logging.md) | — |
+| 16.1.1 | Log inventory | ✅ | [logging.md §1](logging.md) | Document review (`logging.md`) |
 | 16.2.1 | When, where, who, what in every entry | ✅ | `utils/securityLog.ts` + request id | `securityLog.test.ts`, `securityEvents.test.ts` |
 | 16.2.2 | UTC timestamps, synced clocks | ✅ | ISO 8601 UTC; Google-synced clocks | `securityLog.test.ts` |
-| 16.2.3 | Logs only to documented sinks | ✅ | stdout → Cloud Logging, and `systemlogs` | — |
+| 16.2.3 | Logs only to documented sinks | ✅ | stdout → Cloud Logging, and `systemlogs` | `securityLog.test.ts`; Document review (`logging.md`) |
 | 16.2.4 | Common, machine-readable format | ✅ | JSON lines with Cloud Logging `severity` | `securityLog.test.ts` |
 | 16.2.5 | Sensitive data in logs per protection level | ✅ | No secrets; e-mails masked; no bodies | `securityEvents.test.ts` |
 | 16.3.1 | All authentication operations logged | ✅ | `auth.*`, `session.*` events, success and failure | `securityEvents.test.ts` |
@@ -447,7 +447,7 @@ Every one of the 183 Level 2 requirements of ASVS 5.0, with its status.
 | 16.3.4 | Unexpected errors and control failures logged | ✅ | `error.unexpected`, `email.send`, `dependency.unavailable`, pipeline `systemlogs` | `errorHandler.test.ts` |
 | 16.4.1 | Log injection prevented | ✅ | One `JSON.stringify` per entry | `securityLog.test.ts` |
 | 16.4.2 | Logs protected from access and modification | ⚠️ | Cloud Logging entries can't be edited and reads need IAM; the log bucket still has to be locked at deployment to prevent early deletion ([logging.md §7](logging.md)) | Deployment step |
-| 16.4.3 | Logs sent to a separate system | ✅ | Cloud Logging, outside the container | — |
+| 16.4.3 | Logs sent to a separate system | ✅ | Cloud Logging, outside the container | Document review (`logging.md`) |
 | 16.5.1 | Generic error messages | ✅ | `errorHandler.ts` | `errorHandler.test.ts` |
 | 16.5.2 | Graceful degradation when dependencies fail | ✅ | Timeouts, retries, per-TOR isolation, fail-open breach check, queued retries | Ingestion tests, `passwordPolicy.test.ts` |
 | 16.5.3 | Fail securely | ✅ | Validation stops writes; transactions roll back; undecryptable seed = wrong code | `accountDeleteTransaction.test.ts`, `mfa.test.ts` |
