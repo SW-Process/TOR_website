@@ -85,6 +85,10 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+      # Demo data: on first start (empty mongo_data volume) mongo runs
+      # seed/mongo-init/10-restore-tors.sh, which loads a snapshot of real TORs
+      # from tors.archive.gz. It never runs again unless you `docker compose down -v`.
+      - ./seed/mongo-init:/docker-entrypoint-initdb.d:ro
 
 volumes:
   frontend_node_modules:
