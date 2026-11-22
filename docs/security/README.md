@@ -4,7 +4,7 @@ TOR Checker is secured against the [OWASP Application Security Verification Stan
 
 | ASVS Level 1 | ASVS Level 2 | Level 3 extras | Automated checks |
 | :-: | :-: | :-: | :-: |
-| **62 / 63** applicable met, 1 awaiting an SSL Labs scan | **135 / 140** applicable met | **22** met | 1,250+ backend tests, `npm audit` and an SBOM on every pull request; CodeQL code scanning and secret scanning on GitHub |
+| **62 / 63** applicable met, 1 awaiting an SSL Labs scan | **135 / 140** applicable met | **21** met | 1,300+ backend tests, `npm audit` and an SBOM on every pull request; CodeQL code scanning and secret scanning on GitHub |
 
 ## Documents
 
@@ -49,7 +49,7 @@ Key properties:
 2. **Security headers**: HSTS, nosniff, CSP, `X-Frame-Options`, `Referrer-Policy`, `Cross-Origin-Opener-Policy`, `Cache-Control: no-store`; unused methods (TRACE) refused. The frontend sends its own set: a per-page nonce CSP, HSTS, nosniff, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy`
 3. **CORS**: only `CLIENT_ORIGIN` may read responses
 4. **CSRF guard**: `Origin` / `Sec-Fetch-Site` must be ours
-5. **Rate limit**: a global limit of 300 requests per minute per IP on every API route, plus stricter limits on sign-in, sign-up, MFA codes, password reset, re-authentication, reports, views and chat
+5. **Rate limit**: a global limit of 300 requests per minute per IP on every API route (applied first, right after the request id, so a flood is cut off before any other work), plus stricter limits on sign-in, sign-up, MFA codes, password reset, re-authentication, reports, views and chat
 6. **Authentication**: HS256 JWT with issuer, audience and purpose, a live session row, 30-minute idle and 12-hour limits
 7. **Role check**: vendor or admin; admins also need an MFA-verified session
 8. **Re-authentication**: for changes to the account's own e-mail, password, MFA, Google link and sessions
